@@ -23,11 +23,26 @@ Plan → 빌드 → Commit → 검증 1단계 → 검증 2단계 (병렬) → Pu
 
 ## 설치
 
+### Linux / macOS
+
 ```bash
-git clone <repository-url>
+git clone https://github.com/ultivis-iot/claude-code-setup.git
 cd claude-code-setup
 ./setup.sh
 ```
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/ultivis-iot/claude-code-setup.git
+cd claude-code-setup
+.\setup.ps1
+```
+
+> **참고**: Windows에서 스크립트 실행이 차단되면 다음 명령을 먼저 실행하세요:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
 
 ## 설치되는 파일
 
