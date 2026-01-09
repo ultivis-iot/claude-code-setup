@@ -1,7 +1,13 @@
-# Claude Code 개발 플로우 설치 스크립트 (Windows PowerShell)
+﻿# Claude Code 개발 플로우 설치 스크립트 (Windows PowerShell)
 # 사용법: .\setup.ps1
 
 $ErrorActionPreference = "Stop"
+
+# UTF-8 코드 페이지 설정 (한글 깨짐 방지)
+chcp 65001 > $null
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::InputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
@@ -23,17 +29,17 @@ $Marker = "# === Claude Code 개발 플로우 설정 ==="
 $SourceClaudeMd = Join-Path $ScriptDir "CLAUDE.md"
 
 if (Test-Path $ClaudeMdPath) {
-    $Content = Get-Content $ClaudeMdPath -Raw -ErrorAction SilentlyContinue
+    $Content = Get-Content $ClaudeMdPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
     if ($Content -and $Content.Contains($Marker)) {
         Write-Host "   이미 설치된 설정 발견. 건너뜀" -ForegroundColor Yellow
     } else {
-        Add-Content -Path $ClaudeMdPath -Value "`n$Marker"
-        Get-Content $SourceClaudeMd | Add-Content -Path $ClaudeMdPath
+        Add-Content -Path $ClaudeMdPath -Value "`n$Marker" -Encoding UTF8
+        Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
         Write-Host "   CLAUDE.md에 설정 추가 완료" -ForegroundColor Green
     }
 } else {
-    Set-Content -Path $ClaudeMdPath -Value $Marker
-    Get-Content $SourceClaudeMd | Add-Content -Path $ClaudeMdPath
+    Set-Content -Path $ClaudeMdPath -Value $Marker -Encoding UTF8
+    Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
     Write-Host "   CLAUDE.md 생성 완료" -ForegroundColor Green
 }
 
