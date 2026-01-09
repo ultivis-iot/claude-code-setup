@@ -37,9 +37,11 @@ model: haiku
 
 ## 검증 절차
 
-1. `git diff HEAD~1`로 변경된 파일 확인
+1. 기준 브랜치 대비 변경된 파일 확인: `git diff <base_branch>...HEAD --name-only`
 2. 변경된 코드 파일과 관련 문서 파일 비교
 3. 문서 업데이트 필요 여부 판단
+
+**참고**: `<base_branch>`는 main, master, dev 중 존재하는 브랜치
 
 ## 결과 형식
 

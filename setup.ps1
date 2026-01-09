@@ -65,8 +65,20 @@ if (Test-Path $AgentsSource) {
     }
 }
 
+# Schemas 설치
+Write-Host "5. Schemas 설치..."
+$SchemasSource = Join-Path $ScriptDir "schemas"
+$SchemasDest = Join-Path $ClaudeDir "schemas"
+if (Test-Path $SchemasSource) {
+    New-Item -ItemType Directory -Force -Path $SchemasDest | Out-Null
+    Get-ChildItem -Path $SchemasSource -Filter "*.json" | ForEach-Object {
+        Copy-Item $_.FullName -Destination $SchemasDest -Force
+        Write-Host "   $($_.Name)" -ForegroundColor Green
+    }
+}
+
 # Plugins 설치
-Write-Host "5. Plugins 설치..."
+Write-Host "6. Plugins 설치..."
 $PluginsSource = Join-Path $ScriptDir "plugins"
 $PluginsDest = Join-Path $ClaudeDir "plugins"
 if (Test-Path $PluginsSource) {
@@ -91,6 +103,7 @@ Write-Host "  ~/.claude/agents/intent-validator.md"
 Write-Host "  ~/.claude/agents/doc-validator.md"
 Write-Host "  ~/.claude/agents/security-validator.md"
 Write-Host "  ~/.claude/agents/code-simplifier.md"
+Write-Host "  ~/.claude/schemas/validation-status.schema.json"
 Write-Host "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
 Write-Host ""
 Write-Host "사용 방법:"

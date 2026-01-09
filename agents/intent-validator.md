@@ -25,9 +25,10 @@ Plan 문서와 실제 구현을 비교하여 의도 충족 여부를 검증합�
    - 의도(Intent) 섹션 파악
    - 검증 기준(Verification) 항목 확인
 
-2. **최근 변경사항 확인**
-   - `git diff HEAD~1` 또는 `git diff --staged`로 변경 내용 파악
-   - 변경된 파일 목록 확인
+2. **브랜치 변경사항 확인**
+   - 기준 브랜치(main/master/dev) 대비 전체 변경: `git diff <base_branch>...HEAD`
+   - 브랜치의 모든 커밋: `git log <base_branch>..HEAD --oneline`
+   - 변경된 파일 목록: `git diff <base_branch>...HEAD --name-only`
 
 3. **의도 대비 구현 비교**
    - Plan의 의도(Intent)가 코드에 반영되었는지 확인

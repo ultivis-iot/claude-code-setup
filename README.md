@@ -57,6 +57,8 @@ cd claude-code-setup
 │   ├── doc-validator.md        # 검증 2단계: 문서 검증
 │   ├── security-validator.md   # 검증 2단계: 보안 검증
 │   └── code-simplifier.md      # 검증 2단계: 코드 단순화
+├── schemas/
+│   └── validation-status.schema.json  # 검증 결과 표준 스키마
 └── plugins/
     └── security-guidance/      # 실시간 보안 검사 Hook
 ```

@@ -63,8 +63,21 @@ for file in "$SCRIPT_DIR/agents"/*.md; do
     fi
 done
 
+# Schemas 설치
+echo "5. Schemas 설치..."
+if [ -d "$SCRIPT_DIR/schemas" ]; then
+    mkdir -p "$CLAUDE_DIR/schemas"
+    for file in "$SCRIPT_DIR/schemas"/*.json; do
+        if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            cp "$file" "$CLAUDE_DIR/schemas/$filename"
+            echo -e "${GREEN}   ✓ $filename${NC}"
+        fi
+    done
+fi
+
 # Plugins 설치
-echo "5. Plugins 설치..."
+echo "6. Plugins 설치..."
 if [ -d "$SCRIPT_DIR/plugins" ]; then
     mkdir -p "$CLAUDE_DIR/plugins"
     for plugin_dir in "$SCRIPT_DIR/plugins"/*/; do
@@ -91,6 +104,7 @@ echo "  ~/.claude/agents/intent-validator.md"
 echo "  ~/.claude/agents/doc-validator.md"
 echo "  ~/.claude/agents/security-validator.md"
 echo "  ~/.claude/agents/code-simplifier.md"
+echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
 echo ""
 echo "사용 방법:"

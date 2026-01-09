@@ -33,9 +33,12 @@ argument-hint: [directory] [commit-message]
 - 해당 디렉토리의 Git 상태 확인
 
 **확인할 항목**:
+- 현재 브랜치: `git -C <directory> branch --show-current`
+- 기준 브랜치 확인: main, master, dev 중 존재하는 브랜치
 - Git 상태: `git -C <directory> status`
-- 변경 내용: `git -C <directory> diff --staged`
-- 최근 커밋: `git -C <directory> log --oneline -5`
+- 브랜치 전체 커밋: `git -C <directory> log <base_branch>..HEAD --oneline`
+- 브랜치 전체 변경: `git -C <directory> diff <base_branch>...HEAD`
+- staged 변경 내용: `git -C <directory> diff --staged`
 
 ## Plan 문서 참조
 
@@ -71,31 +74,32 @@ argument-hint: [directory] [commit-message]
 
 ## validation-status.json 형식 (필수)
 
-검증 완료 후 **반드시** 다음 형식으로 파일을 생성해야 합니다:
+검증 완료 후 **반드시** 표준 스키마에 따라 파일을 생성해야 합니다.
 
-```json
-{
-  "timestamp": "2024-01-15T10:30:00Z",
-  "commit": "abc1234",
-  "results": {
-    "intent-validator": "PASS",
-    "doc-validator": "PASS",
-    "security-validator": "WARN",
-    "code-simplifier": "PASS"
-  },
-  "overall": "PASS",
-  "warnings": ["보안: 위험 패턴 감지"],
-  "errors": []
-}
+**스키마 참조**: `schemas/validation-status.schema.json`
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `timestamp` | string (ISO 8601) | O | 검증 완료 시간 |
+| `branch` | string | O | 현재 브랜치명 |
+| `base_branch` | string | O | 기준 브랜치명 (main, master, dev 등) |
+| `commits` | array | O | 브랜치의 커밋 목록 |
+| `commits[].hash` | string | O | 커밋 해시 (7-40자) |
+| `commits[].message` | string | O | 커밋 메시지 |
+| `results` | object | O | 각 validator별 결과 |
+| `results.intent-validator` | "PASS" \| "WARN" \| "FAIL" | O | 의도 검증 결과 |
+| `results.doc-validator` | "PASS" \| "WARN" \| "FAIL" | O | 문서 검증 결과 |
+| `results.security-validator` | "PASS" \| "WARN" \| "FAIL" | O | 보안 검증 결과 |
+| `results.code-simplifier` | "PASS" \| "WARN" \| "FAIL" | O | 코드 품질 검증 결과 |
+| `overall` | "PASS" \| "WARN" \| "FAIL" | O | 전체 검증 결과 |
+| `warnings` | string[] | O | 경고 메시지 배열 |
+| `errors` | string[] | O | 에러 메시지 배열 |
+
+**커밋 목록 수집 방법**:
+```bash
+# base_branch 이후의 모든 커밋 조회
+git log <base_branch>..HEAD --oneline
 ```
-
-**필드 설명**:
-- `timestamp`: ISO 8601 형식의 검증 완료 시간
-- `commit`: 검증된 커밋 해시 (short)
-- `results`: 각 validator의 개별 결과
-- `overall`: 전체 결과 (FAIL이 하나라도 있으면 FAIL)
-- `warnings`: 경고 메시지 배열
-- `errors`: 에러 메시지 배열
 
 **overall 판정 기준**:
 - `PASS`: 모든 검증 통과

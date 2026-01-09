@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "validation-status.schema.json",
+  "title": "Validation Status",
+  "description": "commit-and-verify 검증 결과 표준 스키마",
+  "type": "object",
+  "required": ["timestamp", "branch", "base_branch", "commits", "results", "overall", "warnings", "errors"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "검증 완료 시간 (ISO 8601)"
+    },
+    "branch": {
+      "type": "string",
+      "description": "현재 브랜치명"
+    },
+    "base_branch": {
+      "type": "string",
+      "description": "기준 브랜치명 (main, master, dev 등)"
+    },
+    "commits": {
+      "type": "array",
+      "description": "브랜치의 커밋 목록 (base_branch 이후)",
+      "items": {
+        "type": "object",
+        "required": ["hash", "message"],
+        "properties": {
+          "hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{7,40}$",
+            "description": "커밋 해시"
+          },
+          "message": {
+            "type": "string",
+            "description": "커밋 메시지"
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "description": "각 validator별 결과",
+      "required": ["intent-validator", "doc-validator", "security-validator", "code-simplifier"],
+      "properties": {
+        "intent-validator": {
+          "$ref": "#/$defs/validationResult"
+        },
+        "doc-validator": {
+          "$ref": "#/$defs/validationResult"
+        },
+        "security-validator": {
+          "$ref": "#/$defs/validationResult"
+        },
+        "code-simplifier": {
+          "$ref": "#/$defs/validationResult"
+        }
+      }
+    },
+    "overall": {
+      "$ref": "#/$defs/validationResult",
+      "description": "전체 검증 결과"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "경고 메시지 목록"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "에러 메시지 목록"
+    }
+  },
+  "$defs": {
+    "validationResult": {
+      "type": "string",
+      "enum": ["PASS", "WARN", "FAIL"],
+      "description": "검증 결과 상태"
+    }
+  }
+}
