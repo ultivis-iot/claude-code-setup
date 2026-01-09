@@ -1,8 +1,16 @@
 ---
-allowed-tools: Bash(git:*), Task, Read, Grep, Glob
+allowed-tools: Bash(git:*), Task, Read, Grep, Glob, Write
 description: 커밋 후 검증 단계를 자동으로 실행
 argument-hint: [directory] [commit-message]
 ---
+
+## 중요 제한 사항
+
+**Subagent 제한**:
+- 검증 subagent(intent-validator, doc-validator, security-validator, code-simplifier)는 **검증만 수행**
+- Subagent는 `/create-pr`, `/commit-and-verify` 등 다른 skill/command를 **절대 호출하지 않음**
+- PR 생성은 사용자가 직접 `/create-pr`을 호출해야 함
+- 이 명령은 **검증까지만** 수행하고 종료됨
 
 ## 인자 파싱
 
@@ -56,9 +64,43 @@ argument-hint: [directory] [commit-message]
    - 반드시 세 Task 도구를 **한 번의 응답에서 동시에 호출**
    - 각 subagent에 작업 디렉토리 정보 전달
 
-4. **결과 종합 보고**
-   - 검증 상태 파일 업데이트: `<directory>/tmp/validation-status.json`
-   - PASS/WARN/FAIL 결과 요약
+4. **결과 종합 보고** (필수)
+   - **반드시** 검증 상태 파일 생성: `<directory>/tmp/validation-status.json`
+   - 이 파일이 없으면 검증이 완료되지 않은 것으로 간주됨
+   - PASS/WARN/FAIL 결과 요약 출력
+
+## validation-status.json 형식 (필수)
+
+검증 완료 후 **반드시** 다음 형식으로 파일을 생성해야 합니다:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "commit": "abc1234",
+  "results": {
+    "intent-validator": "PASS",
+    "doc-validator": "PASS",
+    "security-validator": "WARN",
+    "code-simplifier": "PASS"
+  },
+  "overall": "PASS",
+  "warnings": ["보안: 위험 패턴 감지"],
+  "errors": []
+}
+```
+
+**필드 설명**:
+- `timestamp`: ISO 8601 형식의 검증 완료 시간
+- `commit`: 검증된 커밋 해시 (short)
+- `results`: 각 validator의 개별 결과
+- `overall`: 전체 결과 (FAIL이 하나라도 있으면 FAIL)
+- `warnings`: 경고 메시지 배열
+- `errors`: 에러 메시지 배열
+
+**overall 판정 기준**:
+- `PASS`: 모든 검증 통과
+- `WARN`: FAIL 없이 WARN 존재
+- `FAIL`: 하나라도 FAIL
 
 ## 검증 실패 시
 

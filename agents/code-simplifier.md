@@ -5,6 +5,15 @@ tools: Read, Grep, Glob
 model: haiku
 ---
 
+## 금지 사항
+
+**절대 수행하지 않음**:
+- `/create-pr`, `/commit-and-verify` 등 다른 skill/command 호출
+- 코드 수정 또는 파일 작성
+- Git commit, push 등 저장소 변경 작업
+
+**이 agent는 검증만 수행하고 결과를 보고합니다.**
+
 ## 역할
 
 코드 중복 및 복잡도를 검증합니다.
