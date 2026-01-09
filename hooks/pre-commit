@@ -1,0 +1,118 @@
+#!/bin/bash
+
+# Claude Code 개발 플로우 - Pre-commit Hook
+# 커밋 전 validation-status.json을 확인하여 검증 통과 여부를 검사합니다.
+
+# 색상 정의
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+VALIDATION_FILE="tmp/validation-status.json"
+
+# 검증 파일 존재 확인
+if [ ! -f "$VALIDATION_FILE" ]; then
+    echo -e "${YELLOW}⚠️  검증 상태 파일이 없습니다.${NC}"
+    echo ""
+    echo "커밋 전 검증을 수행하려면:"
+    echo "  /commit-and-verify 명령을 사용하세요."
+    echo ""
+    echo -e "${YELLOW}검증 없이 커밋하려면:${NC}"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+# jq가 설치되어 있는지 확인
+if command -v jq &> /dev/null; then
+    # jq로 JSON 파싱
+    READY_FOR_PR=$(jq -r '.ready_for_pr // false' "$VALIDATION_FILE" 2>/dev/null)
+    INTENT_STATUS=$(jq -r '.intent_validation.status // "UNKNOWN"' "$VALIDATION_FILE" 2>/dev/null)
+    DOC_STATUS=$(jq -r '.quality_validation.doc_validator // "UNKNOWN"' "$VALIDATION_FILE" 2>/dev/null)
+    SECURITY_STATUS=$(jq -r '.quality_validation.security_validator // "UNKNOWN"' "$VALIDATION_FILE" 2>/dev/null)
+    CODE_STATUS=$(jq -r '.quality_validation.code_simplifier // "UNKNOWN"' "$VALIDATION_FILE" 2>/dev/null)
+else
+    # jq 없이 grep으로 간단히 파싱
+    READY_FOR_PR=$(grep -o '"ready_for_pr"[[:space:]]*:[[:space:]]*true' "$VALIDATION_FILE" && echo "true" || echo "false")
+    INTENT_STATUS=$(grep -o '"status"[[:space:]]*:[[:space:]]*"[^"]*"' "$VALIDATION_FILE" | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+
+    if [ -z "$INTENT_STATUS" ]; then
+        INTENT_STATUS="UNKNOWN"
+    fi
+fi
+
+# 검증 결과 출력
+echo ""
+echo "┌─────────────────────────────────────┐"
+echo "│      Claude Code 검증 상태 확인       │"
+echo "├─────────────────────────────────────┤"
+
+# 상태 표시 함수
+print_status() {
+    local name=$1
+    local status=$2
+
+    case $status in
+        PASS)
+            echo -e "│  $name: ${GREEN}✓ PASS${NC}"
+            ;;
+        WARN)
+            echo -e "│  $name: ${YELLOW}⚠ WARN${NC}"
+            ;;
+        FAIL)
+            echo -e "│  $name: ${RED}✗ FAIL${NC}"
+            ;;
+        *)
+            echo -e "│  $name: ${YELLOW}? $status${NC}"
+            ;;
+    esac
+}
+
+print_status "Intent Validation    " "$INTENT_STATUS"
+print_status "Doc Validation       " "$DOC_STATUS"
+print_status "Security Validation  " "$SECURITY_STATUS"
+print_status "Code Quality         " "$CODE_STATUS"
+
+echo "├─────────────────────────────────────┤"
+
+# 커밋 가능 여부 확인
+if [ "$READY_FOR_PR" = "true" ]; then
+    echo -e "│  ${GREEN}✓ 커밋 가능${NC}                         │"
+    echo "└─────────────────────────────────────┘"
+    echo ""
+    exit 0
+else
+    # FAIL이 있는지 확인
+    HAS_FAIL=false
+    for status in "$INTENT_STATUS" "$DOC_STATUS" "$SECURITY_STATUS" "$CODE_STATUS"; do
+        if [ "$status" = "FAIL" ]; then
+            HAS_FAIL=true
+            break
+        fi
+    done
+
+    if [ "$HAS_FAIL" = "true" ]; then
+        echo -e "│  ${RED}✗ 검증 실패 - 커밋 차단${NC}              │"
+        echo "└─────────────────────────────────────┘"
+        echo ""
+        echo "검증 실패 항목을 수정한 후 다시 시도하세요:"
+        echo "  /commit-and-verify"
+        echo ""
+        echo -e "${YELLOW}검증 없이 커밋하려면:${NC}"
+        echo "  git commit --no-verify"
+        echo ""
+        exit 1
+    else
+        echo -e "│  ${YELLOW}⚠ 검증 미완료${NC}                       │"
+        echo "└─────────────────────────────────────┘"
+        echo ""
+        echo "검증을 완료하려면:"
+        echo "  /commit-and-verify"
+        echo ""
+        echo -e "${YELLOW}검증 없이 커밋하려면:${NC}"
+        echo "  git commit --no-verify"
+        echo ""
+        exit 1
+    fi
+fi
