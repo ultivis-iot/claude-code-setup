@@ -44,6 +44,28 @@ cd claude-code-setup
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
+## 업데이트
+
+설정이 변경되면 `git pull` 후 업데이트 명령을 실행합니다.
+
+### Linux / macOS
+
+```bash
+cd claude-code-setup
+git pull
+./setup.sh --update
+```
+
+### Windows (PowerShell)
+
+```powershell
+cd claude-code-setup
+git pull
+.\setup.ps1 -Update
+```
+
+> **참고**: 업데이트 시 `~/.claude/CLAUDE.md`의 `# === Claude Code 개발 플로우 설정 ===` 이후 내용만 교체됩니다. 사용자 설정은 해당 마커 이전에 작성하세요.
+
 ## 설치되는 파일
 
 ```

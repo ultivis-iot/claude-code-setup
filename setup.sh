@@ -1,16 +1,28 @@
 #!/bin/bash
 
 # Claude Code 개발 플로우 설치 스크립트
-# 사용법: ./setup.sh
+# 사용법: ./setup.sh [--update|-u]
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 
-echo "==================================="
-echo "Claude Code 개발 플로우 설치"
-echo "==================================="
+# 옵션 파싱
+UPDATE_MODE=false
+if [ "$1" = "--update" ] || [ "$1" = "-u" ]; then
+    UPDATE_MODE=true
+fi
+
+if [ "$UPDATE_MODE" = true ]; then
+    echo "==================================="
+    echo "Claude Code 개발 플로우 업데이트"
+    echo "==================================="
+else
+    echo "==================================="
+    echo "Claude Code 개발 플로우 설치"
+    echo "==================================="
+fi
 echo ""
 
 # 색상 정의
@@ -29,7 +41,18 @@ MARKER="# === Claude Code 개발 플로우 설정 ==="
 if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
     # 이미 설치된 내용이 있는지 확인
     if grep -q "$MARKER" "$CLAUDE_DIR/CLAUDE.md" 2>/dev/null; then
-        echo -e "${YELLOW}   이미 설치된 설정 발견. 건너뜀${NC}"
+        if [ "$UPDATE_MODE" = true ]; then
+            # 업데이트 모드: 기존 설정 섹션 교체
+            echo -e "${YELLOW}   기존 설정 섹션 업데이트${NC}"
+            # MARKER 이전 내용만 유지
+            sed -i "/$MARKER/,\$d" "$CLAUDE_DIR/CLAUDE.md"
+            # 새 내용 추가
+            echo "$MARKER" >> "$CLAUDE_DIR/CLAUDE.md"
+            cat "$SCRIPT_DIR/CLAUDE.md" >> "$CLAUDE_DIR/CLAUDE.md"
+            echo -e "${GREEN}   ✓ CLAUDE.md 업데이트 완료${NC}"
+        else
+            echo -e "${YELLOW}   이미 설치된 설정 발견. 건너뜀 (업데이트: --update)${NC}"
+        fi
     else
         echo -e "${YELLOW}   기존 CLAUDE.md에 설정 추가${NC}"
         echo "" >> "$CLAUDE_DIR/CLAUDE.md"

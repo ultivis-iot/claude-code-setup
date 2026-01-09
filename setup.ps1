@@ -1,5 +1,9 @@
 ﻿# Claude Code 개발 플로우 설치 스크립트 (Windows PowerShell)
-# 사용법: .\setup.ps1
+# 사용법: .\setup.ps1 [-Update]
+
+param(
+    [switch]$Update
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -13,7 +17,11 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
 
 Write-Host "===================================" -ForegroundColor Cyan
-Write-Host "Claude Code 개발 플로우 설치" -ForegroundColor Cyan
+if ($Update) {
+    Write-Host "Claude Code 개발 플로우 업데이트" -ForegroundColor Cyan
+} else {
+    Write-Host "Claude Code 개발 플로우 설치" -ForegroundColor Cyan
+}
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -31,7 +39,19 @@ $SourceClaudeMd = Join-Path $ScriptDir "CLAUDE.md"
 if (Test-Path $ClaudeMdPath) {
     $Content = Get-Content $ClaudeMdPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
     if ($Content -and $Content.Contains($Marker)) {
-        Write-Host "   이미 설치된 설정 발견. 건너뜀" -ForegroundColor Yellow
+        if ($Update) {
+            # 업데이트 모드: 기존 설정 섹션 교체
+            Write-Host "   기존 설정 섹션 업데이트" -ForegroundColor Yellow
+            # MARKER 이전 내용만 유지
+            $MarkerIndex = $Content.IndexOf($Marker)
+            $BeforeMarker = $Content.Substring(0, $MarkerIndex)
+            # 새 내용으로 교체
+            $NewContent = $BeforeMarker + $Marker + "`n" + (Get-Content $SourceClaudeMd -Raw -Encoding UTF8)
+            Set-Content -Path $ClaudeMdPath -Value $NewContent -Encoding UTF8 -NoNewline
+            Write-Host "   CLAUDE.md 업데이트 완료" -ForegroundColor Green
+        } else {
+            Write-Host "   이미 설치된 설정 발견. 건너뜀 (업데이트: -Update)" -ForegroundColor Yellow
+        }
     } else {
         Add-Content -Path $ClaudeMdPath -Value "`n$Marker" -Encoding UTF8
         Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
