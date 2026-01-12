@@ -17,6 +17,7 @@ Plan → 빌드 → Commit → 검증 1단계 → 검증 2단계 (병렬) → Pu
 | 기능 | 설명 |
 |-----|------|
 | **Plan 모드 가이드** | 사용자 의도를 명확하게 문서화 |
+| **Plan 자동 저장** | Plan 승인 시 `tmp/current-plan.md`로 자동 복사 |
 | **자동 검증** | 커밋 후 의도 검증 + 품질 검증 자동 실행 |
 | **보안 검사** | 실시간 보안 취약점 경고 + 커밋 후 보안 리뷰 |
 | **PR 생성** | 검증 통과 확인 후 자동 PR 생성 |
@@ -71,6 +72,7 @@ git pull
 ```
 ~/.claude/
 ├── CLAUDE.md                   # Plan 모드 가이드
+├── settings.json               # hooks 설정 포함
 ├── commands/
 │   ├── commit-and-verify.md    # 커밋 + 검증 자동 실행
 │   └── create-pr.md            # 검증 통과 후 PR 생성
@@ -81,8 +83,10 @@ git pull
 │   └── code-simplifier.md      # 검증 2단계: 코드 단순화
 ├── schemas/
 │   └── validation-status.schema.json  # 검증 결과 표준 스키마
+├── hooks/
+│   └── copy-plan-on-accept.sh  # Plan 승인 시 자동 복사
 └── plugins/
-    └── security-guidance/      # 실시간 보안 검사 Hook
+    └── security-guidance/      # 실시간 보안 검사 Plugin
 ```
 
 ## 사용 방법
@@ -92,6 +96,10 @@ git pull
 `Shift+Tab` 두 번 또는 CLI에서 `claude --permission-mode plan`
 
 Plan 작성 시 반드시 **의도(Intent)** 섹션을 포함하여 사용자 의도를 명문화합니다.
+
+**Plan 승인 시 자동 동작**:
+- 사용자가 Plan을 승인하면 `tmp/current-plan.md`로 자동 복사됩니다
+- 이 Plan은 검증 단계에서 의도 검증의 기준이 됩니다
 
 ### 2. 구현 (빌드)
 
@@ -134,7 +142,9 @@ Plan에 따라 코드를 구현합니다.
 mkdir -p tmp
 ```
 
-Plan 문서는 `tmp/current-plan.md`에 저장되고, 검증 상태는 `tmp/validation-status.json`에 기록됩니다.
+**자동 생성되는 파일**:
+- `tmp/current-plan.md` - Plan 승인 시 자동 복사 (PostToolUse hook)
+- `tmp/validation-status.json` - 검증 결과 기록
 
 ### Git Hook 설치 (선택)
 

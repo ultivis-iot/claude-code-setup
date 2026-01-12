@@ -114,6 +114,87 @@ if [ -d "$SCRIPT_DIR/plugins" ]; then
     done
 fi
 
+# Hooks 설치
+echo "7. Hooks 설치..."
+if [ -d "$SCRIPT_DIR/hooks" ]; then
+    mkdir -p "$CLAUDE_DIR/hooks"
+    for file in "$SCRIPT_DIR/hooks"/*.sh; do
+        if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            # install-hooks.sh는 git hook용이므로 제외
+            if [ "$filename" != "install-hooks.sh" ]; then
+                cp "$file" "$CLAUDE_DIR/hooks/$filename"
+                chmod +x "$CLAUDE_DIR/hooks/$filename"
+                echo -e "${GREEN}   ✓ $filename${NC}"
+            fi
+        fi
+    done
+fi
+
+# settings.json에 hooks 설정 추가
+echo "8. settings.json 업데이트..."
+SETTINGS_FILE="$CLAUDE_DIR/settings.json"
+if [ -f "$SETTINGS_FILE" ]; then
+    # hooks 설정이 있는지 확인
+    if grep -q '"hooks"' "$SETTINGS_FILE" 2>/dev/null; then
+        echo -e "${YELLOW}   hooks 설정이 이미 존재함. 건너뜀${NC}"
+    else
+        # jq가 있으면 사용, 없으면 수동 처리
+        if command -v jq &> /dev/null; then
+            jq '. + {"hooks": {"PostToolUse": [{"matcher": "ExitPlanMode", "hooks": [{"type": "command", "command": "~/.claude/hooks/copy-plan-on-accept.sh", "timeout": 10}]}]}}' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp" && mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+            echo -e "${GREEN}   ✓ settings.json에 hooks 추가 (jq 사용)${NC}"
+        else
+            # jq 없이 수동 처리 - 전체 파일 재작성
+            cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
+{
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/copy-plan-on-accept.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+SETTINGS_EOF
+            echo -e "${GREEN}   ✓ settings.json 재생성 완료${NC}"
+        fi
+    fi
+else
+    # settings.json이 없으면 새로 생성
+    cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
+{
+  "enabledPlugins": {
+    "security-guidance@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/copy-plan-on-accept.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+SETTINGS_EOF
+    echo -e "${GREEN}   ✓ settings.json 생성 완료${NC}"
+fi
+
 echo ""
 echo "==================================="
 echo -e "${GREEN}설치 완료!${NC}"
@@ -128,7 +209,9 @@ echo "  ~/.claude/agents/doc-validator.md"
 echo "  ~/.claude/agents/security-validator.md"
 echo "  ~/.claude/agents/code-simplifier.md"
 echo "  ~/.claude/schemas/validation-status.schema.json"
-echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
+echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
+echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
+echo "  ~/.claude/settings.json (hooks 설정 포함)"
 echo ""
 echo "사용 방법:"
 echo "  1. Plan 모드 진입: Shift+Tab 두 번"
