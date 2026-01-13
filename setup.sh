@@ -79,7 +79,7 @@ if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
             sed -i "/$MARKER/,\$d" "$CLAUDE_DIR/CLAUDE.md"
             # 새 내용 추가
             echo "$MARKER" >> "$CLAUDE_DIR/CLAUDE.md"
-            cat "$SCRIPT_DIR/CLAUDE.md" >> "$CLAUDE_DIR/CLAUDE.md"
+            cat "$SCRIPT_DIR/templates/global-claude.md" >> "$CLAUDE_DIR/CLAUDE.md"
             echo -e "${GREEN}   ✓ CLAUDE.md 업데이트 완료${NC}"
         else
             echo -e "${YELLOW}   이미 설치된 설정 발견. 건너뜀 (업데이트: --update)${NC}"
@@ -88,12 +88,12 @@ if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
         echo -e "${YELLOW}   기존 CLAUDE.md에 설정 추가${NC}"
         echo "" >> "$CLAUDE_DIR/CLAUDE.md"
         echo "$MARKER" >> "$CLAUDE_DIR/CLAUDE.md"
-        cat "$SCRIPT_DIR/CLAUDE.md" >> "$CLAUDE_DIR/CLAUDE.md"
+        cat "$SCRIPT_DIR/templates/global-claude.md" >> "$CLAUDE_DIR/CLAUDE.md"
         echo -e "${GREEN}   ✓ CLAUDE.md에 설정 추가 완료${NC}"
     fi
 else
     echo "$MARKER" > "$CLAUDE_DIR/CLAUDE.md"
-    cat "$SCRIPT_DIR/CLAUDE.md" >> "$CLAUDE_DIR/CLAUDE.md"
+    cat "$SCRIPT_DIR/templates/global-claude.md" >> "$CLAUDE_DIR/CLAUDE.md"
     echo -e "${GREEN}   ✓ CLAUDE.md 생성 완료${NC}"
 fi
 
