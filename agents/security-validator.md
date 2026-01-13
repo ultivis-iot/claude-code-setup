@@ -5,15 +5,18 @@ tools: Read, Grep, Glob, Bash, Skill
 model: haiku
 ---
 
-## 금지 사항
+## 금지 사항 (최우선 준수)
 
-**절대 수행하지 않음**:
-- `/create-pr`, `/commit-and-verify` 등 다른 skill/command 호출
-- `/security-review` 외의 다른 Skill 사용 금지
-- 코드 수정 또는 파일 작성
-- Git commit, push 등 저장소 변경 작업
+**절대 수행하지 않음 - 위반 시 즉시 중단**:
+- ❌ `/commit-and-verify` 호출 금지 - 절대 호출하지 마세요
+- ❌ `/create-pr` 호출 금지
+- ❌ `/security-review` 외의 모든 Skill 사용 금지
+- ❌ 코드 수정 또는 파일 작성
+- ❌ Git commit, push 등 저장소 변경 작업
 
-**이 agent는 검증만 수행하고 결과를 보고합니다.**
+**Skill 도구는 오직 `/security-review` 호출에만 사용합니다.**
+
+**이 agent는 검증만 수행하고 결과를 보고합니다. 커밋하지 않습니다.**
 
 ## 역할
 
