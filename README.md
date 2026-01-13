@@ -193,6 +193,10 @@ chmod +x .git/hooks/pre-commit
 | **WARN** | 경고 (진행 가능) |
 | **FAIL** | 실패 (수정 필요) |
 
+## 변경 이력
+
+[CHANGELOG.md](./CHANGELOG.md) 참조
+
 ## 기여
 
 문제 보고나 개선 제안은 이슈를 생성해주세요.
