@@ -8,6 +8,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 
+# 색상 정의
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
 # 옵션 파싱
 UPDATE_MODE=false
 if [ "$1" = "--update" ] || [ "$1" = "-u" ]; then
@@ -18,17 +23,43 @@ if [ "$UPDATE_MODE" = true ]; then
     echo "==================================="
     echo "Claude Code 개발 플로우 업데이트"
     echo "==================================="
+    echo ""
+
+    # Git 저장소인지 확인하고 업데이트 수행
+    if [ -d "$SCRIPT_DIR/.git" ]; then
+        echo "0. 원격 저장소 업데이트 확인..."
+        cd "$SCRIPT_DIR"
+
+        # remote가 설정되어 있는지 확인
+        if git remote -v | grep -q "origin"; then
+            # fetch로 원격 변경사항 확인
+            git fetch origin 2>/dev/null
+
+            LOCAL=$(git rev-parse HEAD 2>/dev/null)
+            REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "")
+
+            if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+                echo -e "${YELLOW}   원격 저장소에 업데이트가 있습니다. pull 수행 중...${NC}"
+                if git pull origin "$(git branch --show-current)" 2>/dev/null; then
+                    echo -e "${GREEN}   ✓ 최신 버전으로 업데이트 완료${NC}"
+                else
+                    echo -e "${YELLOW}   ⚠ git pull 실패. 로컬 파일로 진행합니다.${NC}"
+                fi
+            else
+                echo -e "${GREEN}   ✓ 이미 최신 버전입니다${NC}"
+            fi
+        else
+            echo -e "${YELLOW}   원격 저장소가 설정되지 않음. 로컬 파일로 진행합니다.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}   Git 저장소가 아님. 로컬 파일로 진행합니다.${NC}"
+    fi
 else
     echo "==================================="
     echo "Claude Code 개발 플로우 설치"
     echo "==================================="
 fi
 echo ""
-
-# 색상 정의
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
 
 # 디렉토리 생성
 echo "1. 디렉토리 생성..."

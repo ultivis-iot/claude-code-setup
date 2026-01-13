@@ -2,7 +2,7 @@
 name: intent-validator
 description: Plan 문서의 의도대로 구현되었는지 검증. 코드 변경 후 자동 사용.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: sonnet
 ---
 
 ## 금지 사항
