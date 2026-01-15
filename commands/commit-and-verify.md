@@ -9,6 +9,8 @@ argument-hint: [directory] [commit-message]
 **Subagent 제한**:
 - 검증 subagent(intent-validator, doc-validator, security-validator, code-simplifier)는 **검증만 수행**
 - Subagent는 `/create-pr`, `/commit-and-verify` 등 다른 skill/command를 **절대 호출하지 않음**
+- **Subagent는 파일을 작성하지 않음** - 결과를 JSON 텍스트로 반환만 함
+- **메인(이 커맨드)에서 결과를 취합**하여 `tmp/validation-status.json` 파일 생성
 - PR 생성은 사용자가 직접 `/create-pr`을 호출해야 함
 - 이 명령은 **검증까지만** 수행하고 종료됨
 
@@ -92,18 +94,23 @@ feat: 회원가입 유효성 검사 추가
    - intent-validator subagent 호출
    - Plan 문서 경로: `<directory>/tmp/current-plan.md`
    - Plan 문서의 의도대로 구현되었는지 확인
+   - **subagent가 반환한 JSON 결과에서 status 확인**
+   - **⚠️ FAIL 시 즉시 중지**: 2단계로 진행하지 않고, 실패 내용을 사용자에게 안내
 
 3. **검증 2단계 (품질 검증)** 병렬 수행
-   - 검증 1단계 통과 시 실행
+   - **검증 1단계 PASS 시에만 실행**
    - 다음 세 가지 검증을 **동시에 병렬로** 실행:
      - doc-validator subagent: 문서 검증
      - security-validator subagent: 보안 검증
      - code-simplifier subagent: 코드 단순화 검증
    - 반드시 세 Task 도구를 **한 번의 응답에서 동시에 호출**
    - 각 subagent에 작업 디렉토리 정보 전달
+   - **각 subagent가 반환한 JSON 결과를 수집** (파일 작성은 subagent가 하지 않음)
 
-4. **결과 종합 보고** (필수)
-   - **반드시** 검증 상태 파일 생성: `<directory>/tmp/validation-status.json`
+4. **결과 취합 및 파일 생성** (필수 - 메인에서만 수행)
+   - 각 subagent가 반환한 결과(JSON 텍스트)를 파싱
+   - 결과를 취합하여 `<directory>/tmp/validation-status.json` 파일 **직접 생성**
+   - **Subagent는 이 파일을 작성하지 않음 - 반드시 메인에서 Write 도구로 생성**
    - 이 파일이 없으면 검증이 완료되지 않은 것으로 간주됨
    - PASS/WARN/FAIL 결과 요약 출력
 
@@ -123,9 +130,9 @@ feat: 회원가입 유효성 검사 추가
 | `commits[].message` | string | O | 커밋 메시지 |
 | `results` | object | O | 각 validator별 결과 |
 | `results.intent-validator` | "PASS" \| "WARN" \| "FAIL" | O | 의도 검증 결과 |
-| `results.doc-validator` | "PASS" \| "WARN" \| "FAIL" | O | 문서 검증 결과 |
-| `results.security-validator` | "PASS" \| "WARN" \| "FAIL" | O | 보안 검증 결과 |
-| `results.code-simplifier` | "PASS" \| "WARN" \| "FAIL" | O | 코드 품질 검증 결과 |
+| `results.doc-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 문서 검증 결과 |
+| `results.security-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 보안 검증 결과 |
+| `results.code-simplifier` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 코드 품질 검증 결과 |
 | `overall` | "PASS" \| "WARN" \| "FAIL" | O | 전체 검증 결과 |
 | `warnings` | string[] | O | 경고 메시지 배열 |
 | `errors` | string[] | O | 에러 메시지 배열 |
@@ -141,9 +148,33 @@ git log <base_branch>..HEAD --oneline
 - `WARN`: FAIL 없이 WARN 존재
 - `FAIL`: 하나라도 FAIL
 
+**1단계 FAIL 시 파일 생성**:
+- 1단계에서 FAIL이면 2단계는 실행하지 않음
+- 이 경우에도 `validation-status.json` 파일은 생성
+- 2단계 validator 결과는 `"SKIP"`으로 표시
+
+```json
+{
+  "results": {
+    "intent-validator": "FAIL",
+    "doc-validator": "SKIP",
+    "security-validator": "SKIP",
+    "code-simplifier": "SKIP"
+  },
+  "overall": "FAIL"
+}
+```
+
 ## 검증 실패 시
 
-- 구체적인 미충족 사항 안내
+### 1단계 (의도 검증) FAIL
+- **2단계로 진행하지 않고 즉시 중지**
+- intent-validator가 반환한 미충족 의도 항목 안내
+- 수정이 필요한 파일/위치 지정
+- 빌드 단계로 돌아가 재구현 안내
+
+### 2단계 (품질 검증) FAIL
+- 구체적인 미충족 사항 안내 (어느 validator에서 실패했는지 명시)
 - 수정이 필요한 파일/위치 지정
 - 빌드 단계로 돌아가 수정하도록 안내
 

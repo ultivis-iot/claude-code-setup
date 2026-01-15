@@ -65,16 +65,7 @@ Plan 문서와 실제 구현을 비교하여 의도 충족 여부를 검증합�
 - 수정 방향 제안
 - 빌드 단계로 복귀하여 재구현 필요함을 안내
 
-## 결과 저장
+## 결과 반환
 
-검증 완료 후 `tmp/validation-status.json` 파일 업데이트:
-
-```json
-{
-  "intent_validation": {
-    "status": "PASS" | "FAIL",
-    "timestamp": "<현재시간>",
-    "details": "<상세내용>"
-  }
-}
-```
+**파일 작성 금지**: 이 agent는 `tmp/validation-status.json`에 직접 작성하지 않습니다.
+위 "결과 형식"의 JSON을 텍스트로 반환하면, 메인(commit-and-verify)에서 취합하여 파일을 생성합니다.

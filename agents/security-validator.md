@@ -60,15 +60,7 @@ Claude Code의 내장 `/security-review` 명령을 실행하고, 결과를 표�
 - **WARN**: 낮은 심각도(low/medium) 이슈만 발견 (진행 가능, 추후 수정 권장)
 - **FAIL**: 높은 심각도(high/critical) 이슈 발견 (즉시 수정 필요)
 
-## 결과 저장
+## 결과 반환
 
-검증 완료 후 `tmp/validation-status.json`의 `quality_validation.security_validator` 업데이트:
-
-```json
-{
-  "quality_validation": {
-    "security_validator": "PASS" | "WARN" | "FAIL",
-    "timestamp": "<현재시간>"
-  }
-}
-```
+**파일 작성 금지**: 이 agent는 `tmp/validation-status.json`에 직접 작성하지 않습니다.
+위 "결과 형식"의 JSON을 텍스트로 반환하면, 메인(commit-and-verify)에서 취합하여 파일을 생성합니다.

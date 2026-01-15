@@ -79,6 +79,7 @@ model: haiku
 - **WARN**: 개선 권장 사항 있음 (진행 가능)
 - **FAIL**: 심각한 코드 품질 문제 (리팩토링 필요)
 
-## 결과 저장
+## 결과 반환
 
-검증 완료 후 `tmp/validation-status.json`의 `quality_validation.code_simplifier` 업데이트
+**파일 작성 금지**: 이 agent는 `tmp/validation-status.json`에 직접 작성하지 않습니다.
+위 "결과 형식"의 JSON을 텍스트로 반환하면, 메인(commit-and-verify)에서 취합하여 파일을 생성합니다.

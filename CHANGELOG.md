@@ -2,6 +2,7 @@
 
 | 날짜 | 변경사항 |
 |------|----------|
+| 2025-01-15 | subagent 결과 취합 방식 개선 - 메인에서 validation-status.json 생성 |
 | 2025-01-14 | templates/ 디렉토리 분리, 업데이트 검증 문서화 |
 | 2025-01-14 | 업데이트 시 원격 저장소 자동 pull 기능 추가 |
 | 2025-01-14 | security-validator commit-and-verify 호출 금지 강화 |

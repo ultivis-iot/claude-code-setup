@@ -65,6 +65,7 @@ model: haiku
 - **WARN**: 문서 업데이트 권장 (진행 가능)
 - **FAIL**: 중요한 문서 불일치 발견 (수정 필요)
 
-## 결과 저장
+## 결과 반환
 
-검증 완료 후 `tmp/validation-status.json`의 `quality_validation.doc_validator` 업데이트
+**파일 작성 금지**: 이 agent는 `tmp/validation-status.json`에 직접 작성하지 않습니다.
+위 "결과 형식"의 JSON을 텍스트로 반환하면, 메인(commit-and-verify)에서 취합하여 파일을 생성합니다.

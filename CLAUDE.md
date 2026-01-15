@@ -1,4 +1,4 @@
-# Claude Code Setup 프로젝트
+﻿# Claude Code Setup 프로젝트
 
 Claude Code 개발 플로우 설정 도구 저장소입니다.
 
@@ -22,6 +22,9 @@ Claude Code 개발 플로우 설정 도구 저장소입니다.
 - `agents/*.md` 파일로 정의
 - 금지 사항을 명확히 명시 (특히 다른 skill 호출 제한)
 - model 필드: `haiku`, `sonnet`, `opus`, `inherit` 중 선택
+
+### 업데이트 내역 작성
+- `CHANGELOG.md` 에 업데이트 진행 내역을 간단히 기록
 
 ### Command 작성
 - `commands/*.md` 파일로 정의

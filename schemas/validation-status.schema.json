@@ -79,8 +79,8 @@
   "$defs": {
     "validationResult": {
       "type": "string",
-      "enum": ["PASS", "WARN", "FAIL"],
-      "description": "검증 결과 상태"
+      "enum": ["PASS", "WARN", "FAIL", "SKIP"],
+      "description": "검증 결과 상태 (SKIP: 이전 단계 실패로 미실행)"
     }
   }
 }
