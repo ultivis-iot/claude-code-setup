@@ -19,6 +19,22 @@ if [ "$1" = "--update" ] || [ "$1" = "-u" ]; then
     UPDATE_MODE=true
 fi
 
+# 버전 파일 경로
+VERSION_FILE="$SCRIPT_DIR/VERSION"
+INSTALLED_VERSION_FILE="$CLAUDE_DIR/.installed-version"
+
+# 현재 버전 읽기
+CURRENT_VERSION="unknown"
+if [ -f "$VERSION_FILE" ]; then
+    CURRENT_VERSION=$(cat "$VERSION_FILE" | tr -d '[:space:]')
+fi
+
+# 설치된 버전 읽기
+INSTALLED_VERSION="none"
+if [ -f "$INSTALLED_VERSION_FILE" ]; then
+    INSTALLED_VERSION=$(cat "$INSTALLED_VERSION_FILE" | tr -d '[:space:]')
+fi
+
 if [ "$UPDATE_MODE" = true ]; then
     echo "==================================="
     echo "Claude Code 개발 플로우 업데이트"
@@ -226,10 +242,26 @@ SETTINGS_EOF
     echo -e "${GREEN}   ✓ settings.json 생성 완료${NC}"
 fi
 
+# 설치된 버전 기록
+echo "$CURRENT_VERSION" > "$INSTALLED_VERSION_FILE"
+
 echo ""
 echo "==================================="
-echo -e "${GREEN}설치 완료!${NC}"
+echo -e "${GREEN}설치 완료!${NC} (v$CURRENT_VERSION)"
 echo "==================================="
+
+# 업데이트 모드에서 버전 변경 내역 출력
+if [ "$UPDATE_MODE" = true ] && [ "$INSTALLED_VERSION" != "$CURRENT_VERSION" ]; then
+    echo ""
+    echo -e "${YELLOW}업데이트 내역 ($INSTALLED_VERSION → $CURRENT_VERSION):${NC}"
+    echo "-----------------------------------"
+    if [ -f "$SCRIPT_DIR/CHANGELOG.md" ]; then
+        # CHANGELOG에서 현재 버전 섹션 출력
+        sed -n "/^## v$CURRENT_VERSION/,/^## v/p" "$SCRIPT_DIR/CHANGELOG.md" | head -n -1
+    fi
+    echo "-----------------------------------"
+fi
+
 echo ""
 echo "설치된 파일:"
 echo "  ~/.claude/CLAUDE.md (기존 파일에 추가됨)"
