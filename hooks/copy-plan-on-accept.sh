@@ -7,7 +7,7 @@
 INPUT=$(cat)
 
 # 디버그 로깅 (필요시 활성화)
-# echo "$INPUT" >> /tmp/hook-debug.log
+# echo "$(date): $INPUT" >> /tmp/hook-debug.log
 
 # 도구 이름 확인 (ExitPlanMode가 아니면 종료)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
@@ -21,18 +21,11 @@ if [ -z "$CWD" ]; then
     exit 0
 fi
 
-# Claude plans 디렉토리에서 가장 최근 수정된 plan 파일 찾기
-PLANS_DIR="$HOME/.claude/plans"
-if [ ! -d "$PLANS_DIR" ]; then
-    echo "Plans 디렉토리가 없습니다: $PLANS_DIR" >&2
-    exit 0
-fi
+# tool_input.plan에서 직접 plan 내용 추출 (가장 확실한 방법)
+PLAN_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.plan // ""')
 
-# 가장 최근 수정된 .md 파일 찾기 (최근 5분 이내)
-LATEST_PLAN=$(find "$PLANS_DIR" -name "*.md" -mmin -5 -type f -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)
-
-if [ -z "$LATEST_PLAN" ]; then
-    echo "최근 수정된 plan 파일을 찾을 수 없습니다." >&2
+if [ -z "$PLAN_CONTENT" ]; then
+    echo "tool_input.plan이 비어있습니다." >&2
     exit 0
 fi
 
@@ -40,10 +33,10 @@ fi
 TARGET_DIR="$CWD/tmp"
 mkdir -p "$TARGET_DIR"
 
-# Plan 파일 복사
+# Plan 내용을 파일로 저장
 TARGET_FILE="$TARGET_DIR/current-plan.md"
-cp "$LATEST_PLAN" "$TARGET_FILE"
+echo "$PLAN_CONTENT" > "$TARGET_FILE"
 
 # 성공 메시지 (Claude에게 전달됨)
-echo "{\"decision\": \"approve\", \"reason\": \"Plan이 $TARGET_FILE로 복사되었습니다.\"}"
+echo "{\"decision\": \"approve\", \"reason\": \"Plan이 $TARGET_FILE로 저장되었습니다.\"}"
 exit 0
