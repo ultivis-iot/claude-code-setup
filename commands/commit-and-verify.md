@@ -7,7 +7,7 @@ argument-hint: [directory] [commit-message]
 ## 중요 제한 사항
 
 **Subagent 제한**:
-- 검증 subagent(intent-validator, doc-validator, security-validator, code-simplifier)는 **검증만 수행**
+- 검증 subagent(intent-validator, doc-validator, security-validator, code-simplifier, test-validator)는 **검증만 수행**
 - Subagent는 `/create-pr`, `/commit-and-verify` 등 다른 skill/command를 **절대 호출하지 않음**
 - **Subagent는 파일을 작성하지 않음** - 결과를 JSON 텍스트로 반환만 함
 - **메인(이 커맨드)에서 결과를 취합**하여 `tmp/validation-status.json` 파일 생성
@@ -99,11 +99,12 @@ feat: 회원가입 유효성 검사 추가
 
 3. **검증 2단계 (품질 검증)** 병렬 수행
    - **검증 1단계 PASS 시에만 실행**
-   - 다음 세 가지 검증을 **동시에 병렬로** 실행:
+   - 다음 네 가지 검증을 **동시에 병렬로** 실행:
      - doc-validator subagent: 문서 검증
      - security-validator subagent: 보안 검증
      - code-simplifier subagent: 코드 단순화 검증
-   - 반드시 세 Task 도구를 **한 번의 응답에서 동시에 호출**
+     - test-validator subagent: 테스트 검증
+   - 반드시 네 Task 도구를 **한 번의 응답에서 동시에 호출**
    - 각 subagent에 작업 디렉토리 정보 전달
    - **각 subagent가 반환한 JSON 결과를 수집** (파일 작성은 subagent가 하지 않음)
 
@@ -133,6 +134,7 @@ feat: 회원가입 유효성 검사 추가
 | `results.doc-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 문서 검증 결과 |
 | `results.security-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 보안 검증 결과 |
 | `results.code-simplifier` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 코드 품질 검증 결과 |
+| `results.test-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 테스트 검증 결과 |
 | `overall` | "PASS" \| "WARN" \| "FAIL" | O | 전체 검증 결과 |
 | `warnings` | string[] | O | 경고 메시지 배열 |
 | `errors` | string[] | O | 에러 메시지 배열 |
@@ -159,7 +161,8 @@ git log <base_branch>..HEAD --oneline
     "intent-validator": "FAIL",
     "doc-validator": "SKIP",
     "security-validator": "SKIP",
-    "code-simplifier": "SKIP"
+    "code-simplifier": "SKIP",
+    "test-validator": "SKIP"
   },
   "overall": "FAIL"
 }

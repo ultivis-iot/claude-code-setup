@@ -2,6 +2,9 @@
 
 # Claude Code - Plan Accept 시 current-plan.md로 복사하는 Hook 스크립트
 # PostToolUse hook에서 ExitPlanMode 도구 사용 시 실행됩니다.
+#
+# ExitPlanMode 도구에는 plan 파라미터가 없으므로,
+# ~/.claude/plans/에서 가장 최근 수정된 Plan 파일을 복사합니다.
 
 # stdin으로 받은 JSON에서 정보 추출
 INPUT=$(cat)
@@ -21,11 +24,20 @@ if [ -z "$CWD" ]; then
     exit 0
 fi
 
-# tool_input.plan에서 직접 plan 내용 추출 (가장 확실한 방법)
-PLAN_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.plan // ""')
+# ~/.claude/plans/에서 최신 Plan 파일 찾기
+PLANS_DIR="$HOME/.claude/plans"
+LATEST_PLAN=$(ls -t "$PLANS_DIR"/*.md 2>/dev/null | head -1)
+
+if [ -z "$LATEST_PLAN" ] || [ ! -f "$LATEST_PLAN" ]; then
+    echo '{"decision": "approve", "reason": "Plan 파일을 찾을 수 없습니다."}'
+    exit 0
+fi
+
+# Plan 내용 읽기
+PLAN_CONTENT=$(cat "$LATEST_PLAN")
 
 if [ -z "$PLAN_CONTENT" ]; then
-    echo "tool_input.plan이 비어있습니다." >&2
+    echo '{"decision": "approve", "reason": "Plan 내용이 비어있습니다."}'
     exit 0
 fi
 

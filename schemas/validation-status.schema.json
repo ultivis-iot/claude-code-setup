@@ -41,7 +41,7 @@
     "results": {
       "type": "object",
       "description": "각 validator별 결과",
-      "required": ["intent-validator", "doc-validator", "security-validator", "code-simplifier"],
+      "required": ["intent-validator", "doc-validator", "security-validator", "code-simplifier", "test-validator"],
       "properties": {
         "intent-validator": {
           "$ref": "#/$defs/validationResult"
@@ -53,6 +53,9 @@
           "$ref": "#/$defs/validationResult"
         },
         "code-simplifier": {
+          "$ref": "#/$defs/validationResult"
+        },
+        "test-validator": {
           "$ref": "#/$defs/validationResult"
         }
       }

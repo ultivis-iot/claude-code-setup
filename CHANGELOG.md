@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.2.0 (2025-01-25)
+- test-validator 추가 - 테스트 커버리지 및 테스트 통과 여부 검증
+- test-validator를 검증 플로우(commit-and-verify)에 통합
+
+## v0.1.2 (2025-01-25)
+- Plan 복사 hook 수정 - `~/.claude/plans/`에서 최신 Plan 파일 복사 방식으로 변경
+- ExitPlanMode 도구에 plan 파라미터가 없는 문제 해결
+
 ## v0.1.1 (2025-01-18)
 - 버전 정책 도입 및 문서화
 - setup.sh에 버전 비교 및 업데이트 내역 출력 기능 추가
