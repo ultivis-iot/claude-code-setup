@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.2.1 (2025-01-25)
+- commit-and-verify에서 Plan 파일 선택 기능 추가 - 최근 5개 Plan 중 사용자가 직접 선택
+- 동시 세션 환경에서 정확한 Plan 선택 지원
+
 ## v0.2.0 (2025-01-25)
 - test-validator 추가 - 테스트 커버리지 및 테스트 통과 여부 검증
 - test-validator를 검증 플로우(commit-and-verify)에 통합

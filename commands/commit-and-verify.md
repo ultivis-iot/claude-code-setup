@@ -42,11 +42,29 @@ argument-hint: [directory] [commit-message]
 - 브랜치 전체 변경: `git -C <directory> diff <base_branch>...HEAD`
 - staged 변경 내용: `git -C <directory> diff --staged`
 
-## Plan 문서 참조
+## Plan 문서 선택
 
-작업 디렉토리의 Plan 문서를 확인합니다:
-- 경로: `<directory>/tmp/current-plan.md`
-- Plan 문서가 없으면 경고 후 계속 진행 여부 확인
+`~/.claude/plans/`에서 Plan 파일을 찾아 사용자가 선택할 수 있도록 합니다:
+
+1. **최근 Plan 파일 검색** (최근 5개)
+   ```bash
+   ls -t ~/.claude/plans/*.md 2>/dev/null | head -5
+   ```
+
+2. **Plan 파일 목록 표시**
+   - 각 파일의 제목(`#`으로 시작하는 첫 줄)과 의도 섹션 요약 출력
+   - 파일명과 수정 시간 표시
+
+3. **사용자 선택**
+   - 여러 개면: AskUserQuestion으로 선택 요청
+   - 1개면: 해당 파일 사용 확인
+   - 0개면: Plan 없이 진행할지 확인
+
+4. **선택된 Plan 복사**
+   ```bash
+   mkdir -p <directory>/tmp
+   cp <선택된_plan_파일> <directory>/tmp/current-plan.md
+   ```
 
 ## 커밋 메시지 컨벤션
 
