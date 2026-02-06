@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 (2026-02-06)
+- visual-qa 커맨드 추가 — Chrome MCP 브라우저 자동화로 React 프론트엔드 UI/UX 검증
+- visual-qa-analyzer 에이전트 추가 — 수집 데이터 기반 디자인 품질 평가 및 이슈 판정
+- commit-and-verify에 visual-qa 선택적 3단계 통합 — 프론트엔드 변경 감지 시 사용자에게 제안
+- validation-status.schema.json에 visual-qa 필드 추가
+
 ## v0.2.1 (2025-01-25)
 - commit-and-verify에서 Plan 파일 선택 기능 추가 - 최근 5개 Plan 중 사용자가 직접 선택
 - 동시 세션 환경에서 정확한 Plan 선택 지원

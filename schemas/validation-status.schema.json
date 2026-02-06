@@ -57,6 +57,10 @@
         },
         "test-validator": {
           "$ref": "#/$defs/validationResult"
+        },
+        "visual-qa": {
+          "$ref": "#/$defs/visualQaResult",
+          "description": "Visual QA 결과 (선택적 — 프론트엔드 변경 시)"
         }
       }
     },
@@ -84,6 +88,11 @@
       "type": "string",
       "enum": ["PASS", "WARN", "FAIL", "SKIP"],
       "description": "검증 결과 상태 (SKIP: 이전 단계 실패로 미실행)"
+    },
+    "visualQaResult": {
+      "type": "string",
+      "enum": ["PASS", "WARN", "FAIL", "SKIP", "PENDING"],
+      "description": "Visual QA 결과 (PENDING: 사용자가 /visual-qa 실행 대기 중, SKIP: 프론트엔드 변경 없음 또는 사용자 건너뛰기)"
     }
   }
 }

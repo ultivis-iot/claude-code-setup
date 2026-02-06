@@ -14,6 +14,11 @@ argument-hint: [directory] [commit-message]
 - PR 생성은 사용자가 직접 `/create-pr`을 호출해야 함
 - 이 명령은 **검증까지만** 수행하고 종료됨
 
+**Visual QA 통합**:
+- 프론트엔드 파일 변경이 감지되면 3단계에서 `/visual-qa` 수행 여부를 사용자에게 제안
+- `/visual-qa`는 브라우저 MCP가 필요하므로 이 커맨드에서 직접 실행하지 않음 — 사용자가 별도 실행
+- `validation-status.json`에 `visual-qa` 결과를 기록 (`SKIP` 또는 `PENDING`)
+
 ## 인자 파싱
 
 입력된 인자: `$ARGUMENTS`
@@ -126,7 +131,19 @@ feat: 회원가입 유효성 검사 추가
    - 각 subagent에 작업 디렉토리 정보 전달
    - **각 subagent가 반환한 JSON 결과를 수집** (파일 작성은 subagent가 하지 않음)
 
-4. **결과 취합 및 파일 생성** (필수 - 메인에서만 수행)
+4. **검증 3단계 (선택적 — Visual QA)**
+   - **검증 2단계 PASS/WARN 시에만 실행** (FAIL이면 건너뜀)
+   - 변경 파일 중 프론트엔드 파일(`.jsx`, `.tsx`, `.js`, `.ts`, `.css`, `.scss`) 존재 여부 확인:
+     ```bash
+     git -C <directory> diff <base_branch>...HEAD --name-only | grep -E '\.(jsx|tsx|js|ts|css|scss)$' | grep -v 'node_modules\|\.config\.\|\.test\.\|\.spec\.'
+     ```
+   - **프론트엔드 변경이 있는 경우**: AskUserQuestion으로 선택 제시:
+     - "Visual QA를 수행하시겠습니까? (프론트엔드 변경 감지)"
+     - 선택지: "예 — 이 검증 후 `/visual-qa` 실행", "아니오 — 건너뛰기"
+   - **"예" 선택 시**: `visual-qa` 결과를 `"PENDING"`으로 기록, 결과 안내에서 `/visual-qa` 실행 안내 표시
+   - **"아니오" 선택 시 또는 프론트엔드 변경 없음**: `visual-qa` 결과를 `"SKIP"`으로 기록
+
+5. **결과 취합 및 파일 생성** (필수 - 메인에서만 수행)
    - 각 subagent가 반환한 결과(JSON 텍스트)를 파싱
    - 결과를 취합하여 `<directory>/tmp/validation-status.json` 파일 **직접 생성**
    - **Subagent는 이 파일을 작성하지 않음 - 반드시 메인에서 Write 도구로 생성**
@@ -153,6 +170,7 @@ feat: 회원가입 유효성 검사 추가
 | `results.security-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 보안 검증 결과 |
 | `results.code-simplifier` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 코드 품질 검증 결과 |
 | `results.test-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 테스트 검증 결과 |
+| `results.visual-qa` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" \| "PENDING" | X | Visual QA 결과 (선택적) |
 | `overall` | "PASS" \| "WARN" \| "FAIL" | O | 전체 검증 결과 |
 | `warnings` | string[] | O | 경고 메시지 배열 |
 | `errors` | string[] | O | 에러 메시지 배열 |
@@ -167,6 +185,7 @@ git log <base_branch>..HEAD --oneline
 - `PASS`: 모든 검증 통과
 - `WARN`: FAIL 없이 WARN 존재
 - `FAIL`: 하나라도 FAIL
+- `visual-qa`는 선택적이므로 `SKIP`/`PENDING`일 때 overall에 영향 없음
 
 **1단계 FAIL 시 파일 생성**:
 - 1단계에서 FAIL이면 2단계는 실행하지 않음
@@ -180,7 +199,8 @@ git log <base_branch>..HEAD --oneline
     "doc-validator": "SKIP",
     "security-validator": "SKIP",
     "code-simplifier": "SKIP",
-    "test-validator": "SKIP"
+    "test-validator": "SKIP",
+    "visual-qa": "SKIP"
   },
   "overall": "FAIL"
 }
@@ -198,6 +218,14 @@ git log <base_branch>..HEAD --oneline
 - 구체적인 미충족 사항 안내 (어느 validator에서 실패했는지 명시)
 - 수정이 필요한 파일/위치 지정
 - 빌드 단계로 돌아가 수정하도록 안내
+
+### 3단계 (Visual QA) PENDING
+- 검증 완료 후 안내:
+  ```
+  프론트엔드 변경이 감지되어 Visual QA가 대기 중입니다.
+  `/visual-qa` 명령으로 UI 검증을 수행하세요.
+  ```
+- `/visual-qa` 실행 후 리포트(`tmp/visual-qa-report.md`)에서 결과 확인
 
 ## 사용 예시
 
