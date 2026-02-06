@@ -1,2 +1,5 @@
 # 임시 파일
 tmp/
+
+# dev-tools 사용자 환경 설정
+dev-tools/.env

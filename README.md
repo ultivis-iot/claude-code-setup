@@ -85,8 +85,12 @@ git pull
 │   └── validation-status.schema.json  # 검증 결과 표준 스키마
 ├── hooks/
 │   └── copy-plan-on-accept.sh  # Plan 승인 시 자동 복사
-└── plugins/
-    └── security-guidance/      # 실시간 보안 검사 Plugin
+├── plugins/
+│   └── security-guidance/      # 실시간 보안 검사 Plugin
+└── dev-tools/
+    ├── dev-commands.sh         # 개발 환경 셸 명령어
+    ├── .env.example            # 환경 설정 템플릿
+    └── .env                    # 사용자별 경로 설정 (자동 생성)
 ```
 
 ## 사용 방법
@@ -192,6 +196,90 @@ chmod +x .git/hooks/pre-commit
 | **PASS** | 검증 통과 |
 | **WARN** | 경고 (진행 가능) |
 | **FAIL** | 실패 (수정 필요) |
+
+## 개발 환경 셸 명령어
+
+`setup.sh` 실행 시 Git Worktree + tmux + Claude Code를 조합한 셸 명령어가 함께 설치됩니다.
+
+### 환경 변수 (.env)
+
+설치 시 `MAIN_PROJECT`와 `AX_DIR` 경로를 입력하면 `~/.claude/dev-tools/.env`가 자동 생성됩니다.
+
+```bash
+MAIN_PROJECT="/your/path/to/project-maker"  # 메인 프로젝트 경로 (git worktree 기준)
+AX_DIR="/your/path/to/ax"                   # 작업 루트 디렉토리
+```
+
+### Worktree 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `wt` | Worktree 목록 보기 (PR/merged 상태 표시) |
+| `wa` | Worktree 추가 (원격 브랜치 선택 또는 새 브랜치) |
+| `wr` | Worktree 삭제 (대화형, merged 우선 표시) |
+| `gw` | `git worktree list` 단축 |
+
+### Claude Code 세션 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `cc [target]` | Claude Code tmux 세션 시작/접속 |
+| `cc 552` | pm-552 디렉토리로 세션 시작 (숫자만 입력) |
+| `cc main` | 메인 프로젝트 세션 (또는 `cc m`) |
+| `ccs` | 모든 worktree의 세션 상태 보기 |
+| `cca` | 모든 worktree에 대해 세션 일괄 생성 |
+| `cc0` / `ccm` | 메인 프로젝트 세션 단축 |
+
+### Docker Worktree 전환
+
+> **참고**: `dw` 명령어는 project-maker 프로젝트 구조에 맞춰져 있습니다.
+> 아래 환경이 갖춰진 경우에만 동작합니다:
+> - `docker/docker-compose.dev.yml` (Docker Compose 설정)
+> - `scripts/init-dev.sh` (개발 환경 초기화 스크립트)
+> - `apps/api/alembic/` (Alembic 마이그레이션)
+> - `pnpm` + Vite dev server (프론트엔드)
+>
+> 해당 구조가 없는 프로젝트에서는 `dw`를 사용하지 않아도 됩니다. 나머지 명령어(`wt`, `wa`, `cc` 등)는 프로젝트 구조와 무관하게 사용 가능합니다.
+
+| 명령어 | 설명 |
+|--------|------|
+| `dw` | 현재 Docker worktree 상태 표시 |
+| `dw 583` | pm-583 워크트리로 Docker+Vite 전환 |
+| `dw main` | 기본 project-maker로 복원 (또는 `dw m`) |
+
+`dw` 실행 시 Alembic downgrade → Docker 재시작 → Alembic upgrade → Vite dev server 재시작이 자동으로 수행됩니다.
+
+### tmux 단축 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `tl` | tmux 세션 목록 |
+| `tk <name>` | 특정 세션 종료 |
+| `tka` | 모든 세션 종료 |
+| `td` | 현재 세션에서 detach |
+
+### Git 테스트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `gtest <branch>` | 메인 프로젝트에서 non-commit 테스트 머지 |
+| `greset` | 테스트 머지 초기화 |
+
+### 워크플로우 예시
+
+```bash
+# 1. 새 이슈 작업 시작
+wa              # worktree 추가 (브랜치 선택)
+cc 558          # 해당 worktree에서 Claude Code 시작
+
+# 2. 기존 작업 이어하기
+ccs             # 세션 상태 확인
+cc 552          # 원하는 세션으로 접속
+
+# 3. Docker 워크트리 전환
+dw 583          # Docker + Vite를 pm-583으로 전환
+dw main         # 작업 끝나면 메인으로 복원
+```
 
 ## 변경 이력
 

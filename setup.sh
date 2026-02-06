@@ -242,6 +242,66 @@ SETTINGS_EOF
     echo -e "${GREEN}   ✓ settings.json 생성 완료${NC}"
 fi
 
+# Dev-tools 설치
+echo "9. Dev-tools 설치..."
+DEV_TOOLS_DEST="$CLAUDE_DIR/dev-tools"
+mkdir -p "$DEV_TOOLS_DEST"
+
+# dev-commands.sh 복사 (항상 최신으로 갱신)
+cp "$SCRIPT_DIR/dev-tools/dev-commands.sh" "$DEV_TOOLS_DEST/dev-commands.sh"
+echo -e "${GREEN}   ✓ dev-commands.sh${NC}"
+
+# .env.example 복사
+cp "$SCRIPT_DIR/dev-tools/.env.example" "$DEV_TOOLS_DEST/.env.example"
+echo -e "${GREEN}   ✓ .env.example${NC}"
+
+# .env 생성 (없을 때만)
+if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
+    if [ "$UPDATE_MODE" = false ]; then
+        echo ""
+        echo -e "${YELLOW}   dev-tools 환경 설정이 필요합니다.${NC}"
+        read -p "   MAIN_PROJECT 경로 (메인 프로젝트, 예: /data/user/ax/project-maker): " MAIN_PROJECT_PATH
+        read -p "   AX_DIR 경로 (작업 루트, 예: /data/user/ax): " AX_DIR_PATH
+
+        if [ -n "$MAIN_PROJECT_PATH" ] && [ -n "$AX_DIR_PATH" ]; then
+            cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
+# AX 개발 환경 설정
+# 이 파일을 .env로 복사 후 경로를 수정하세요
+
+# 메인 프로젝트 경로 (git worktree의 기준)
+MAIN_PROJECT="$MAIN_PROJECT_PATH"
+
+# 작업 루트 디렉토리 (worktree들이 생성되는 상위 디렉토리)
+AX_DIR="$AX_DIR_PATH"
+ENV_EOF
+            echo -e "${GREEN}   ✓ .env 생성 완료${NC}"
+        else
+            echo -e "${YELLOW}   ⚠ 경로가 입력되지 않았습니다. .env.example을 참고하여 수동으로 .env를 생성하세요.${NC}"
+        fi
+    else
+        echo -e "${YELLOW}   .env 파일 없음. ~/.claude/dev-tools/.env.example 참고하여 수동 생성 필요${NC}"
+    fi
+else
+    echo -e "${GREEN}   ✓ .env 유지 (기존 설정 보존)${NC}"
+fi
+
+# ~/.bashrc에 source 라인 추가
+BASHRC="$HOME/.bashrc"
+SOURCE_LINE="source \"\$HOME/.claude/dev-tools/dev-commands.sh\""
+if [ -f "$BASHRC" ]; then
+    if ! grep -qF 'dev-tools/dev-commands.sh' "$BASHRC" 2>/dev/null; then
+        echo "" >> "$BASHRC"
+        echo "# AX 개발 환경 명령어" >> "$BASHRC"
+        echo "$SOURCE_LINE" >> "$BASHRC"
+        echo -e "${GREEN}   ✓ ~/.bashrc에 source 추가${NC}"
+    else
+        echo -e "${GREEN}   ✓ ~/.bashrc에 이미 설정됨${NC}"
+    fi
+else
+    echo "$SOURCE_LINE" > "$BASHRC"
+    echo -e "${GREEN}   ✓ ~/.bashrc 생성 및 source 추가${NC}"
+fi
+
 # 설치된 버전 기록
 echo "$CURRENT_VERSION" > "$INSTALLED_VERSION_FILE"
 
@@ -275,6 +335,8 @@ echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
 echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
 echo "  ~/.claude/settings.json (hooks 설정 포함)"
+echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
+echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
 echo ""
 echo "사용 방법:"
 echo "  1. Plan 모드 진입: Shift+Tab 두 번"
