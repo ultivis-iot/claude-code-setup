@@ -123,6 +123,19 @@ for file in "$SCRIPT_DIR/commands"/*.md; do
     fi
 done
 
+# Scripts 설치
+if [ -d "$SCRIPT_DIR/scripts" ]; then
+    mkdir -p "$CLAUDE_DIR/scripts"
+    for file in "$SCRIPT_DIR/scripts"/*.sh; do
+        if [ -f "$file" ]; then
+            filename=$(basename "$file")
+            cp "$file" "$CLAUDE_DIR/scripts/$filename"
+            chmod +x "$CLAUDE_DIR/scripts/$filename"
+            echo -e "${GREEN}   ✓ $filename${NC}"
+        fi
+    done
+fi
+
 # Agents 설치
 echo "4. Agents 설치..."
 for file in "$SCRIPT_DIR/agents"/*.md; do
@@ -335,6 +348,7 @@ echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
 echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
 echo "  ~/.claude/settings.json (hooks 설정 포함)"
+echo "  ~/.claude/scripts/issue.sh (이슈 조회 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
 echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
 echo ""
