@@ -47,8 +47,9 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 
 **중복 리뷰 판별**:
 - `tmp/last-review-id-{PR번호}.txt`에 `{comment_id}:{consecutive_count}` 형식으로 기록 (PR별 격리)
-- 최신 comment ID와 비교하여 동일하면 count 증가, 다르면 1로 리셋
-- 3회 연속 동일 (count ≥ 3) → `<promise>REVIEW COMPLETE</promise>` 출력
+- 최신 comment ID와 비교하여 동일하면 **60초 대기 후 재확인** (리뷰 도착 대기)
+- 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
+- 2회 연속 동일 (count ≥ 2, 각 회차마다 60초 대기 포함) → `<promise>REVIEW COMPLETE</promise>` 출력
 - 이 파일은 `.gitignore`에 추가 권장 (로컬 상태, 커밋 불필요)
 - 파일이 없거나 포맷이 깨진 경우 count를 0으로 초기화하여 처리
 
