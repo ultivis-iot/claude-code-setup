@@ -17,6 +17,7 @@ PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
 
 - `/review-cycle 23` → PR #23
 - `/review-cycle` → 현재 브랜치의 PR 자동 감지 (`gh pr view --json number`)
+- PR 번호는 양의 정수(`^[0-9]+$`)만 허용. 그 외 입력은 에러 출력 후 즉시 종료
 
 ## 실행 모드
 
@@ -38,6 +39,7 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 
 세 가지 소스를 모두 확인하여 가장 최신 항목을 기준으로 처리.
 타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt` (reply 없으면 thread 자체의 `createdAt`).
+reviewThreads에서 `isResolved: true`인 thread는 필터링 대상에서 제외.
 
 **CI와 리뷰를 병렬 확인**:
 - CI 실패 + 신규 리뷰 있음 → CI 수정 + 리뷰 반영 모두 처리
@@ -48,9 +50,10 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 **중복 리뷰 판별**:
 - `tmp/last-review-id-{PR번호}.txt`에 `{source}:{comment_id}:{consecutive_count}` 형식으로 기록 (PR별 격리, 소스별 구분)
   - source: `comment`, `review`, `thread` 중 하나
-- 최신 항목의 `{source}:{id}`와 비교하여 동일하면 **60초 대기 후 재확인** (리뷰 도착 대기)
-- 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
-- 2회 연속 동일 (count ≥ 2, 각 회차마다 60초 대기 포함) → `<promise>REVIEW COMPLETE</promise>` 출력
+- 최신 항목의 `{source}:{id}`와 비교:
+  - **단독 모드**: 동일하면 "새 리뷰 없음"으로 즉시 종료 (대기 없음)
+  - **Ralph Loop 모드**: 동일하면 **60초 대기 후 재확인**. 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
+- 2회 연속 동일 (count ≥ 2) → `<promise>REVIEW COMPLETE</promise>` 출력
 - 이 파일은 `.gitignore`에 추가 권장 (로컬 상태, 커밋 불필요)
 - 파일이 없거나 포맷이 깨진 경우 count를 0으로 초기화하여 처리
 
