@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
 description: PR AI 리뷰 확인 → 분석 → 반영/코멘트 → 커밋+push 사이클
 argument-hint: [PR번호]
 ---
@@ -8,7 +8,7 @@ argument-hint: [PR번호]
 
 PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
 
-**단독 실행**: `/review-cycle 23`
+**단독 실행**: `/review-cycle 23` — 최신 리뷰 1건 처리 후 종료
 **자동 반복**: `/ralph-loop /review-cycle $ARGUMENTS --completion-promise "REVIEW COMPLETE" --max-iterations 15`
 
 ## 인자 파싱
@@ -17,6 +17,13 @@ PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
 
 - `/review-cycle 23` → PR #23
 - `/review-cycle` → 현재 브랜치의 PR 자동 감지 (`gh pr view --json number`)
+
+## 실행 모드
+
+| 모드 | 대기 | 반복 |
+|------|------|------|
+| **단독** (`/review-cycle 23`) | 없음 — 최신 리뷰 1건 처리 후 즉시 종료 | 사용자가 수동 재호출 |
+| **Ralph Loop** (`/ralph-loop /review-cycle 23 ...`) | ralph-loop이 외부에서 제어 | 자동 반복, promise 감지 시 종료 |
 
 ## 사이클
 
@@ -27,8 +34,16 @@ gh pr checks <PR>       # CI 통과 확인
 gh pr view <PR> --json comments --jq '.comments[-1]'  # 최신 리뷰
 ```
 
-- **CI 실패**: 실패 원인 확인 → 수정 → 커밋 → push → 사이클 종료 (다음 리뷰 대기)
-- **새 리뷰 없음** (이전 사이클과 동일 comment ID): 2분 대기 후 재확인. 3회 연속 동일하면 종료
+**CI와 리뷰를 병렬 확인**:
+- CI 실패 + 신규 리뷰 있음 → CI 수정 + 리뷰 반영 모두 처리
+- CI 실패 + 신규 리뷰 없음 → CI 실패 원인만 수정 → 커밋 → push
+- CI 통과 + 신규 리뷰 있음 → 리뷰 반영 처리
+- CI 통과 + 신규 리뷰 없음 → 종료
+
+**중복 리뷰 판별**:
+- `tmp/last-review-id.txt`에 마지막 처리한 comment ID 기록
+- 최신 comment ID와 비교하여 동일하면 "새 리뷰 없음"으로 판단
+- 3회 연속 동일 → `<promise>REVIEW COMPLETE</promise>` 출력
 
 ### 2. 리뷰 분석
 
@@ -84,6 +99,7 @@ gh pr view <PR> --json comments --jq '.comments[-1]'  # 최신 리뷰
    Co-Authored-By: Claude <noreply@anthropic.com>
    ```
 5. `git push`
+6. 마지막 처리한 comment ID를 `tmp/last-review-id.txt`에 기록
 
 ### 5. 종료 조건
 
