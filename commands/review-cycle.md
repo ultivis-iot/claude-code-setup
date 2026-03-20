@@ -38,6 +38,7 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 ```
 
 **우선순위**: comments(primary) → reviews → reviewThreads(fallback). 대부분의 AI 리뷰어는 일반 comment로 남기므로 comments를 먼저 확인하고, 없으면 나머지 소스를 탐색.
+**AI 리뷰 식별**: bot 계정 여부(`author.is_bot`) 또는 코멘트 본문이 `## 🤖 AI Code Review` 패턴으로 시작하는지 확인. 사람의 일반 코멘트는 리뷰 분석 대상에서 제외.
 타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt` (reply 없으면 thread 자체의 `createdAt`).
 reviewThreads에서 `isResolved: true`인 thread는 필터링 대상에서 제외.
 
@@ -53,7 +54,7 @@ reviewThreads에서 `isResolved: true`인 thread는 필터링 대상에서 제�
 - 최신 항목의 `{source}:{id}`와 비교:
   - **단독 모드**: 동일하면 "새 리뷰 없음"으로 즉시 종료 (대기 없음)
   - **Ralph Loop 모드**: 동일하면 **60초 대기 후 재확인**. 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
-- 2회 연속 동일 (count ≥ 2) → `<promise>REVIEW COMPLETE</promise>` 출력
+- 2회 연속 동일 (count ≥ 2) → 종료 조건 충족 (아래 "종료 조건" 참조)
 - 이 파일은 `.gitignore`에 추가 권장 (로컬 상태, 커밋 불필요)
 - 파일이 없거나 포맷이 깨진 경우 count를 0으로 초기화하여 처리
 
@@ -118,7 +119,7 @@ N차는 PR 코멘트에서 `리뷰 반영` 패턴이 포함된 코멘트 수 + 1
 
 ### 5. 종료 조건
 
-다음 중 하나를 만족하면 종료:
+다음 중 **하나라도** 만족하면 종료. 모든 종료 경로에서 동일한 promise를 출력:
 
 - 신규 지적 없음 (반복 지적만 남음)
 - 모든 지적이 이전 라운드에서 설명 완료
