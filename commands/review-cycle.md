@@ -33,9 +33,10 @@ PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
 gh pr checks <PR>                                              # CI 통과 확인
 gh pr view <PR> --json comments --jq '.comments[-1]'           # 일반 코멘트 (AI 리뷰어 대부분)
 gh pr view <PR> --json reviews --jq '.reviews[-1]'             # Pull Request Review
+gh pr view <PR> --json reviewThreads                           # 인라인 코드 리뷰 코멘트
 ```
 
-양쪽 모두 확인하여 가장 최신 항목을 기준으로 처리.
+세 가지 소스를 모두 확인하여 가장 최신 항목을 기준으로 처리.
 
 **CI와 리뷰를 병렬 확인**:
 - CI 실패 + 신규 리뷰 있음 → CI 수정 + 리뷰 반영 모두 처리
@@ -44,10 +45,11 @@ gh pr view <PR> --json reviews --jq '.reviews[-1]'             # Pull Request Re
 - CI 통과 + 신규 리뷰 없음 → 종료
 
 **중복 리뷰 판별**:
-- `tmp/last-review-id.txt`에 `{comment_id}:{consecutive_count}` 형식으로 기록
+- `tmp/last-review-id-{PR번호}.txt`에 `{comment_id}:{consecutive_count}` 형식으로 기록 (PR별 격리)
 - 최신 comment ID와 비교하여 동일하면 count 증가, 다르면 1로 리셋
 - 3회 연속 동일 (count ≥ 3) → `<promise>REVIEW COMPLETE</promise>` 출력
 - 이 파일은 `.gitignore`에 추가 권장 (로컬 상태, 커밋 불필요)
+- 파일이 없거나 포맷이 깨진 경우 count를 0으로 초기화하여 처리
 
 ### 2. 리뷰 분석
 
@@ -91,7 +93,7 @@ gh pr view <PR> --json reviews --jq '.reviews[-1]'             # Pull Request Re
    - Rust: `cargo clippy --workspace && cargo test --workspace --lib`
    - Node: `npm run lint && npm test`
    - Python: `ruff check . && pytest`
-   - 기타: 프로젝트의 CLAUDE.md 또는 CI 설정 참조. 빌드 명령을 찾지 못하면 경고 로그 후 skip
+   - 기타: 프로젝트의 CLAUDE.md 또는 CI 설정 참조. 빌드 명령을 찾지 못하면 경고 후 skip하고 커밋 메시지에 `[빌드 미검증]` 표기
 3. 관련 파일만 `git add` (민감 파일 제외)
 4. 커밋 메시지:
    ```
@@ -103,7 +105,9 @@ gh pr view <PR> --json reviews --jq '.reviews[-1]'             # Pull Request Re
    Co-Authored-By: Claude <noreply@anthropic.com>
    ```
 5. `git push`
-6. 마지막 처리한 comment ID를 `tmp/last-review-id.txt`에 `{id}:1` 형식으로 기록
+6. 마지막 처리한 comment ID를 `tmp/last-review-id-{PR}.txt`에 `{id}:1` 형식으로 기록
+
+> **주의**: push 실패 시 코멘트만 남고 코드 미반영 상태가 됩니다. push 실패 시 재시도하거나 사용자에게 알려야 합니다.
 
 ### 5. 종료 조건
 

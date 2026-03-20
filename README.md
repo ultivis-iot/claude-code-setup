@@ -166,7 +166,7 @@ mkdir -p tmp
 **자동 생성되는 파일**:
 - `tmp/current-plan.md` - Plan 승인 시 자동 복사 (PostToolUse hook)
 - `tmp/validation-status.json` - 검증 결과 기록
-- `tmp/last-review-id.txt` - 리뷰 사이클 상태 (`.gitignore` 권장)
+- `tmp/last-review-id-{PR}.txt` - 리뷰 사이클 상태 (`.gitignore` 권장)
 
 ### Git Hook 설치 (선택)
 
