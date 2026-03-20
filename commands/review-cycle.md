@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
-description: PR AI 리뷰 확인 → 분석 → 반영/코멘트 → 커밋+push 사이클
+description: PR AI 리뷰 확인 → 분석 → 반영/코멘트/이슈 생성 → 커밋+push 사이클
 argument-hint: [PR번호]
 ---
 
@@ -37,6 +37,7 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 ```
 
 세 가지 소스를 모두 확인하여 가장 최신 항목을 기준으로 처리.
+타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt`.
 
 **CI와 리뷰를 병렬 확인**:
 - CI 실패 + 신규 리뷰 있음 → CI 수정 + 리뷰 반영 모두 처리
@@ -107,7 +108,7 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 5. `git push`
 6. 마지막 처리한 comment ID를 `tmp/last-review-id-{PR}.txt`에 `{id}:1` 형식으로 기록
 
-> **주의**: push 실패 시 코멘트만 남고 코드 미반영 상태가 됩니다. push 실패 시 재시도하거나 사용자에게 알려야 합니다.
+> **push 실패 시**: 1회 재시도 → 재실패 시 PR 코멘트에 `[push 실패]` 표기 후 사이클 중단. 코드는 로컬에 커밋된 상태이므로 수동 push로 복구 가능.
 
 ### 5. 종료 조건
 
