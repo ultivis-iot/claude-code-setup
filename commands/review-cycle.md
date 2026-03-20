@@ -37,7 +37,7 @@ gh pr view <PR> --json reviews --jq '.reviews[-1]'             # Pull Request Re
 gh pr view <PR> --json reviewThreads                           # 인라인 코드 리뷰 코멘트
 ```
 
-세 가지 소스를 모두 확인하여 가장 최신 항목을 기준으로 처리.
+**우선순위**: comments(primary) → reviews → reviewThreads(fallback). 대부분의 AI 리뷰어는 일반 comment로 남기므로 comments를 먼저 확인하고, 없으면 나머지 소스를 탐색.
 타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt` (reply 없으면 thread 자체의 `createdAt`).
 reviewThreads에서 `isResolved: true`인 thread는 필터링 대상에서 제외.
 
@@ -100,7 +100,7 @@ N차는 PR 코멘트에서 `리뷰 반영` 패턴이 포함된 코멘트 수 + 1
    - Rust: `cargo clippy --workspace && cargo test --workspace --lib`
    - Node: `npm run lint && npm test`
    - Python: `ruff check . && pytest`
-   - 기타: 프로젝트의 CLAUDE.md 또는 CI 설정 참조. 빌드 명령을 찾지 못하면 경고 후 skip하고 커밋 메시지에 `[빌드 미검증]` 표기
+   - 기타: 프로젝트의 CLAUDE.md 또는 CI 설정 참조. 빌드 명령을 찾지 못하면 경고 후 skip하고 커밋 메시지에 `[빌드 미검증]` 표기. 이 경우 push는 보류하고 사용자 확인을 요청
 3. 관련 파일만 `git add` (민감 파일 제외)
 4. 커밋 메시지:
    ```
