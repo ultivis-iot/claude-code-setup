@@ -109,7 +109,7 @@ N차는 PR 코멘트에서 `리뷰 반영` 패턴이 포함된 코멘트 수 + 1
    Co-Authored-By: Claude <noreply@anthropic.com>
    ```
 5. `git push`
-6. 마지막 처리한 comment ID를 `tmp/last-review-id-{PR}.txt`에 `{id}:1` 형식으로 기록
+6. 마지막 처리한 comment ID를 `tmp/last-review-id-{PR}.txt`에 `{source}:{id}:1` 형식으로 기록
 
 > **push 실패 시**: `git pull --rebase` 후 1회 재시도 → 재실패 시 PR 코멘트에 `[push 실패]` 표기 후 사이클 중단. 코드는 로컬에 커밋된 상태이므로 수동 push로 복구 가능.
 
@@ -119,7 +119,7 @@ N차는 PR 코멘트에서 `리뷰 반영` 패턴이 포함된 코멘트 수 + 1
 
 - 신규 지적 없음 (반복 지적만 남음)
 - 모든 지적이 이전 라운드에서 설명 완료
-- 3회 연속 동일 리뷰 (새 리뷰 미도착)
+- 2회 연속 동일 리뷰 (새 리뷰 미도착, 각 회차 60초 대기 포함)
 
 종료 시 출력:
 ```
