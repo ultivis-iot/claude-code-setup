@@ -37,7 +37,7 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 ```
 
 세 가지 소스를 모두 확인하여 가장 최신 항목을 기준으로 처리.
-타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt`.
+타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt` (reply 없으면 thread 자체의 `createdAt`).
 
 **CI와 리뷰를 병렬 확인**:
 - CI 실패 + 신규 리뷰 있음 → CI 수정 + 리뷰 반영 모두 처리
@@ -46,8 +46,9 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 - CI 통과 + 신규 리뷰 없음 → 종료
 
 **중복 리뷰 판별**:
-- `tmp/last-review-id-{PR번호}.txt`에 `{comment_id}:{consecutive_count}` 형식으로 기록 (PR별 격리)
-- 최신 comment ID와 비교하여 동일하면 **60초 대기 후 재확인** (리뷰 도착 대기)
+- `tmp/last-review-id-{PR번호}.txt`에 `{source}:{comment_id}:{consecutive_count}` 형식으로 기록 (PR별 격리, 소스별 구분)
+  - source: `comment`, `review`, `thread` 중 하나
+- 최신 항목의 `{source}:{id}`와 비교하여 동일하면 **60초 대기 후 재확인** (리뷰 도착 대기)
 - 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
 - 2회 연속 동일 (count ≥ 2, 각 회차마다 60초 대기 포함) → `<promise>REVIEW COMPLETE</promise>` 출력
 - 이 파일은 `.gitignore`에 추가 권장 (로컬 상태, 커밋 불필요)
@@ -67,7 +68,8 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 
 ### 3. 코멘트 작성
 
-**먼저** PR 코멘트로 반영/미반영을 남김 (코드 수정 전):
+**먼저** PR 코멘트로 반영/미반영을 남김 (코드 수정 전).
+N차는 PR 코멘트에서 `리뷰 반영` 패턴이 포함된 코멘트 수 + 1로 산출.
 
 ```markdown
 ## N차 리뷰 반영 현황
@@ -109,7 +111,7 @@ gh pr view <PR> --json reviewThreads                           # 인라인 코�
 5. `git push`
 6. 마지막 처리한 comment ID를 `tmp/last-review-id-{PR}.txt`에 `{id}:1` 형식으로 기록
 
-> **push 실패 시**: 1회 재시도 → 재실패 시 PR 코멘트에 `[push 실패]` 표기 후 사이클 중단. 코드는 로컬에 커밋된 상태이므로 수동 push로 복구 가능.
+> **push 실패 시**: `git pull --rebase` 후 1회 재시도 → 재실패 시 PR 코멘트에 `[push 실패]` 표기 후 사이클 중단. 코드는 로컬에 커밋된 상태이므로 수동 push로 복구 가능.
 
 ### 5. 종료 조건
 
