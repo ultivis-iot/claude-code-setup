@@ -1,0 +1,116 @@
+---
+allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write
+description: PR AI 리뷰 확인 → 분석 → 반영/코멘트 → 커밋+push 사이클
+argument-hint: [PR번호]
+---
+
+# PR 리뷰 반영 사이클
+
+PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
+
+**단독 실행**: `/review-cycle 23`
+**자동 반복**: `/ralph-loop /review-cycle $ARGUMENTS --completion-promise "REVIEW COMPLETE" --max-iterations 15`
+
+## 인자 파싱
+
+입력: `$ARGUMENTS`
+
+- `/review-cycle 23` → PR #23
+- `/review-cycle` → 현재 브랜치의 PR 자동 감지 (`gh pr view --json number`)
+
+## 사이클
+
+### 1. 상태 확인
+
+```bash
+gh pr checks <PR>       # CI 통과 확인
+gh pr view <PR> --json comments --jq '.comments[-1]'  # 최신 리뷰
+```
+
+- **CI 실패**: 실패 원인 확인 → 수정 → 커밋 → push → 사이클 종료 (다음 리뷰 대기)
+- **새 리뷰 없음** (이전 사이클과 동일 comment ID): 2분 대기 후 재확인. 3회 연속 동일하면 종료
+
+### 2. 리뷰 분석
+
+최신 리뷰의 각 지적을 분류:
+
+| 분류 | 기준 | 조치 |
+|------|------|------|
+| **실제 버그** | panic, 데이터 손실, 보안 취약점 | 즉시 수정 |
+| **유효한 개선** | 에러 처리 누락, 검증 미비, 엣지케이스 | 수정 |
+| **설계 개선** | 리팩터링, 모듈 분리, 캐시 도입 등 | PR 범위 초과 시 → 이슈 생성 또는 코멘트 |
+| **반복 지적** | 이전 라운드에서 이미 설명한 항목 | skip |
+| **오탐** | 코드를 잘못 읽었거나 컨텍스트 부족 | 코멘트로 정정 |
+
+### 3. 코멘트 작성
+
+**먼저** PR 코멘트로 반영/미반영을 남김 (코드 수정 전):
+
+```markdown
+## N차 리뷰 반영 현황
+
+### 반영 (N건)
+- **지적 요약**: 수정 내용
+
+### 의도적 미반영 (N건, 사유)
+- **지적 요약**: 미반영 사유
+```
+
+신규 지적이 전혀 없으면:
+```markdown
+## N차 리뷰 — 신규 지적 없음
+(반복 지적 정리 테이블 포함)
+```
+→ 코드 수정 없이 사이클 종료
+
+### 4. 코드 수정
+
+"반영" 분류된 항목만 수정:
+
+1. 코드 수정
+2. 프로젝트 빌드/린트 확인 (프로젝트에 맞는 도구 사용)
+   - Rust: `cargo clippy --workspace && cargo test --workspace --lib`
+   - Node: `npm run lint && npm test`
+   - Python: `ruff check . && pytest`
+   - 기타: 프로젝트의 CLAUDE.md 또는 CI 설정 참조
+3. 관련 파일만 `git add` (민감 파일 제외)
+4. 커밋 메시지:
+   ```
+   fix: N차 리뷰 반영 — 요약
+
+   - 수정 항목 1
+   - 수정 항목 2
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   ```
+5. `git push`
+
+### 5. 종료 조건
+
+다음 중 하나를 만족하면 종료:
+
+- 신규 지적 없음 (반복 지적만 남음)
+- 모든 지적이 이전 라운드에서 설명 완료
+- 3회 연속 동일 리뷰 (새 리뷰 미도착)
+
+종료 시 출력:
+```
+<promise>REVIEW COMPLETE</promise>
+```
+
+## 판단 원칙
+
+### 무조건 수정
+- **CLAUDE.md 규칙 위반** — 프로젝트에서 금지한 패턴
+- **실제 런타임 버그** — panic, 크래시, 데이터 손실
+- **보안 취약점** — injection, path traversal, 인증 우회
+
+### 상황 판단
+- **코드 스타일/구조 개선** → PR 범위 내면 수정, 아니면 이슈 생성
+- **동일 지적 3회 이상 반복** → 이전 설명 참조 안내 후 skip
+- **이슈 생성 대상** → `gh issue create`로 생성 후 코멘트에 링크 포함
+
+### 하지 않는 것
+- 반영/미반영 판단 전에 코드 수정하지 않음 (코멘트 먼저)
+- AI 리뷰어의 반복 지적에 무한 대응하지 않음 (3회 이상 → skip)
+- PR 범위를 넘어서는 리팩터링을 이번 커밋에 포함하지 않음

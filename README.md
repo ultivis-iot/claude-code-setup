@@ -75,7 +75,8 @@ git pull
 ├── settings.json               # hooks 설정 포함
 ├── commands/
 │   ├── commit-and-verify.md    # 커밋 + 검증 자동 실행
-│   └── create-pr.md            # 검증 통과 후 PR 생성
+│   ├── create-pr.md            # 검증 통과 후 PR 생성
+│   └── review-cycle.md         # PR AI 리뷰 반영 사이클
 ├── agents/
 │   ├── intent-validator.md     # 검증 1단계: 의도 검증
 │   ├── doc-validator.md        # 검증 2단계: 문서 검증
@@ -135,6 +136,22 @@ Plan에 따라 코드를 구현합니다.
 ```
 
 모든 검증 통과 시 Push 및 PR을 생성합니다.
+
+### 5. PR 리뷰 반영
+
+```bash
+# 1회 실행 — 최신 AI 리뷰 확인 후 반영/코멘트
+/review-cycle 23
+
+# 자동 반복 — 새 리뷰가 올 때마다 자동 반영 (Ralph Loop 연동)
+/ralph-loop /review-cycle 23 --completion-promise "REVIEW COMPLETE" --max-iterations 15
+```
+
+AI 코드 리뷰어의 지적을 자동으로 분석하고:
+- **실제 버그/보안 문제** → 코드 수정 + 커밋 + push
+- **설계 개선** → PR 범위 초과 시 GitHub 이슈 생성
+- **오탐/반복 지적** → PR 코멘트로 사유 설명
+- **신규 지적 없음** → 사이클 종료
 
 ## 프로젝트별 설정
 
