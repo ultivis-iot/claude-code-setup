@@ -231,57 +231,118 @@ wr() {
     done
 
     echo ""
-    read -p "선택 (1-${#all_list[@]}, q=취소): " choice
+    echo "  [a] merged 전체 선택"
+    echo ""
+    read -p "선택 (번호/콤마/범위, a=merged 전체, q=취소): " choice
 
     case "$choice" in
         q|Q) echo "취소됨"; return 1 ;;
-        ''|*[!0-9]*) echo "잘못된 입력"; return 1 ;;
+        '') echo "잘못된 입력"; return 1 ;;
     esac
 
-    local idx=$((choice - 1))
-    if [ $idx -lt 0 ] || [ $idx -ge ${#all_list[@]} ]; then
-        echo "잘못된 선택"
-        return 1
+    # 선택 파싱 → 인덱스 배열
+    local selected_indices=()
+
+    if [ "$choice" = "a" ] || [ "$choice" = "A" ]; then
+        for ((j=0; j<${#merged_list[@]}; j++)); do
+            selected_indices+=($j)
+        done
+        if [ ${#selected_indices[@]} -eq 0 ]; then
+            echo "merged 워크트리가 없습니다."
+            return 0
+        fi
+    else
+        # 콤마, 공백, 하이픈 범위 파싱 (예: "1,3,5" "1 3 5" "1-3")
+        local nums=$(echo "$choice" | tr ',' ' ')
+        for num in $nums; do
+            if [[ "$num" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+                local range_start="${BASH_REMATCH[1]}"
+                local range_end="${BASH_REMATCH[2]}"
+                for ((k=range_start; k<=range_end; k++)); do
+                    local idx=$((k - 1))
+                    if [ $idx -ge 0 ] && [ $idx -lt ${#all_list[@]} ]; then
+                        selected_indices+=($idx)
+                    fi
+                done
+            elif [[ "$num" =~ ^[0-9]+$ ]]; then
+                local idx=$((num - 1))
+                if [ $idx -ge 0 ] && [ $idx -lt ${#all_list[@]} ]; then
+                    selected_indices+=($idx)
+                else
+                    echo "잘못된 번호: $num"; return 1
+                fi
+            fi
+        done
     fi
 
-    local selected="${all_list[$idx]}"
-    local wtpath=$(echo "$selected" | cut -d'|' -f1)
-    local wtname=$(echo "$selected" | cut -d'|' -f2)
-    local wtbranch=$(echo "$selected" | cut -d'|' -f3)
-
-    # 깨끗한 상태인지 확인
-    local dirty=$(git -C "$wtpath" status --porcelain 2>/dev/null)
-    if [ -n "$dirty" ]; then
-        echo ""
-        echo "❌ $wtname 에 커밋되지 않은 변경사항이 있습니다:"
-        git -C "$wtpath" status --short
-        echo ""
-        echo "변경사항을 커밋하거나 삭제한 후 다시 시도하세요."
-        return 1
+    if [ ${#selected_indices[@]} -eq 0 ]; then
+        echo "선택된 항목이 없습니다."; return 1
     fi
+
+    # 선택 항목 표시 + dirty 체크
+    echo ""
+    echo "삭제 대상:"
+    local has_dirty=false
+    for idx in "${selected_indices[@]}"; do
+        local selected="${all_list[$idx]}"
+        local wtpath=$(echo "$selected" | cut -d'|' -f1)
+        local wtname=$(echo "$selected" | cut -d'|' -f2)
+        local wtbranch=$(echo "$selected" | cut -d'|' -f3)
+        local dirty=$(git -C "$wtpath" status --porcelain 2>/dev/null)
+        if [ -n "$dirty" ]; then
+            echo "  ❌ $wtname ($wtbranch) — 변경사항 있음 (건너뜀)"
+            has_dirty=true
+        else
+            echo "  - $wtname ($wtbranch)"
+        fi
+    done
 
     echo ""
-    echo "삭제 대상: $wtname ($wtbranch)"
-    read -p "정말 삭제하시겠습니까? (y/n): " confirm
-
+    if [ "$has_dirty" = true ]; then
+        read -p "변경사항 있는 항목은 건너뛰고 진행합니까? (y/n): " confirm
+    else
+        read -p "정말 삭제하시겠습니까? (y/n): " confirm
+    fi
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        echo "취소됨"
-        return 1
+        echo "취소됨"; return 1
     fi
 
-    # Docker worktree 안전장치: 삭제 대상이 활성 Docker 워크트리면 초기화
-    local state_file="$DEV_TOOLS_DIR/.worktree-active"
-    if [ -f "$state_file" ]; then
-        local active_dw=$(cat "$state_file")
-        if [ "$active_dw" = "$wtname" ]; then
-            echo "⚠️  삭제 대상이 활성 Docker 워크트리입니다. 상태를 초기화합니다."
-            echo "project-maker" > "$state_file"
-            unset PM_PROJECT_ROOT
+    # 삭제 실행
+    local deleted=0
+    for idx in "${selected_indices[@]}"; do
+        local selected="${all_list[$idx]}"
+        local wtpath=$(echo "$selected" | cut -d'|' -f1)
+        local wtname=$(echo "$selected" | cut -d'|' -f2)
+
+        # dirty 스킵
+        local dirty=$(git -C "$wtpath" status --porcelain 2>/dev/null)
+        if [ -n "$dirty" ]; then
+            echo "⏭️  $wtname 건너뜀 (변경사항 있음)"
+            continue
         fi
-    fi
 
-    git worktree remove "$wtpath"
-    echo "✅ 삭제 완료: $wtname"
+        # Docker worktree 안전장치
+        local state_file="$DEV_TOOLS_DIR/.worktree-active"
+        if [ -f "$state_file" ]; then
+            local active_dw=$(cat "$state_file")
+            if [ "$active_dw" = "$wtname" ]; then
+                echo "⚠️  $wtname: 활성 Docker 워크트리 상태 초기화"
+                echo "$(basename "$MAIN_PROJECT")" > "$state_file"
+                unset PM_PROJECT_ROOT
+            fi
+        fi
+
+        git worktree remove "$wtpath" --force 2>/dev/null || {
+            echo "⚠️  $wtname: git worktree remove 실패, 수동 삭제..."
+            rm -rf "$wtpath" 2>/dev/null
+            git worktree prune 2>/dev/null
+        }
+        echo "✅ 삭제: $wtname"
+        deleted=$((deleted + 1))
+    done
+
+    echo ""
+    echo "총 ${deleted}개 워크트리 삭제됨"
     echo ""
     wt
 }
