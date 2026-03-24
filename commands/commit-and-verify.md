@@ -7,7 +7,7 @@ argument-hint: [directory] [commit-message]
 ## 중요 제한 사항
 
 **Subagent 제한**:
-- 검증 subagent(intent-validator, doc-validator, security-validator, code-simplifier, test-validator)는 **검증만 수행**
+- 검증 subagent(intent-validator, doc-validator, security-validator, code-simplifier, test-validator, cli-validator)는 **검증만 수행**
 - Subagent는 `/create-pr`, `/commit-and-verify` 등 다른 skill/command를 **절대 호출하지 않음**
 - **Subagent는 파일을 작성하지 않음** - 결과를 JSON 텍스트로 반환만 함
 - **메인(이 커맨드)에서 결과를 취합**하여 `tmp/validation-status.json` 파일 생성
@@ -18,6 +18,11 @@ argument-hint: [directory] [commit-message]
 - 프론트엔드 파일 변경이 감지되면 3단계에서 `/visual-qa` 수행 여부를 사용자에게 제안
 - `/visual-qa`는 브라우저 MCP가 필요하므로 이 커맨드에서 직접 실행하지 않음 — 사용자가 별도 실행
 - `validation-status.json`에 `visual-qa` 결과를 기록 (`SKIP` 또는 `PENDING`)
+
+**CLI 동기화 검증**:
+- 프로젝트 루트에 `.cli-sync.json`이 있고 `enabled: true`이면, 2단계에서 cli-validator를 병렬 실행
+- `.cli-sync.json`이 없으면 첫 커밋 시 CLI 유무를 질문하여 파일 생성
+- `enabled: false`이면 CLI 디렉토리가 새로 추가되었는지 자동 탐지
 
 ## 인자 파싱
 
@@ -46,6 +51,38 @@ argument-hint: [directory] [commit-message]
 - 브랜치 전체 커밋: `git -C <directory> log <base_branch>..HEAD --oneline`
 - 브랜치 전체 변경: `git -C <directory> diff <base_branch>...HEAD`
 - staged 변경 내용: `git -C <directory> diff --staged`
+
+## CLI 동기화 설정 확인
+
+1. **`.cli-sync.json` 존재 확인**
+   ```bash
+   test -f <directory>/.cli-sync.json && echo "EXISTS" || echo "NOT_FOUND"
+   ```
+
+2. **파일이 없는 경우** — AskUserQuestion으로 질문:
+   - "이 프로젝트에 AI Agent용 CLI가 있나요?"
+   - **"예" 선택 시**: 추가 질문으로 cliPath, serverApiPath, cliLanguage, apiType 입력받아 `.cli-sync.json` 생성
+   - **"아니오" 선택 시**: `{"enabled": false}` 로 `.cli-sync.json` 생성
+   - 생성된 파일을 staged에 추가
+
+3. **파일이 있고 `enabled: false`인 경우** — CLI 자동 탐지:
+   - 프로젝트에 CLI가 새로 추가되었는지 빠르게 확인:
+     ```bash
+     # Go CLI
+     find <directory> -maxdepth 3 -name "go.mod" -exec dirname {} \; 2>/dev/null | xargs -I{} test -d "{}/cmd" && echo "go"
+     # Python CLI
+     find <directory> -maxdepth 3 -name "__main__.py" -path "*/cli/*" 2>/dev/null
+     # TypeScript CLI (package.json의 bin 필드)
+     find <directory> -maxdepth 3 -name "package.json" -exec grep -l '"bin"' {} \; 2>/dev/null
+     # Rust CLI
+     find <directory> -maxdepth 3 -name "Cargo.toml" -exec grep -l '\[\[bin\]\]' {} \; 2>/dev/null
+     ```
+   - **감지됨** → AskUserQuestion: "CLI가 추가된 것 같은데, 설정을 업데이트할까요?"
+     - "예" → cliPath 등 질문 → `.cli-sync.json` 업데이트
+     - "아니오" → 유지
+   - **감지 안 됨** → CLI_ENABLED=false로 설정, 스킵
+
+4. **파일이 있고 `enabled: true`인 경우** — CLI_ENABLED=true로 설정, 설정값 보관
 
 ## Plan 문서 선택
 
@@ -122,12 +159,25 @@ feat: 회원가입 유효성 검사 추가
 
 3. **검증 2단계 (품질 검증)** 병렬 수행
    - **검증 1단계 PASS 시에만 실행**
-   - 다음 네 가지 검증을 **동시에 병렬로** 실행:
+   - 다음 검증을 **동시에 병렬로** 실행:
      - doc-validator subagent: 문서 검증
      - security-validator subagent: 보안 검증
      - code-simplifier subagent: 코드 단순화 검증
      - test-validator subagent: 테스트 검증
-   - 반드시 네 Task 도구를 **한 번의 응답에서 동시에 호출**
+     - **cli-validator subagent: CLI 동기화 + help 품질 검증** (CLI_ENABLED=true일 때만)
+   - CLI_ENABLED=false이면 cli-validator를 호출하지 않고 결과를 `"SKIP"`으로 기록
+   - cli-validator에 전달할 프롬프트:
+     ```
+     작업 디렉토리: <directory 절대경로>
+     기준 브랜치: <base_branch>
+     CLI 설정:
+     - cliPath: <.cli-sync.json의 cliPath>
+     - serverApiPath: <.cli-sync.json의 serverApiPath>
+     - cliLanguage: <.cli-sync.json의 cliLanguage>
+     - apiType: <.cli-sync.json의 apiType>
+     - helpQualityRules: <.cli-sync.json의 helpQualityRules 배열>
+     ```
+   - 반드시 모든 Task 도구를 **한 번의 응답에서 동시에 호출**
    - 각 subagent에 작업 디렉토리 정보 전달
    - **각 subagent가 반환한 JSON 결과를 수집** (파일 작성은 subagent가 하지 않음)
 
@@ -170,6 +220,7 @@ feat: 회원가입 유효성 검사 추가
 | `results.security-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 보안 검증 결과 |
 | `results.code-simplifier` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 코드 품질 검증 결과 |
 | `results.test-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | O | 테스트 검증 결과 |
+| `results.cli-validator` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" | X | CLI 동기화 검증 결과 (선택적 — .cli-sync.json 활성화 시) |
 | `results.visual-qa` | "PASS" \| "WARN" \| "FAIL" \| "SKIP" \| "PENDING" | X | Visual QA 결과 (선택적) |
 | `overall` | "PASS" \| "WARN" \| "FAIL" | O | 전체 검증 결과 |
 | `warnings` | string[] | O | 경고 메시지 배열 |
@@ -185,7 +236,8 @@ git log <base_branch>..HEAD --oneline
 - `PASS`: 모든 검증 통과
 - `WARN`: FAIL 없이 WARN 존재
 - `FAIL`: 하나라도 FAIL
-- `visual-qa`는 선택적이므로 `SKIP`/`PENDING`일 때 overall에 영향 없음
+- `visual-qa`와 `cli-validator`는 선택적이므로 `SKIP` 상태일 때 overall에 영향 없음
+- `cli-validator`가 활성화된 경우(SKIP이 아닌 경우)에는 overall 판정에 포함
 
 **1단계 FAIL 시 파일 생성**:
 - 1단계에서 FAIL이면 2단계는 실행하지 않음
@@ -200,6 +252,7 @@ git log <base_branch>..HEAD --oneline
     "security-validator": "SKIP",
     "code-simplifier": "SKIP",
     "test-validator": "SKIP",
+    "cli-validator": "SKIP",
     "visual-qa": "SKIP"
   },
   "overall": "FAIL"

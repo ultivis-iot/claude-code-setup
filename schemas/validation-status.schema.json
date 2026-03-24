@@ -58,6 +58,10 @@
         "test-validator": {
           "$ref": "#/$defs/validationResult"
         },
+        "cli-validator": {
+          "$ref": "#/$defs/validationResult",
+          "description": "CLI 동기화 검증 결과 (선택적 — .cli-sync.json의 enabled: true 시)"
+        },
         "visual-qa": {
           "$ref": "#/$defs/visualQaResult",
           "description": "Visual QA 결과 (선택적 — 프론트엔드 변경 시)"

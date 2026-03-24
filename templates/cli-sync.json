@@ -1,0 +1,25 @@
+{
+  "_comment": "commit-and-verify 첫 실행 시 자동 생성됩니다. 직접 생성 시 참고용 템플릿.",
+  "_examples": {
+    "go_graphql": {
+      "enabled": true,
+      "cliPath": "packages/cli",
+      "cliLanguage": "go",
+      "serverApiPath": "packages/server/src/graphql/typeDefs",
+      "apiType": "graphql",
+      "helpQualityRules": ["모든 커맨드에 --json 플래그 필수"]
+    },
+    "python_rest": {
+      "enabled": true,
+      "cliPath": "cli",
+      "cliLanguage": "python",
+      "serverApiPath": "api/openapi.yaml",
+      "apiType": "rest",
+      "helpQualityRules": []
+    },
+    "no_cli": {
+      "enabled": false
+    }
+  },
+  "enabled": false
+}
