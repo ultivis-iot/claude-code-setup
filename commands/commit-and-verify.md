@@ -59,30 +59,42 @@ argument-hint: [directory] [commit-message]
    test -f <directory>/.cli-sync.json && echo "EXISTS" || echo "NOT_FOUND"
    ```
 
-2. **파일이 없는 경우** — AskUserQuestion으로 질문:
-   - "이 프로젝트에 AI Agent용 CLI가 있나요?"
-   - **"예" 선택 시**: 추가 질문으로 cliPath, serverApiPath, cliLanguage, apiType 입력받아 `.cli-sync.json` 생성
-   - **"아니오" 선택 시**: `{"enabled": false}` 로 `.cli-sync.json` 생성
-   - 생성된 파일을 staged에 추가
-
-3. **파일이 있고 `enabled: false`인 경우** — CLI 자동 탐지:
-   - 프로젝트에 CLI가 새로 추가되었는지 빠르게 확인:
+2. **파일이 없는 경우 또는 `enabled: false`인 경우** — CLI 자동 탐지:
+   - 프로젝트에 CLI가 있는지 자동으로 확인:
      ```bash
-     # Go CLI
+     # Go CLI (go.mod + cmd/ 디렉토리)
      find <directory> -maxdepth 3 -name "go.mod" -exec dirname {} \; 2>/dev/null | xargs -I{} test -d "{}/cmd" && echo "go"
-     # Python CLI
+     # Python CLI (cli/ + __main__.py 또는 setup.py entry_points)
      find <directory> -maxdepth 3 -name "__main__.py" -path "*/cli/*" 2>/dev/null
      # TypeScript CLI (package.json의 bin 필드)
      find <directory> -maxdepth 3 -name "package.json" -exec grep -l '"bin"' {} \; 2>/dev/null
-     # Rust CLI
+     # Rust CLI (Cargo.toml의 [[bin]])
      find <directory> -maxdepth 3 -name "Cargo.toml" -exec grep -l '\[\[bin\]\]' {} \; 2>/dev/null
      ```
-   - **감지됨** → AskUserQuestion: "CLI가 추가된 것 같은데, 설정을 업데이트할까요?"
-     - "예" → cliPath 등 질문 → `.cli-sync.json` 업데이트
-     - "아니오" → 유지
-   - **감지 안 됨** → CLI_ENABLED=false로 설정, 스킵
+   - **감지됨** → 서버 API 경로도 자동 탐지:
+     ```bash
+     # GraphQL typeDefs
+     find <directory> -maxdepth 5 -type d -name "typeDefs" -path "*/graphql/*" 2>/dev/null
+     # REST OpenAPI
+     find <directory> -maxdepth 3 -name "openapi.yaml" -o -name "openapi.json" 2>/dev/null
+     # gRPC proto
+     find <directory> -maxdepth 3 -name "*.proto" 2>/dev/null
+     ```
+   - 탐지 결과를 사용자에게 **확인만** 받음:
+     ```
+     CLI가 감지되었습니다:
+       - CLI 경로: packages/cli (Go, cobra)
+       - 서버 API: packages/server/src/graphql/typeDefs (GraphQL)
 
-4. **파일이 있고 `enabled: true`인 경우** — CLI_ENABLED=true로 설정, 설정값 보관
+     이 설정으로 .cli-sync.json을 생성할까요?
+       ○ 예
+       ○ 아니오
+     ```
+   - **"예"** → 탐지된 경로로 `.cli-sync.json` 생성, staged에 추가
+   - **"아니오"** → `{"enabled": false}` 로 생성 (또는 기존 유지)
+   - **감지 안 됨** → `{"enabled": false}` 로 생성, CLI_ENABLED=false 설정, 스킵
+
+3. **파일이 있고 `enabled: true`인 경우** — CLI_ENABLED=true로 설정, 설정값 보관
 
 ## Plan 문서 선택
 
