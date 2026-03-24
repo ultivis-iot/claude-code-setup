@@ -19,7 +19,9 @@ Plan → 빌드 → Commit → 검증 1단계 → 검증 2단계 (병렬) → Pu
 | **Plan 모드 가이드** | 사용자 의도를 명확하게 문서화 |
 | **Plan 자동 저장** | Plan 승인 시 `tmp/current-plan.md`로 자동 복사 |
 | **자동 검증** | 커밋 후 의도 검증 + 품질 검증 자동 실행 |
+| **CLI 동기화 검증** | 서버 API 변경 시 CLI 커맨드 동기화 + Help 품질 자동 검증 |
 | **보안 검사** | 실시간 보안 취약점 경고 + 커밋 후 보안 리뷰 |
+| **Visual QA** | 프론트엔드 변경 시 브라우저 자동화 UI 검증 |
 | **PR 생성** | 검증 통과 확인 후 자동 PR 생성 |
 
 ## 설치
@@ -76,12 +78,16 @@ git pull
 ├── commands/
 │   ├── commit-and-verify.md    # 커밋 + 검증 자동 실행
 │   ├── create-pr.md            # 검증 통과 후 PR 생성
-│   └── review-cycle.md         # PR AI 리뷰 반영 사이클
+│   ├── review-cycle.md         # PR AI 리뷰 반영 사이클
+│   └── visual-qa.md            # 프론트엔드 Visual QA 검증
 ├── agents/
 │   ├── intent-validator.md     # 검증 1단계: 의도 검증
 │   ├── doc-validator.md        # 검증 2단계: 문서 검증
 │   ├── security-validator.md   # 검증 2단계: 보안 검증
-│   └── code-simplifier.md      # 검증 2단계: 코드 단순화
+│   ├── code-simplifier.md      # 검증 2단계: 코드 단순화
+│   ├── test-validator.md       # 검증 2단계: 테스트 검증
+│   ├── cli-validator.md        # 검증 2단계: CLI 동기화 + Help 품질
+│   └── visual-qa-analyzer.md   # Visual QA 결과 분석
 ├── schemas/
 │   └── validation-status.schema.json  # 검증 결과 표준 스키마
 ├── hooks/
@@ -123,7 +129,8 @@ Plan에 따라 코드를 구현합니다.
 이 명령은 다음을 자동으로 수행합니다:
 - 커밋 생성
 - 검증 1단계: Plan 의도대로 구현되었는지 확인
-- 검증 2단계: 문서/보안/코드 품질 병렬 검증
+- 검증 2단계: 문서/보안/코드 품질/테스트/CLI 동기화 병렬 검증
+- 검증 3단계: 프론트엔드 변경 시 Visual QA 제안 (선택적)
 
 ### 4. PR 생성
 
@@ -167,6 +174,7 @@ mkdir -p tmp
 - `tmp/current-plan.md` - Plan 승인 시 자동 복사 (PostToolUse hook)
 - `tmp/validation-status.json` - 검증 결과 기록
 - `tmp/last-review-id-{PR}.txt` - 리뷰 사이클 상태 (`.gitignore` 권장)
+- `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
 
 ### Git Hook 설치 (선택)
 
@@ -234,7 +242,7 @@ AX_DIR="/your/path/to/ax"                   # 작업 루트 디렉토리
 |--------|------|
 | `wt` | Worktree 목록 보기 (PR/merged 상태 표시) |
 | `wa` | Worktree 추가 (원격 브랜치 선택 또는 새 브랜치) |
-| `wr` | Worktree 삭제 (대화형, merged 우선 표시) |
+| `wr` | Worktree 삭제 (복수 선택: `1,3,5` / `1-3` / `a`=merged 전체) |
 | `gw` | `git worktree list` 단축 |
 
 ### Claude Code 세션 명령어
