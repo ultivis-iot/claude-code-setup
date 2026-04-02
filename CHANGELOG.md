@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.0 (2026-04-02)
+- Docker 멀티유저 격리 지원 — 사용자명 해시 기반 포트 자동 할당 및 COMPOSE_PROJECT_NAME 자동 설정
+- dev-commands.sh에서 하드코딩된 포트 제거, 사용자별 자동 계산으로 대체
+- dw 명령어에 사용자별 --env-file 지원 추가
+- setup.sh .env 생성 시 Docker 멀티유저 격리 안내 포함
+
 ## v0.3.0 (2026-02-06)
 - visual-qa 커맨드 추가 — Chrome MCP 브라우저 자동화로 React 프론트엔드 UI/UX 검증
 - visual-qa-analyzer 에이전트 추가 — 수집 데이터 기반 디자인 품질 평가 및 이슈 판정

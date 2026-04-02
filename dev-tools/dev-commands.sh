@@ -15,6 +15,32 @@ else
     return 1 2>/dev/null || exit 1
 fi
 
+# ============================================================
+# 멀티유저 포트 자동 설정 (사용자명 해시 기반)
+# ============================================================
+# COMPOSE_PROJECT_NAME 자동 설정 (미설정 시)
+if [ -z "$COMPOSE_PROJECT_NAME" ]; then
+    export COMPOSE_PROJECT_NAME="pm-$(whoami)"
+fi
+
+# 포트 오프셋 계산: 사용자명 cksum 해시 → 0~49 범위
+if [ -z "$PM_PORT_OFFSET" ]; then
+    PM_PORT_OFFSET=$(( $(echo -n "$(whoami)" | cksum | cut -d' ' -f1) % 50 ))
+fi
+
+# 포트 설정 (.env에서 명시적으로 설정되지 않은 경우 자동 계산)
+export PM_TRAEFIK_PORT="${PM_TRAEFIK_PORT:-$(( 30080 + PM_PORT_OFFSET * 100 ))}"
+export PM_TRAEFIK_HTTPS_PORT="${PM_TRAEFIK_HTTPS_PORT:-$(( 30443 + PM_PORT_OFFSET * 100 ))}"
+export PM_TRAEFIK_DASHBOARD_PORT="${PM_TRAEFIK_DASHBOARD_PORT:-$(( 30081 + PM_PORT_OFFSET * 100 ))}"
+export PM_API_PORT="${PM_API_PORT:-$(( 38000 + PM_PORT_OFFSET * 100 ))}"
+export PM_PG_PORT="${PM_PG_PORT:-$(( 35432 + PM_PORT_OFFSET * 100 ))}"
+export PM_REDIS_PORT="${PM_REDIS_PORT:-$(( 36379 + PM_PORT_OFFSET * 100 ))}"
+export PM_MINIO_PORT="${PM_MINIO_PORT:-$(( 39000 + PM_PORT_OFFSET * 100 ))}"
+export PM_MINIO_CONSOLE_PORT="${PM_MINIO_CONSOLE_PORT:-$(( 39001 + PM_PORT_OFFSET * 100 ))}"
+export PM_FLOWER_PORT="${PM_FLOWER_PORT:-$(( 35555 + PM_PORT_OFFSET * 100 ))}"
+export PM_SMTP_PORT="${PM_SMTP_PORT:-$(( 32525 + PM_PORT_OFFSET * 100 ))}"
+export PM_VITE_PORT="${PM_VITE_PORT:-$(( 20173 + PM_PORT_OFFSET * 100 ))}"
+
 # Docker Worktree 상태 자동 로드
 _load_worktree_state() {
     local state_file="$DEV_TOOLS_DIR/.worktree-active"
@@ -477,6 +503,11 @@ dw() {
         else
             echo "🐳 Docker worktree: project-maker (기본)"
         fi
+        echo ""
+        echo "📡 $(whoami) 포트 (offset=$PM_PORT_OFFSET):"
+        echo "   Traefik: $PM_TRAEFIK_PORT (HTTP), $PM_TRAEFIK_HTTPS_PORT (HTTPS), $PM_TRAEFIK_DASHBOARD_PORT (Dashboard)"
+        echo "   API: $PM_API_PORT, PostgreSQL: $PM_PG_PORT, Redis: $PM_REDIS_PORT"
+        echo "   MinIO: $PM_MINIO_PORT/$PM_MINIO_CONSOLE_PORT, Vite: $PM_VITE_PORT"
         return
     fi
 
@@ -538,32 +569,39 @@ _dw_reboot() {
             | sed 's/revision = "//;s/"//' | sort -t_ -k1 -n | tail -1)
     fi
 
+    # docker compose 공통 옵션 (사용자별 env 파일)
+    local dc_env_file="docker/.env.$(whoami)"
+    local dc_opts=""
+    if [ -f "$dc_env_file" ]; then
+        dc_opts="--env-file $dc_env_file"
+    fi
+
     # 현재 컨테이너에서 타겟 revision까지 downgrade
     if [ -n "$target_head" ]; then
         echo "⏳ Alembic downgrade → $target_head ..."
-        if ! docker compose -f docker/docker-compose.dev.yml exec backend uv run alembic downgrade "$target_head"; then
+        if ! docker compose $dc_opts -f docker/docker-compose.dev.yml exec backend uv run alembic downgrade "$target_head"; then
             echo "⚠️  Alembic downgrade 실패. 수동 확인 필요."
         fi
     fi
 
     echo "⏳ Docker down..."
-    docker compose -f docker/docker-compose.dev.yml down --remove-orphans
+    docker compose $dc_opts -f docker/docker-compose.dev.yml down --remove-orphans
 
     echo "⏳ init-dev.sh..."
     bash scripts/init-dev.sh
 
     echo "⏳ Docker build + up (with workers)..."
-    docker compose -f docker/docker-compose.dev.yml --profile workers up -d --build
+    docker compose $dc_opts -f docker/docker-compose.dev.yml --profile workers up -d --build
 
     echo "⏳ Alembic upgrade head..."
-    if ! docker compose -f docker/docker-compose.dev.yml exec backend uv run alembic upgrade head; then
+    if ! docker compose $dc_opts -f docker/docker-compose.dev.yml exec backend uv run alembic upgrade head; then
         echo "⚠️  Alembic 마이그레이션 실패 (워크트리 간 버전 차이 가능). 수동 확인 필요."
     fi
 
     # 기존 Vite dev server 종료
-    local vite_pid=$(lsof -ti:20173 2>/dev/null)
+    local vite_pid=$(lsof -ti:${PM_VITE_PORT} 2>/dev/null)
     if [ -n "$vite_pid" ]; then
-        echo "⏳ 기존 Vite dev server 종료 (PID: $vite_pid)..."
+        echo "⏳ 기존 Vite dev server 종료 (PID: $vite_pid, 포트: ${PM_VITE_PORT})..."
         kill $vite_pid 2>/dev/null
         sleep 1
     fi
@@ -578,12 +616,18 @@ _dw_reboot() {
         echo "⏳ api-client 빌드..."
         pnpm -C packages/api-client run build
     fi
-    echo "⏳ Vite dev server 시작 ($wt_path)..."
-    nohup pnpm run dev:web > /tmp/dw-vite.log 2>&1 &
+    echo "⏳ Vite dev server 시작 ($wt_path, 포트: ${PM_VITE_PORT})..."
+    nohup pnpm run dev:web --port ${PM_VITE_PORT} > /tmp/dw-vite.log 2>&1 &
     echo "   PID: $!, 로그: /tmp/dw-vite.log"
 
     echo ""
     echo "✅ Docker worktree switched + reboot complete (backend + frontend)"
+    echo ""
+    echo "📡 $(whoami) 포트 (offset=$PM_PORT_OFFSET):"
+    echo "   API: http://localhost:${PM_API_PORT}/project-maker/api/v1"
+    echo "   Traefik: http://localhost:${PM_TRAEFIK_PORT}"
+    echo "   Vite: http://localhost:${PM_VITE_PORT}"
+    echo "   MinIO Console: http://localhost:${PM_MINIO_CONSOLE_PORT}"
     cd "$prev_dir"
 }
 

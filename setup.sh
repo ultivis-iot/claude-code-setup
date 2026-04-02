@@ -277,17 +277,23 @@ if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
         read -p "   AX_DIR 경로 (작업 루트, 예: /data/user/ax): " AX_DIR_PATH
 
         if [ -n "$MAIN_PROJECT_PATH" ] && [ -n "$AX_DIR_PATH" ]; then
+            SETUP_USER="$(whoami)"
             cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
 # AX 개발 환경 설정
-# 이 파일을 .env로 복사 후 경로를 수정하세요
 
 # 메인 프로젝트 경로 (git worktree의 기준)
 MAIN_PROJECT="$MAIN_PROJECT_PATH"
 
 # 작업 루트 디렉토리 (worktree들이 생성되는 상위 디렉토리)
 AX_DIR="$AX_DIR_PATH"
+
+# Docker 멀티유저 격리 (자동 설정)
+# 포트와 COMPOSE_PROJECT_NAME은 dev-commands.sh에서 사용자명 기반으로 자동 계산됩니다.
+# 아래 값을 명시하면 자동 계산을 오버라이드합니다.
+# export COMPOSE_PROJECT_NAME="pm-${SETUP_USER}"
+# export PM_PORT_OFFSET=0
 ENV_EOF
-            echo -e "${GREEN}   ✓ .env 생성 완료${NC}"
+            echo -e "${GREEN}   ✓ .env 생성 완료 (Docker 포트: 사용자명 기반 자동 할당)${NC}"
         else
             echo -e "${YELLOW}   ⚠ 경로가 입력되지 않았습니다. .env.example을 참고하여 수동으로 .env를 생성하세요.${NC}"
         fi
