@@ -1,15 +1,14 @@
 ---
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
-description: PR AI 리뷰 확인 → 분석 → 반영/코멘트/이슈 생성 → 커밋+push 사이클
+description: PR AI 리뷰 확인 → 분석 → 반영/코멘트/이슈 생성 → 커밋+push 사이클 (자동 반복)
 argument-hint: [PR번호]
 ---
 
 # PR 리뷰 반영 사이클
 
-PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
+PR의 AI 리뷰를 확인하고, 유효한 리뷰가 없을 때까지 자동으로 반복하는 사이클.
 
-**단독 실행**: `/review-cycle 23` — 최신 리뷰 1건 처리 후 종료
-**자동 반복**: `/ralph-loop /review-cycle $ARGUMENTS --completion-promise "REVIEW COMPLETE" --max-iterations 15`
+> **gh CLI 규칙**: 이 스킬에서 사용하는 모든 `gh` 명령(`gh pr`, `gh issue` 등)은 반드시 **순차적으로 단독 Bash 호출**해야 한다. 다른 Bash 명령과 병렬로 호출하면 `Cancelled: parallel tool call` 에러가 발생한다.
 
 ## 인자 파싱
 
@@ -19,12 +18,24 @@ PR의 AI 리뷰를 확인하고 반영하는 자동화 사이클.
 - `/review-cycle` → 현재 브랜치의 PR 자동 감지 (`gh pr view --json number`)
 - PR 번호는 양의 정수(`^[0-9]+$`)만 허용. 그 외 입력은 에러 출력 후 즉시 종료
 
-## 실행 모드
+## 기본 동작: 자동 반복
 
-| 모드 | 대기 | 반복 |
-|------|------|------|
-| **단독** (`/review-cycle 23`) | 없음 — 최신 리뷰 1건 처리 후 즉시 종료 | 사용자가 수동 재호출 |
-| **Ralph Loop** (`/ralph-loop /review-cycle 23 ...`) | ralph-loop이 외부에서 제어 | 자동 반복, promise 감지 시 종료 |
+`/review-cycle`은 한 번 호출하면 리뷰가 소진될 때까지 스스로 반복한다:
+
+1. 리뷰 확인 → 유효한 리뷰가 있으면 처리 → push
+2. push 후 **60초 대기** → 새 리뷰 도착 여부 재확인
+3. 새 리뷰가 오면 1번으로 돌아감 (대기 카운터 리셋)
+4. 새 리뷰가 없으면 대기 카운터 +1
+5. **연속 5회 대기** (총 ~5분) 동안 새 리뷰가 없으면 종료
+
+```
+[리뷰 처리] → [push] → [60s 대기] → 새 리뷰? ─Yes→ [리뷰 처리] → ...
+                                         │
+                                         No (5회 연속)
+                                         │
+                                         ▼
+                                      [종료]
+```
 
 ## 사이클
 
@@ -37,24 +48,24 @@ gh pr view <PR> --json reviews --jq '.reviews[-1]'             # Pull Request Re
 gh pr view <PR> --json reviewThreads                           # 인라인 코드 리뷰 코멘트
 ```
 
+**중요**: 위 gh 명령들은 반드시 **순차적으로 단독 Bash 호출**해야 한다. 다른 Bash 명령과 병렬로 호출하면 `Cancelled: parallel tool call` 에러가 발생한다.
+
 **우선순위**: comments(primary) → reviews → reviewThreads(fallback). 대부분의 AI 리뷰어는 일반 comment로 남기므로 comments를 먼저 확인하고, 없으면 나머지 소스를 탐색.
 **AI 리뷰 식별**: bot 계정 여부(`author.is_bot`) 또는 코멘트 본문이 `## 🤖 AI Code Review` 패턴으로 시작하는지 확인. 사람의 일반 코멘트는 리뷰 분석 대상에서 제외.
 타임스탬프 비교: comments는 `createdAt`, reviews는 `submittedAt`, reviewThreads는 마지막 reply의 `createdAt` (reply 없으면 thread 자체의 `createdAt`).
 reviewThreads에서 `isResolved: true`인 thread는 필터링 대상에서 제외.
 
-**CI와 리뷰를 병렬 확인**:
+**CI와 리뷰 확인** (gh 명령은 순차 호출, 결과를 조합하여 판단):
 - CI 실패 + 신규 리뷰 있음 → CI 수정 + 리뷰 반영 모두 처리
 - CI 실패 + 신규 리뷰 없음 → CI 실패 원인만 수정 → 커밋 → push
 - CI 통과 + 신규 리뷰 있음 → 리뷰 반영 처리
-- CI 통과 + 신규 리뷰 없음 → 종료
+- CI 통과 + 신규 리뷰 없음 → 대기 카운터 증가, 60초 후 재확인 (아래 "대기 루프" 참조)
 
 **중복 리뷰 판별**:
 - `tmp/last-review-id-{PR번호}.txt`에 `{source}:{comment_id}:{consecutive_count}` 형식으로 기록 (PR별 격리, 소스별 구분)
   - source: `comment`, `review`, `thread` 중 하나
-- 최신 항목의 `{source}:{id}`와 비교:
-  - **단독 모드**: 동일하면 "새 리뷰 없음"으로 즉시 종료 (대기 없음)
-  - **Ralph Loop 모드**: 동일하면 **60초 대기 후 재확인**. 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
-- 2회 연속 동일 (count ≥ 2) → 종료 조건 충족 (아래 "종료 조건" 참조)
+- 최신 항목의 `{source}:{id}`와 비교하여 신규 여부 판단
+- 동일하면 **60초 대기 후 재확인**. 재확인 후에도 동일하면 count 증가, 다르면 1로 리셋
 - 이 파일은 `.gitignore`에 추가 권장 (로컬 상태, 커밋 불필요)
 - 파일이 없거나 포맷이 깨진 경우 count를 0으로 초기화하여 처리
 
@@ -117,17 +128,31 @@ N차는 PR 코멘트에서 `리뷰 반영` 패턴이 포함된 코멘트 수 + 1
 
 > **push 실패 시**: `git pull --rebase` 후 1회 재시도 → 재실패 시 PR 코멘트에 `[push 실패]` 표기 후 사이클 중단. 코드는 로컬에 커밋된 상태이므로 수동 push로 복구 가능.
 
-### 5. 종료 조건
+### 5. 대기 루프 (push 후 자동 실행)
 
-다음 중 **하나라도** 만족하면 종료. 모든 종료 경로에서 동일한 promise를 출력:
+리뷰를 처리하고 push한 후, 새 리뷰가 올 때까지 자동 대기한다:
 
-- 신규 지적 없음 (반복 지적만 남음)
-- 모든 지적이 이전 라운드에서 설명 완료
-- 2회 연속 동일 리뷰 (새 리뷰 미도착, 각 회차 60초 대기 포함)
+1. push 완료 → 대기 카운터를 0으로 초기화
+2. **60초 sleep** (`sleep 60`)
+3. 1단계(상태 확인)로 돌아가 새 리뷰 확인
+4. 새 리뷰 있음 → 2단계(리뷰 분석)부터 처리, 대기 카운터 리셋
+5. 새 리뷰 없음 → 대기 카운터 +1
+6. **대기 카운터 ≥ 5** → 종료
+
+첫 호출 시 리뷰가 아예 없는 경우에도 동일한 대기 루프를 적용한다:
+- 리뷰 없음 → 60초 대기 → 재확인 → 5회 반복 후 종료
+
+### 6. 종료 조건
+
+다음 중 **하나라도** 만족하면 종료:
+
+- 리뷰 처리 완료 후 연속 5회 대기 동안 새 리뷰 미도착 (~5분)
+- 신규 지적 없음 (반복 지적만 남음) + 연속 5회 대기 동안 새 리뷰 미도착
+- 모든 지적이 이전 라운드에서 설명 완료 + 연속 5회 대기 동안 새 리뷰 미도착
 
 종료 시 출력:
 ```
-<promise>REVIEW COMPLETE</promise>
+REVIEW COMPLETE — N건 리뷰 처리, M회 대기 후 종료
 ```
 
 ## 판단 원칙
