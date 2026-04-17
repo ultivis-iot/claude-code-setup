@@ -273,30 +273,21 @@ if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
     if [ "$UPDATE_MODE" = false ]; then
         echo ""
         echo -e "${YELLOW}   dev-tools 환경 설정이 필요합니다.${NC}"
-        read -p "   MAIN_PROJECT 경로 (메인 프로젝트, 예: /data/user/ax/project-maker): " MAIN_PROJECT_PATH
-        read -p "   AX_DIR 경로 (작업 루트, 예: /data/user/ax): " AX_DIR_PATH
+        DEFAULT_ROOT="$HOME/Git"
+        read -p "   WORKTREE_ROOT 경로 (worktree 루트, 기본: $DEFAULT_ROOT): " WORKTREE_ROOT_PATH
+        WORKTREE_ROOT_PATH="${WORKTREE_ROOT_PATH:-$DEFAULT_ROOT}"
 
-        if [ -n "$MAIN_PROJECT_PATH" ] && [ -n "$AX_DIR_PATH" ]; then
-            SETUP_USER="$(whoami)"
-            cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
-# AX 개발 환경 설정
-
-# 메인 프로젝트 경로 (git worktree의 기준)
-MAIN_PROJECT="$MAIN_PROJECT_PATH"
-
-# 작업 루트 디렉토리 (worktree들이 생성되는 상위 디렉토리)
-AX_DIR="$AX_DIR_PATH"
+        cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
+# Isaac dev-tools 환경 설정
+WORKTREE_ROOT="$WORKTREE_ROOT_PATH"
 
 # Docker 멀티유저 격리 (자동 설정)
-# 포트와 COMPOSE_PROJECT_NAME은 dev-commands.sh에서 사용자명 기반으로 자동 계산됩니다.
-# 아래 값을 명시하면 자동 계산을 오버라이드합니다.
-# export COMPOSE_PROJECT_NAME="pm-${SETUP_USER}"
+# dev-commands.sh가 사용자명 기반으로 포트/COMPOSE_PROJECT_NAME을 자동 계산합니다.
+# 오버라이드 필요 시 아래 주석 해제:
+# export COMPOSE_PROJECT_NAME="pm-$(whoami)"
 # export PM_PORT_OFFSET=0
 ENV_EOF
-            echo -e "${GREEN}   ✓ .env 생성 완료 (Docker 포트: 사용자명 기반 자동 할당)${NC}"
-        else
-            echo -e "${YELLOW}   ⚠ 경로가 입력되지 않았습니다. .env.example을 참고하여 수동으로 .env를 생성하세요.${NC}"
-        fi
+        echo -e "${GREEN}   ✓ .env 생성 완료 (WORKTREE_ROOT=$WORKTREE_ROOT_PATH, 포트 자동 할당)${NC}"
     else
         echo -e "${YELLOW}   .env 파일 없음. ~/.claude/dev-tools/.env.example 참고하여 수동 생성 필요${NC}"
     fi
@@ -319,6 +310,39 @@ if [ -f "$BASHRC" ]; then
 else
     echo "$SOURCE_LINE" > "$BASHRC"
     echo -e "${GREEN}   ✓ ~/.bashrc 생성 및 source 추가${NC}"
+fi
+
+# Notion MCP 설정
+echo "10. Notion MCP 설정..."
+if ! command -v claude &> /dev/null; then
+    echo -e "${YELLOW}   claude CLI를 찾을 수 없어 Notion MCP 등록을 건너뜁니다.${NC}"
+elif claude mcp list 2>/dev/null | grep -q "^notion-api:"; then
+    echo -e "${GREEN}   ✓ notion-api MCP가 이미 등록됨${NC}"
+elif [ "$UPDATE_MODE" = false ]; then
+    echo ""
+    echo "   Notion 워크스페이스 연결을 위해 Internal Integration 토큰이 필요합니다."
+    echo "   발급 방법:"
+    echo "     1. https://www.notion.so/profile/integrations 접속"
+    echo "     2. + New integration → 회사 워크스페이스 선택, Type: Internal"
+    echo "     3. 생성 후 Internal Integration Secret 복사 (ntn_... 또는 secret_...)"
+    echo "     4. 접근할 페이지에서 ··· → Connections로 integration 공유"
+    echo ""
+    read -r -s -p "   NOTION_TOKEN (건너뛰려면 Enter): " NOTION_TOKEN_INPUT
+    echo ""
+    if [ -n "$NOTION_TOKEN_INPUT" ]; then
+        if claude mcp add -s user -e "NOTION_TOKEN=$NOTION_TOKEN_INPUT" notion-api -- npx -y @notionhq/notion-mcp-server > /dev/null 2>&1; then
+            echo -e "${GREEN}   ✓ notion-api MCP 등록 완료 (user scope)${NC}"
+            echo -e "${YELLOW}   ⚠ Claude Code 재시작 후 mcp__notion-api__* 도구 사용 가능${NC}"
+        else
+            echo -e "${YELLOW}   ⚠ notion-api MCP 등록 실패. 수동 등록 필요${NC}"
+        fi
+        unset NOTION_TOKEN_INPUT
+    else
+        echo -e "${YELLOW}   건너뜀. 나중에 등록하려면:${NC}"
+        echo "     claude mcp add -s user -e NOTION_TOKEN=<token> notion-api -- npx -y @notionhq/notion-mcp-server"
+    fi
+else
+    echo -e "${YELLOW}   notion-api 미등록 (업데이트 모드에서는 자동 등록 안 함)${NC}"
 fi
 
 # 설치된 버전 기록
@@ -359,6 +383,7 @@ echo "  ~/.claude/settings.json (hooks 설정 포함)"
 echo "  ~/.claude/scripts/issue.sh (이슈 조회 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
 echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
+echo "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"
 echo ""
 echo "사용 방법:"
 echo "  1. Plan 모드 진입: Shift+Tab 두 번"

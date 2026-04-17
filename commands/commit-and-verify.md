@@ -212,6 +212,27 @@ feat: 회원가입 유효성 검사 추가
    - 이 파일이 없으면 검증이 완료되지 않은 것으로 간주됨
    - PASS/WARN/FAIL 결과 요약 출력
 
+6. **Notion Task에 검증 결과 코멘트 (선택적)**
+   - 현재 브랜치명에서 Issue 번호 추출 (`/issue` 스킬과 동일 패턴)
+   - `mcp__notion-api__API-query-data-source`로 Task DB에서 Issue Number 일치하는 Task 검색
+     - data_source_id: `b89060b1-037c-480d-8671-f206aec117b6`
+     - filter: `{"property": "Issue Number", "formula": {"string": {"equals": "<NUM>"}}}`
+   - **매치되는 Task가 있고 mcp__notion-api__* 도구가 로드되어 있을 때만 실행**
+   - 없으면 조용히 건너뜀 (실패로 간주하지 않음)
+   - `mcp__notion-api__API-create-a-comment`로 Task 페이지에 코멘트 추가:
+     ```
+     [검증] <branch_name> @ <commit_hash_short>
+     - intent: <PASS/WARN/FAIL>
+     - doc: <PASS/WARN/FAIL/SKIP>
+     - security: <PASS/WARN/FAIL/SKIP>
+     - code-simplifier: <PASS/WARN/FAIL/SKIP>
+     - test: <PASS/WARN/FAIL/SKIP>
+     - visual-qa: <PASS/WARN/FAIL/SKIP/PENDING>
+     overall: <PASS/WARN/FAIL>
+     ```
+   - WARN/FAIL이 있는 경우 첫 메시지 1~2개를 코멘트에 함께 첨부
+   - n8n PR 단계의 AI 리뷰와 다른 시점(로컬 검증) — 중복 아님
+
 ## validation-status.json 형식 (필수)
 
 검증 완료 후 **반드시** 표준 스키마에 따라 파일을 생성해야 합니다.

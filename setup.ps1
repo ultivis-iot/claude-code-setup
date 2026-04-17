@@ -110,6 +110,47 @@ if (Test-Path $PluginsSource) {
     }
 }
 
+# Notion MCP 설정
+Write-Host "7. Notion MCP 설정..."
+$ClaudeCmd = Get-Command claude -ErrorAction SilentlyContinue
+if (-not $ClaudeCmd) {
+    Write-Host "   claude CLI를 찾을 수 없어 Notion MCP 등록을 건너뜁니다." -ForegroundColor Yellow
+} else {
+    $McpList = & claude mcp list 2>$null
+    if ($McpList -match "(?m)^notion-api:") {
+        Write-Host "   notion-api MCP가 이미 등록됨" -ForegroundColor Green
+    } elseif (-not $Update) {
+        Write-Host ""
+        Write-Host "   Notion 워크스페이스 연결을 위해 Internal Integration 토큰이 필요합니다."
+        Write-Host "   발급 방법:"
+        Write-Host "     1. https://www.notion.so/profile/integrations 접속"
+        Write-Host "     2. + New integration → 회사 워크스페이스 선택, Type: Internal"
+        Write-Host "     3. 생성 후 Internal Integration Secret 복사"
+        Write-Host "     4. 접근할 페이지에서 ··· → Connections로 integration 공유"
+        Write-Host ""
+        $TokenSecure = Read-Host "   NOTION_TOKEN (건너뛰려면 Enter)" -AsSecureString
+        $Bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($TokenSecure)
+        $NotionToken = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($Bstr)
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($Bstr) | Out-Null
+
+        if ($NotionToken) {
+            $AddResult = & claude mcp add -s user -e "NOTION_TOKEN=$NotionToken" notion-api -- npx -y `@notionhq/notion-mcp-server 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   notion-api MCP 등록 완료 (user scope)" -ForegroundColor Green
+                Write-Host "   Claude Code 재시작 후 mcp__notion-api__* 도구 사용 가능" -ForegroundColor Yellow
+            } else {
+                Write-Host "   notion-api MCP 등록 실패. 수동 등록 필요" -ForegroundColor Yellow
+            }
+            $NotionToken = $null
+        } else {
+            Write-Host "   건너뜀. 나중에 등록하려면:" -ForegroundColor Yellow
+            Write-Host "     claude mcp add -s user -e NOTION_TOKEN=<token> notion-api -- npx -y @notionhq/notion-mcp-server"
+        }
+    } else {
+        Write-Host "   notion-api 미등록 (업데이트 모드에서는 자동 등록 안 함)" -ForegroundColor Yellow
+    }
+}
+
 Write-Host ""
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host "설치 완료!" -ForegroundColor Green
@@ -126,6 +167,7 @@ Write-Host "  ~/.claude/agents/security-validator.md"
 Write-Host "  ~/.claude/agents/code-simplifier.md"
 Write-Host "  ~/.claude/schemas/validation-status.schema.json"
 Write-Host "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
+Write-Host "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"
 Write-Host ""
 Write-Host "사용 방법:"
 Write-Host "  1. Plan 모드 진입: Shift+Tab 두 번"

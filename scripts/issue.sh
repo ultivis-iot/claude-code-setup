@@ -3,13 +3,22 @@
 
 set -e
 
-# 현재 브랜치에서 이슈 번호 추출
 BRANCH=$(git branch --show-current)
-ISSUE_NUM=$(echo "$BRANCH" | grep -oE '^[0-9]+' || echo "")
+ISSUE_NUM=""
 
+# 패턴 1: <topic>/<num>-... (예: feature/234-add-toggle)
 if [ -z "$ISSUE_NUM" ]; then
-    # pm-549-xxx 형태도 지원
+    ISSUE_NUM=$(echo "$BRANCH" | grep -oE '^[a-zA-Z]+/([0-9]+)' | grep -oE '[0-9]+' || echo "")
+fi
+
+# 패턴 2: pm-NNN-... (예: pm-549-fix-bug)
+if [ -z "$ISSUE_NUM" ]; then
     ISSUE_NUM=$(echo "$BRANCH" | grep -oE 'pm-([0-9]+)' | grep -oE '[0-9]+' || echo "")
+fi
+
+# 패턴 3: 숫자로 시작 (예: 234-add-toggle)
+if [ -z "$ISSUE_NUM" ]; then
+    ISSUE_NUM=$(echo "$BRANCH" | grep -oE '^[0-9]+' || echo "")
 fi
 
 if [ -z "$ISSUE_NUM" ]; then
@@ -21,5 +30,4 @@ echo "브랜치: $BRANCH"
 echo "이슈 번호: #$ISSUE_NUM"
 echo ""
 
-# GitHub 이슈 정보 조회
-gh issue view "$ISSUE_NUM" --json title,body,state,labels,comments,assignees,createdAt,author
+gh issue view "$ISSUE_NUM" --json title,body,state,labels,comments,assignees,createdAt,author,url

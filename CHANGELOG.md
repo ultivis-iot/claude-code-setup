@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.5.0 (2026-04-17)
+- **Notion MCP 연동** — setup.sh/ps1에 Internal Integration Token 등록 단계 추가 (user scope)
+- **Isaac 스킬 6개 추가**:
+  - `/isaac-my-tasks` — 본인 Task 조회 + worktree 자동 생성
+  - `/isaac-story-create` — Plan → Story + Task N + Issue N + worktree N 일괄
+  - `/isaac-task-create` — 기존 Story에 Task 추가
+  - `/isaac-task-note` — Task에 메모 코멘트
+  - `/isaac-task-status` — 비정형 상태 변경 (취소/재개)
+  - `/isaac-weekly-report` — 주간 작업 정리 + 발행
+- **공통 헬퍼**:
+  - `scripts/notion-api.sh` — 토큰/캐시(members/projects/repos/schemas/templates)/lookup
+  - `scripts/isaac-wt-add.sh` — repo abbr 기반 worktree 생성
+- **기존 스킬 확장**:
+  - `/issue` — Notion Task/Story/Project 컨텍스트 추가
+  - `/commit-and-verify` — 검증 결과를 Task 코멘트로 자동 동기화
+- **dev-tools 리팩터**:
+  - `MAIN_PROJECT` 제거, `WORKTREE_ROOT`로 통합 (다중 프로젝트 지원)
+  - repo 이니셜 축약 기반 폴더명 (`pm` / `ub` / `url` / `ccs` 등)
+  - `dw` 2-tier hook 조회 (`.isaac/dw.sh` → `~/.claude/dev-tools/hooks/<repo>.sh` → 레거시)
+  - `isaac-init` 명령어 신설 (status/setup/check/dw-hook)
+- **Plan 승인 hook**: worktree 감지 + Plan 성격별 스킬 분류 추천
+
 ## v0.4.0 (2026-04-02)
 - Docker 멀티유저 격리 지원 — 사용자명 해시 기반 포트 자동 할당 및 COMPOSE_PROJECT_NAME 자동 설정
 - dev-commands.sh에서 하드코딩된 포트 제거, 사용자별 자동 계산으로 대체
