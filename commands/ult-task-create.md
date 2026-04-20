@@ -2,18 +2,18 @@
 
 기존 Notion Story에 새 Task를 추가하고, Github Issue + 로컬 브랜치까지 생성합니다.
 
-`/isaac-story-create`가 새 Story부터 만든다면, 이 스킬은 **이미 존재하는 Story에 Task만 끼워넣을 때** 사용합니다.
+`/ult-story-create`가 새 Story부터 만든다면, 이 스킬은 **이미 존재하는 Story에 Task만 끼워넣을 때** 사용합니다.
 
 ## 데이터 소스
 
-`/isaac-story-create`와 동일.
+`/ult-story-create`와 동일.
 
 ## 실행 단계
 
 ### 1. Story 선택
 
 옵션:
-- 인자로 Story title 또는 URL 받음: `/isaac-task-create "다크모드 설정 추가"`
+- 인자로 Story title 또는 URL 받음: `/ult-task-create "다크모드 설정 추가"`
 - 인자 없으면: 본인이 Assignee이거나 Status가 "진행 중"인 Story 목록 표시 후 선택
 
 `mcp__notion-api__API-query-data-source` (Story DB):
@@ -59,7 +59,7 @@
 
 ### 4. Github Issue + Notion Task + (선택적) 브랜치 생성
 
-`/isaac-story-create`의 5단계와 동일 절차로 1개만 생성:
+`/ult-story-create`의 5단계와 동일 절차로 1개만 생성:
 
 1. `gh issue create`
 2. `mcp__notion-api__API-post-page` (Task DB) — Issue URL 즉시 채움
@@ -89,5 +89,5 @@
 
 ## 주의
 
-- Story가 없으면 `/isaac-story-create`를 권장 (Story부터 만들어줌)
+- Story가 없으면 `/ult-story-create`를 권장 (Story부터 만들어줌)
 - Topic 추론 자동화 가능 (Task name 기반 키워드 매칭) — 자신 없으면 항상 사용자 확인

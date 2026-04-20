@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.6.0 (2026-04-20)
+- Codex 지원 추가:
+  - `setup-codex.sh` 신설 — `~/.codex/rules`, `~/.codex/skills`, `~/.codex/dev-tools` 설치
+  - `codex/rules/dev-workflow.rules` 추가 — 개발 플로우를 Codex 규칙으로 적용
+  - `codex/skills/dev-workflow` 추가 — commit/validate/PR/review/Ultivis 흐름을 Codex skill로 제공
+- Ultivis 명령 프리픽스 및 문서 정리:
+  - `isaac-*` 명령/스크립트를 `ult-*`로 정리
+  - Plan 승인 후 흐름을 `AI 제안 + 사용자 확인 + 실행` 방식으로 재구성
+  - README와 workflow 문서의 진입점/온보딩 문구 정리
+- 워크플로우 명령 슬림화 및 검증 보강:
+  - `commit-and-verify`, `create-pr`, `review-cycle`, `visual-qa`, `ult-story-create` 문서 토큰 최적화
+  - validation contract/reference 및 `verify-workflow.sh` 기반 검증 추가
+
 ## v0.5.0 (2026-04-17)
 - **Notion MCP 연동** — setup.sh/ps1에 Internal Integration Token 등록 단계 추가 (user scope)
 - **Isaac 스킬 6개 추가**:

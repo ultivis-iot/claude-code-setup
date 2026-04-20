@@ -2,7 +2,7 @@
 # Worktree 생성 (또는 이미 있으면 경로만 반환)
 #
 # Usage:
-#   isaac-wt-add.sh <branch> [-r <repo_path>] [--base <base_branch>]
+#   ult-wt-add.sh <branch> [-r <repo_path>] [--base <base_branch>]
 #
 # Options:
 #   -r, --repo   대상 repo 경로 (기본: 현재 디렉토리의 git repo)
@@ -14,6 +14,9 @@
 #   진행 메시지는 stderr
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/workflow-env.sh"
 
 BRANCH=""
 REPO_PATH=""
@@ -50,9 +53,9 @@ REPO_NAME=$(basename "$MAIN_REPO")
 REPO_ABBR=$(echo "$REPO_NAME" | awk -F- '{for(i=1;i<=NF;i++) printf "%s", tolower(substr($i,1,1))}')
 
 # WORKTREE_ROOT 로드
-if [ -f "$HOME/.claude/dev-tools/.env" ]; then
+if [ -f "$WORKFLOW_DEV_TOOLS_DIR/.env" ]; then
     # shellcheck disable=SC1091
-    . "$HOME/.claude/dev-tools/.env"
+    . "$WORKFLOW_DEV_TOOLS_DIR/.env"
 fi
 [ -z "$WORKTREE_ROOT" ] && [ -n "$AX_DIR" ] && WORKTREE_ROOT="$AX_DIR"
 WORKTREE_ROOT="${WORKTREE_ROOT:-$HOME/Git}"

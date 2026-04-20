@@ -1,9 +1,9 @@
 #!/bin/bash
 # 주간 작업 데이터 수집 → JSON 출력
 # Usage:
-#   isaac-weekly-collect.sh                  # 본인, 이번 주
-#   isaac-weekly-collect.sh --week DATE      # 특정 날짜 포함 주
-#   isaac-weekly-collect.sh --team           # 팀 전체
+#   ult-weekly-collect.sh                  # 본인, 이번 주
+#   ult-weekly-collect.sh --week DATE      # 특정 날짜 포함 주
+#   ult-weekly-collect.sh --team           # 팀 전체
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

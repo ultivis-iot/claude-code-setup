@@ -1,16 +1,34 @@
-# Claude Code 표준 개발 플로우 설정
+# Claude Code / Codex 표준 개발 플로우 설정
 
-표준화된 개발 플로우를 위한 Claude Code 전역 설정 패키지입니다.
+표준화된 개발 플로우를 위한 Claude Code / Codex 설정 패키지입니다.
 
 ## 개요
 
 이 설정은 다음과 같은 개발 플로우를 자동화합니다:
 
-```
+``` 
 Plan → 빌드 → Commit → 검증 1단계 → 검증 2단계 (병렬) → Push & PR
                            ↓
                       (실패 시 빌드로 복귀)
 ```
+
+Plan을 작업 단위로 발행할 때는 다음 관계를 기준으로 움직입니다:
+
+- `Story`는 여러 `Task`를 묶는 상위 단위
+- `Task 1개 = GitHub Issue 1개`
+- 필요하면 각 Issue 기준으로 브랜치/worktree를 생성
+
+즉 큰 Plan은 `ult-story-create`로 `Story + Task N개 + Issue N개`로 발행하고, 기존 Story에 작업 하나를 붙일 때는 `ult-task-create`로 `Task 1개 + Issue 1개`를 만듭니다.
+
+## 처음 시작
+
+처음 쓰는 사용자는 보통 아래 순서로 시작하면 됩니다.
+
+1. Plan 작성 후 승인
+2. Plan 승인 후 AI 제안을 확인하고 진행
+3. 필요하면 `wa`, `cc`, `dw`, `ult-init`로 로컬 작업 환경 진입/전환
+4. 구현 후 `/commit-and-verify`
+5. 검증 통과 시 `/create-pr`, 이후 필요하면 `/review-cycle`
 
 ## 주요 기능
 
@@ -19,12 +37,23 @@ Plan → 빌드 → Commit → 검증 1단계 → 검증 2단계 (병렬) → Pu
 | **Plan 모드 가이드** | 사용자 의도를 명확하게 문서화 |
 | **Plan 자동 저장** | Plan 승인 시 `tmp/current-plan.md`로 자동 복사 |
 | **자동 검증** | 커밋 후 의도 검증 + 품질 검증 자동 실행 |
+| **작업 중심 진입점** | `ult-start-task`, `ult-finish-task`, `ult-sync-task` 명령으로 세부 명령 추상화 |
 | **CLI 동기화 검증** | 서버 API 변경 시 CLI 커맨드 동기화 + Help 품질 자동 검증 |
 | **보안 검사** | 실시간 보안 취약점 경고 + 커밋 후 보안 리뷰 |
 | **Visual QA** | 프론트엔드 변경 시 브라우저 자동화 UI 검증 |
 | **PR 생성** | 검증 통과 확인 후 자동 PR 생성 |
 
 ## 설치
+
+### Codex (Linux / macOS)
+
+```bash
+git clone https://github.com/ultivis-iot/claude-code-setup.git
+cd claude-code-setup
+./setup-codex.sh
+```
+
+Codex에서는 Claude의 slash command 대신 `rules + skills` 형태로 동일한 워크플로우를 적용합니다.
 
 ### Linux / macOS
 
@@ -59,6 +88,14 @@ git pull
 ./setup.sh --update
 ```
 
+### Codex (Linux / macOS)
+
+```bash
+cd claude-code-setup
+git pull
+./setup-codex.sh --update
+```
+
 ### Windows (PowerShell)
 
 ```powershell
@@ -78,6 +115,9 @@ git pull
 ├── commands/
 │   ├── commit-and-verify.md    # 커밋 + 검증 자동 실행
 │   ├── create-pr.md            # 검증 통과 후 PR 생성
+│   ├── ult-start-task.md       # 작업 시작 단일 진입점
+│   ├── ult-finish-task.md      # 작업 마무리 단일 진입점
+│   ├── ult-sync-task.md        # Task 동기화 단일 진입점
 │   ├── review-cycle.md         # PR AI 리뷰 반영 사이클
 │   └── visual-qa.md            # 프론트엔드 Visual QA 검증
 ├── agents/
@@ -100,7 +140,39 @@ git pull
     └── .env                    # 사용자별 경로 설정 (자동 생성)
 ```
 
+Codex 설치 시:
+
+```text
+~/.codex/
+├── rules/
+│   └── dev-workflow.rules
+├── skills/
+│   └── dev-workflow/
+│       ├── SKILL.md
+│       └── references/
+│           ├── core-workflow.md
+│           ├── commit-and-verify.md
+│           ├── create-pr.md
+│           ├── review-cycle.md
+│           └── ult-notion.md
+└── dev-tools/
+    ├── dev-commands.sh
+    ├── .env.example
+    └── .env
+```
+
 ## 사용 방법
+
+### Codex
+
+`setup-codex.sh` 실행 후 새 Codex 세션에서 다음처럼 요청하면 됩니다:
+
+- "이 작업 plan 먼저 잡고 intent 명시해줘"
+- "commit and verify 해줘"
+- "validation 통과했으면 PR 만들어줘"
+- "PR 23 review cycle 돌려줘"
+
+Codex는 `dev-workflow` skill과 `~/.codex/rules/dev-workflow.rules`를 기준으로 같은 개발 플로우를 따릅니다.
 
 ### 1. Plan 모드 진입
 
@@ -112,11 +184,47 @@ Plan 작성 시 반드시 **의도(Intent)** 섹션을 포함하여 사용자 �
 - 사용자가 Plan을 승인하면 `tmp/current-plan.md`로 자동 복사됩니다
 - 이 Plan은 검증 단계에서 의도 검증의 기준이 됩니다
 
-### 2. 구현 (빌드)
+### 2. Plan 승인 후 확인
+
+Plan 승인 후에는 AI가 Plan 성격을 먼저 분류하고, 가장 적절한 다음 흐름 1개를 제안합니다.
+
+- 새 Story가 적절하면 `ult-story-create` 흐름을 제안하고, 확인되면 이어서 진행
+- 기존 Story에 Task 1개를 붙이는 게 맞으면 `ult-task-create` 흐름을 제안하고, 확인되면 이어서 진행
+- 현재 Task 메모면 `ult-task-note` 흐름을 제안하고, 확인되면 이어서 진행
+- 발행 없이 바로 구현할 작은 로컬 작업이면 그대로 Build 시작을 제안
+
+즉 사용자가 항상 명령어를 직접 고르는 구조가 아니라, AI가 먼저 추천하고 사용자는 발행 방식만 확인하는 구조를 기본으로 둡니다.
+
+작업 크기와 발행 단위는 항상 같지 않습니다. 작은 작업이어도 새 Story로 관리할 수 있고, 큰 작업이어도 기존 Story에 Task로 붙일 수 있습니다.
+
+### 3. 구현 (빌드)
 
 Plan에 따라 코드를 구현합니다.
 
-### 3. 커밋 + 검증
+### 작업 시작 명령
+
+직접 세부 명령을 고를 수도 있고, 아래 진입점으로 시작할 수도 있습니다.
+
+- `/ult-my-tasks` - 내 Task 조회 후 선택, 필요 시 브랜치/worktree 연결
+- `/ult-story-create` - Plan을 새 Story와 Task들로 발행
+- `/ult-task-create` - 기존 Story에 Task 1개와 Issue 1개 추가
+- `/ult-task-note` - 현재 Task에 메모 추가
+- `/ult-task-status` - 현재 Task 상태 수동 변경
+- `/ult-weekly-report` - 주간 작업 집계 및 보고서 발행
+
+### 셸 워크플로우 명령
+
+로컬 작업 환경 전환도 이 저장소의 중요한 축입니다.
+
+- `wt` - 현재 프로젝트 worktree 목록 확인
+- `wa` - 새 worktree 생성 또는 기존 브랜치 기준 worktree 추가
+- `cc` - 선택한 worktree에서 Claude Code 세션 시작/접속
+- `dw` - 프로젝트별 개발 환경 전환 스크립트 실행
+- `ult-init` - dev-tools 상태 확인, 설정, `dw-hook` 생성
+
+보통 작업 흐름은 `ult-*` 명령으로 Task를 정한 뒤 `wa`/`cc`/`dw`로 로컬 환경을 맞추고 구현으로 들어갑니다.
+
+### 4. 커밋 + 검증
 
 ```bash
 # 현재 디렉토리
@@ -132,7 +240,15 @@ Plan에 따라 코드를 구현합니다.
 - 검증 2단계: 문서/보안/코드 품질/테스트/CLI 동기화 병렬 검증
 - 검증 3단계: 프론트엔드 변경 시 Visual QA 제안 (선택적)
 
-### 4. PR 생성
+### 작업 중심 명령
+
+세부 명령을 직접 기억하지 않아도 아래 진입점으로 시작할 수 있습니다.
+
+- `/ult-start-task` - 내 Task 조회, Story 발행, Task 추가 중 상황에 맞는 흐름 선택
+- `/ult-finish-task` - 검증 상태를 확인하고 필요 시 `/commit-and-verify` 후 `/create-pr`까지 연결
+- `/ult-sync-task` - 현재 Task 메모 추가, 상태 변경, Issue/Task 컨텍스트 확인을 단일 진입점으로 처리
+
+### 5. PR 생성
 
 ```bash
 # 현재 디렉토리
@@ -144,7 +260,7 @@ Plan에 따라 코드를 구현합니다.
 
 모든 검증 통과 시 Push 및 PR을 생성합니다.
 
-### 5. PR 리뷰 반영
+### 6. PR 리뷰 반영
 
 ```bash
 # 1회 실행 — 최신 AI 리뷰 확인 후 반영/코멘트
@@ -227,14 +343,27 @@ chmod +x .git/hooks/pre-commit
 
 `setup.sh` 실행 시 Git Worktree + tmux + Claude Code를 조합한 셸 명령어가 함께 설치됩니다.
 
-### 환경 변수 (.env)
+## 저장소 검증
 
-설치 시 `MAIN_PROJECT`와 `AX_DIR` 경로를 입력하면 `~/.claude/dev-tools/.env`가 자동 생성됩니다.
+이 저장소 자체 변경 후에는 아래 검증 스크립트로 기본 계약을 확인할 수 있습니다.
 
 ```bash
-MAIN_PROJECT="/your/path/to/project-maker"  # 메인 프로젝트 경로 (git worktree 기준)
-AX_DIR="/your/path/to/ax"                   # 작업 루트 디렉토리
+./scripts/verify-workflow.sh
 ```
+
+포함 항목:
+- 주요 셸 스크립트 문법 검사
+- `fixtures/validation-status.sample.json` 계약 검사
+
+### 환경 변수 (.env)
+
+설치 시 `WORKTREE_ROOT` 기준의 `~/.claude/dev-tools/.env`가 자동 생성됩니다.
+
+```bash
+WORKTREE_ROOT="/your/path/to/worktrees"
+```
+
+하위 호환으로 `AX_DIR`도 읽지만, 현재 기준 설정 키는 `WORKTREE_ROOT`입니다.
 
 ### Worktree 명령어
 

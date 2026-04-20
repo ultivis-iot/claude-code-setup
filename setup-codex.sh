@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# Codex 개발 플로우 설치 스크립트
+# 사용법: ./setup-codex.sh [--update|-u]
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
+SKILL_NAME="dev-workflow"
+RULE_NAME="dev-workflow.rules"
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+UPDATE_MODE=false
+if [ "$1" = "--update" ] || [ "$1" = "-u" ]; then
+    UPDATE_MODE=true
+fi
+
+echo "==================================="
+if [ "$UPDATE_MODE" = true ]; then
+    echo "Codex 개발 플로우 업데이트"
+else
+    echo "Codex 개발 플로우 설치"
+fi
+echo "==================================="
+echo ""
+
+echo "1. 디렉토리 생성..."
+mkdir -p "$CODEX_DIR/rules"
+mkdir -p "$CODEX_DIR/skills"
+
+echo "2. Rules 설치..."
+cp "$SCRIPT_DIR/codex/rules/$RULE_NAME" "$CODEX_DIR/rules/$RULE_NAME"
+echo -e "${GREEN}   ✓ ~/.codex/rules/$RULE_NAME${NC}"
+
+echo "3. Skill 설치..."
+rm -rf "$CODEX_DIR/skills/$SKILL_NAME"
+cp -R "$SCRIPT_DIR/codex/skills/$SKILL_NAME" "$CODEX_DIR/skills/$SKILL_NAME"
+echo -e "${GREEN}   ✓ ~/.codex/skills/$SKILL_NAME${NC}"
+
+echo "4. Dev-tools 설치..."
+DEV_TOOLS_DEST="$CODEX_DIR/dev-tools"
+mkdir -p "$DEV_TOOLS_DEST"
+
+cp "$SCRIPT_DIR/dev-tools/dev-commands.sh" "$DEV_TOOLS_DEST/dev-commands.sh"
+cp "$SCRIPT_DIR/dev-tools/.env.example" "$DEV_TOOLS_DEST/.env.example"
+echo -e "${GREEN}   ✓ ~/.codex/dev-tools/dev-commands.sh${NC}"
+echo -e "${GREEN}   ✓ ~/.codex/dev-tools/.env.example${NC}"
+
+if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
+    if [ "$UPDATE_MODE" = false ]; then
+        echo ""
+        echo -e "${YELLOW}   dev-tools 환경 설정이 필요합니다.${NC}"
+        DEFAULT_ROOT="$HOME/Git"
+        read -p "   WORKTREE_ROOT 경로 (worktree 루트, 기본: $DEFAULT_ROOT): " WORKTREE_ROOT_PATH
+        WORKTREE_ROOT_PATH="${WORKTREE_ROOT_PATH:-$DEFAULT_ROOT}"
+
+        cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
+# Codex dev-tools 환경 설정
+WORKTREE_ROOT="$WORKTREE_ROOT_PATH"
+
+# Docker 멀티유저 격리 (자동 설정)
+# dev-commands.sh가 사용자명 기반으로 포트/COMPOSE_PROJECT_NAME을 자동 계산합니다.
+# 오버라이드 필요 시 아래 주석 해제:
+# export COMPOSE_PROJECT_NAME="pm-$(whoami)"
+# export PM_PORT_OFFSET=0
+ENV_EOF
+        echo -e "${GREEN}   ✓ ~/.codex/dev-tools/.env 생성 완료${NC}"
+    else
+        echo -e "${YELLOW}   .env 파일 없음. ~/.codex/dev-tools/.env.example 참고하여 수동 생성 필요${NC}"
+    fi
+else
+    echo -e "${GREEN}   ✓ ~/.codex/dev-tools/.env 유지${NC}"
+fi
+
+BASHRC="$HOME/.bashrc"
+SOURCE_LINE="source \"\$HOME/.codex/dev-tools/dev-commands.sh\""
+if [ -f "$BASHRC" ]; then
+    if ! grep -qF '.codex/dev-tools/dev-commands.sh' "$BASHRC" 2>/dev/null; then
+        echo "" >> "$BASHRC"
+        echo "# Codex 개발 환경 명령어" >> "$BASHRC"
+        echo "$SOURCE_LINE" >> "$BASHRC"
+        echo -e "${GREEN}   ✓ ~/.bashrc에 Codex dev-tools source 추가${NC}"
+    else
+        echo -e "${GREEN}   ✓ ~/.bashrc에 이미 Codex dev-tools 설정됨${NC}"
+    fi
+else
+    echo "$SOURCE_LINE" > "$BASHRC"
+    echo -e "${GREEN}   ✓ ~/.bashrc 생성 및 Codex dev-tools source 추가${NC}"
+fi
+
+echo ""
+echo "==================================="
+echo -e "${GREEN}설치 완료!${NC}"
+echo "==================================="
+echo ""
+echo "설치된 파일:"
+echo "  ~/.codex/rules/$RULE_NAME"
+echo "  ~/.codex/skills/$SKILL_NAME/SKILL.md"
+echo "  ~/.codex/skills/$SKILL_NAME/references/*.md"
+echo "  ~/.codex/dev-tools/dev-commands.sh"
+echo "  ~/.codex/dev-tools/.env"
+echo ""
+echo "사용 방법:"
+echo "  1. 새 Codex 세션 시작"
+echo "  2. Plan 작성 시 Intent를 명확히 문서화"
+echo "  3. 구현 후 'commit and verify', 'create PR', 'review cycle'처럼 요청"
+echo "  4. 필요 시 ~/.codex/rules/$RULE_NAME 내용을 프로젝트 규칙과 함께 사용"

@@ -19,17 +19,17 @@ n8n이 자동 처리하지 못하는 비정형 상태 전이를 수동으로 적
 ## 실행
 
 ```bash
-~/.claude/scripts/isaac-task-status.sh [<issue_num>] [<action>]
+~/.claude/scripts/ult-task-status.sh [<issue_num>] [<action>]
 ```
 
 ### 사용 예
 
 ```
-/isaac-task-status                 # 현재 브랜치 Task, 대화형
-/isaac-task-status #234 cancel     # Task #234 미완료 처리
-/isaac-task-status #234 reopen     # 시작 전으로 되돌림
-/isaac-task-status #234 in-progress
-/isaac-task-status #234 done
+/ult-task-status                 # 현재 브랜치 Task, 대화형
+/ult-task-status #234 cancel     # Task #234 미완료 처리
+/ult-task-status #234 reopen     # 시작 전으로 되돌림
+/ult-task-status #234 in-progress
+/ult-task-status #234 done
 ```
 
 ### action 매핑

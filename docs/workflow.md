@@ -1,0 +1,249 @@
+# Isaac 개발 워크플로우
+
+Notion + Github + Claude Code + n8n 자동화가 한 몸으로 움직이는 워크플로우. 개발자는 Claude 안에서 Plan부터 PR 머지까지 끝냅니다.
+
+## 초기 설정 (1회)
+
+### 사전 요구사항
+- `gh` CLI 인증 (`gh auth login`)
+- `jq` 설치
+- `tmux` (cc 명령어용, 선택)
+- Notion Integration 토큰 — [발급 가이드](https://www.notion.so/profile/integrations)
+
+### 설치
+
+```bash
+git clone https://github.com/ultivis-iot/claude-code-setup.git
+cd claude-code-setup
+./setup.sh
+```
+
+setup.sh가 대화형으로 묻는 것:
+
+1. **Notion Integration 토큰** — `ntn_...` 또는 `secret_...` 입력 (Enter로 건너뛰기 가능)
+2. **WORKTREE_ROOT** — worktree 둘 디렉토리 (기본: `$HOME/Git`)
+
+### Claude Code 재시작
+
+Notion MCP 도구(`mcp__notion-api__*`)를 로드하려면 `/exit` 후 재실행 필요.
+
+### 프로젝트별 셋업 (선택, 필요 시)
+
+```bash
+cd <your-project>
+ult-init dw-hook    # dw 환경 전환 스크립트 생성 (대화형)
+```
+
+팀 공유(`.isaac/dw.sh`) 또는 개인(`~/.claude/dev-tools/hooks/<repo>.sh`) 선택.
+
+### 검증
+
+```bash
+ult-init            # 상태 확인
+ult-init check      # 필수 요소 검증
+/ult-my-tasks       # 첫 호출 시 Member 캐시 자동 빌드 (~2s)
+```
+
+---
+
+## 큰 그림
+
+```
+[Claude Code]                    [n8n 자동화]
+  Plan 모드 → 승인                 Github webhook → Notion
+        ↓                               ↑
+  Claude가 Plan 분류                  PR 생성 → AI 리뷰
+        ↓                               ↑
+  Story/Task/Issue/브랜치            commit / push
+  (exec 스크립트)                      ↑
+        ↓                          개발자 코드 작성
+  worktree로 진입 (cc)               ↓
+        ↓                          /commit-and-verify → /create-pr
+  코드 작성
+```
+
+---
+
+## Plan 승인 흐름
+
+Plan 모드(`Shift+Tab×2`)에서 작성 → 승인하면 hook이 `tmp/current-plan.md`를 저장하고, 그 다음 단계는 AI가 먼저 제안합니다.
+
+| Plan 성격 | 기본 제안 |
+|---|---|
+| 새 Story로 관리할 작업 | `ult-story-create` 흐름 제안 |
+| 기존 Story 추가 작업 | `ult-task-create` 흐름 제안 |
+| 현재 Task의 보완 | `ult-task-note` 흐름 제안 |
+| 작은 일회성 변경 | 발행 없이 Build 제안 |
+
+기본 UX는 `명령어 입력`보다 `AI 제안 → 사용자 확인 → AI 실행`입니다.
+
+- AI는 추천 흐름 1개와 이유 1줄을 먼저 제시
+- 사용자는 발행 방식을 확인만 하면 됨
+- 확인되면 AI가 해당 흐름을 직접 이어서 수행
+
+**현재 worktree 안이면** 새 worktree 생성은 건너뛰는 쪽을 우선 제안합니다.
+
+---
+
+## 주요 명령어
+
+### Claude 스킬 (`/ult-*`)
+
+| 명령어 | 역할 | 속도 |
+|---|---|---|
+| `/ult-my-tasks` | 본인 Task 조회 + worktree 자동 생성 | ~2s |
+| `/ult-story-create` | Plan → Story + Task N + Issue N + worktree N | LLM + 3s |
+| `/ult-task-create` | 기존 Story에 Task 1개 추가 | LLM + 2s |
+| `/ult-task-note` | 현재 Task에 메모 코멘트 | ~1s |
+| `/ult-task-status` | 비정형 상태 변경 (취소/재개) | ~1.5s |
+| `/ult-weekly-report` | 주간 작업 정리 + 발행 | 5s + LLM |
+
+### 작업 중심 진입점
+
+| 명령어 | 역할 |
+|---|---|
+| `/ult-start-task` | 내 Task 조회, Story 발행, Task 추가 중 상황에 맞는 시작 흐름 선택 |
+| `/ult-finish-task` | 검증 상태 확인 후 필요 시 검증 + PR 생성까지 연결 |
+| `/ult-sync-task` | Task 메모, 상태 변경, Issue 컨텍스트 확인을 한 진입점으로 통합 |
+
+### 기존 확장
+
+| 명령어 | 역할 |
+|---|---|
+| `/issue` | 현재 브랜치의 Github Issue + Notion 컨텍스트 |
+| `/commit-and-verify` | 검증 5종 + Task 코멘트 자동 동기화 |
+| `/create-pr` | PR 생성 |
+
+### 셸 명령어 (dev-tools, 사용자 주도)
+
+| 명령어 | 역할 |
+|---|---|
+| `wt` | 현재 repo worktree 목록 |
+| `wa [branch]` | worktree 생성 (대화형 또는 인자) |
+| `wr` | worktree 삭제 (대화형) |
+| `cc <name\|num\|m>` | tmux 세션 + Claude Code 진입 |
+| `ccs` / `cca` | 세션 상태 / 모든 worktree에 세션 |
+| `dw <name\|num\|m>` | 환경 전환 (docker/DB/dev server) |
+| `ult-init [setup\|check\|dw-hook]` | dev-tools 설정 |
+
+---
+
+## 하루 시나리오
+
+```bash
+# 아침
+/ult-my-tasks                    # 오늘 할 일 확인 → 선택
+# → worktree 자동 생성 (예: ub-234)
+cc ub-234                          # tmux 세션 + Claude Code
+
+# 새 환경 필요할 때 (docker restart 등)
+dw ub-234                          # 프로젝트별 .isaac/dw.sh 실행
+
+# 작업 중 기록
+/ult-task-note "Token 이슈 백엔드 확인 대기"
+
+# 컨텍스트 재확인
+/issue
+
+# 마무리
+/commit-and-verify                 # 검증 5종 + Task 코멘트
+/create-pr                         # PR 생성
+# → n8n이 AI 리뷰 자동 수행, 머지 시 Task 완료 처리
+
+# 주간 회고 (금요일)
+/ult-weekly-report
+```
+
+---
+
+## 설정 파일 위치
+
+### 전역 (`~/.claude/`)
+- `dev-tools/.env` — `WORKTREE_ROOT` (기본 `$HOME/Git`)
+- `dev-tools/.worktree-active` — 현재 활성 worktree
+- `dev-tools/hooks/<repo>.sh` — 개인용 dw hook
+- `notion-cache/` — Members/Projects/Repositories/Schemas/Templates 캐시
+
+### 프로젝트별 (`<repo>/`)
+- `.isaac/dw.sh` — 팀 공유 dw hook (커밋 권장)
+- `.isaac/dw.local.sh` — 개인 오버라이드 (gitignore)
+- `tmp/current-plan.md` — 승인된 Plan
+- `tmp/validation-status.json` — 검증 결과
+
+---
+
+## Worktree 이름 규칙
+
+repo 이름의 하이픈 세그먼트 첫 글자 + 번호:
+
+| repo | abbr | worktree 예 |
+|---|---|---|
+| project-maker | `pm` | `pm-583` |
+| ultivis-base | `ub` | `ub-583` |
+| ultivis-react-library | `url` | `url-583` |
+| claude-code-setup | `ccs` | `ccs-583` |
+
+`dw 583` / `cc 583` → 현재 repo abbr 우선. 여러 repo에 `*-583*` 있으면 선택 프롬프트.
+
+---
+
+## dw hook 2-tier 조회
+
+```
+dw <target>
+    ↓
+1. <wt>/.isaac/dw.sh                       ← 팀 공유 (커밋)
+2. ~/.claude/dev-tools/hooks/<repo>.sh     ← 개인
+3. 레거시 자동 감지 (alembic+apps)
+4. fallback (env var만)
+```
+
+`ult-init dw-hook`이 프로젝트 타입을 감지해 템플릿 생성:
+- compose / pnpm / django / nextjs / project-maker / generic
+
+---
+
+## n8n 자동화 (Github → Notion)
+
+| 트리거 | 동작 |
+|---|---|
+| 브랜치 생성 | Task → `진행 중` |
+| push | Commit DB 적재 |
+| PR opened | Task → `AI검토중` + Claude Code AI 리뷰 |
+| PR merged/closed | Task → `완료` / `미완료` |
+
+파일 export는 `n8n/` 디렉토리 참고.
+
+---
+
+## 책임 분리
+
+| 레이어 | 담당 | 예시 |
+|---|---|---|
+| 데이터/프로세스 | Claude | Plan, Notion, Github Issue, 브랜치, worktree 생성 |
+| 파일시스템 | 사용자 | worktree 관리, tmux |
+| 런타임 | 사용자 | docker, DB 전환 (`dw`) |
+| Github 이벤트 동기화 | n8n | 단방향 자동 |
+
+---
+
+## 개발자 하루 액션 횟수
+
+| 시점 | 액션 | 횟수 |
+|---|---|---|
+| 출근 | `/ult-my-tasks` | 1 |
+| 환경 진입 | `cc <name>` | 1 |
+| 작업 시작 | Plan 승인 → 분류 따라가기 | 1~3 |
+| 환경 전환 필요 시 | `dw <name>` | 0~N |
+| 작업 중 기록 | `/ult-task-note` | 0~N |
+| 마무리 | `/commit-and-verify` → `/create-pr` | 1~3 |
+| 금요일 | `/ult-weekly-report` | 1/주 |
+| **Notion 진입** | — | **0** |
+
+---
+
+## 참고
+
+- 자세한 Notion DB 스키마: `/ult-my-tasks`, `/ult-story-create` 등 각 커맨드 md 참조
+- n8n 워크플로우 상세: [`n8n/README.md`](../n8n/README.md)
+- Notion MCP 연동: 설치 시 `setup.sh` 가 자동 안내

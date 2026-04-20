@@ -1,9 +1,10 @@
 #!/bin/bash
 # 내 Task 목록 조회 + 선택 시 브랜치 자동 체크아웃/생성
-# Usage: isaac-my-tasks.sh [--week | --all]
+# Usage: ult-my-tasks.sh [--week | --all]
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/workflow-env.sh"
 . "$SCRIPT_DIR/notion-api.sh"
 
 MODE="default"
@@ -69,7 +70,7 @@ story_ids=$(echo "$resp" | jq -r '.results[].properties["📜 Story"].relation[]
 repo_ids=$(echo "$resp" | jq -r '.results[].properties["🥨 Repository"].relation[]?.id' | sort -u)
 
 # 캐시 디렉토리
-CACHE_DIR="/tmp/isaac-tasks-cache-$$"
+CACHE_DIR="/tmp/ult-tasks-cache-$$"
 mkdir -p "$CACHE_DIR"
 trap 'rm -rf "$CACHE_DIR"' EXIT
 
@@ -185,8 +186,8 @@ else
     branch="${topic}/${issue_num}-${slug}"
 fi
 
-# Worktree 생성 (또는 기존 worktree 경로 얻기) — isaac-wt-add.sh 위임
-wt_path=$("$HOME/.claude/scripts/isaac-wt-add.sh" "$branch") || exit 1
+# Worktree 생성 (또는 기존 worktree 경로 얻기) — ult-wt-add.sh 위임
+wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch") || exit 1
 
 wt_name=$(basename "$wt_path")
 

@@ -1,104 +1,52 @@
 ---
 allowed-tools: Bash(git:*), Bash(gh:*), Read
-description: 검증 통과 확인 후 Push 및 PR 생성
+description: 검증 결과를 확인한 뒤 push와 PR 생성을 수행
 argument-hint: [directory] [-b target-branch]
 ---
 
-## 인자 파싱
+# Create PR
 
-입력된 인자: `$ARGUMENTS`
+본문만으로 기본 실행은 가능하고, 아래 문서는 validation 기준이 헷갈릴 때만 연다:
 
-**인자 형식**:
-- `/create-pr` → 현재 디렉토리, 기본 브랜치로 PR
-- `/create-pr project-maker` → project-maker 디렉토리
-- `/create-pr -b dev` → 현재 디렉토리, dev 브랜치로 PR
-- `/create-pr project-maker -b dev` → project-maker 디렉토리, dev 브랜치로 PR
+- `docs/references/create-pr-contract.md`
+  - PR 생성 전 validation-status 해석 기준을 다시 볼 때
 
-**파싱 규칙**:
-1. `-b <branch>` 옵션이 있으면 해당 브랜치를 타겟으로 사용
-2. 첫 번째 인자가 존재하고 디렉토리라면 → 작업 디렉토리로 사용
-3. 인자가 없거나 디렉토리가 아니면 → 현재 디렉토리 사용
-4. 타겟 브랜치 미지정 시 → 저장소 기본 브랜치 사용
+## 입력 파싱
 
-## 1. 검증 상태 확인
+입력: `$ARGUMENTS`
 
-작업 디렉토리의 검증 상태 파일을 확인합니다:
-- 경로: `<directory>/tmp/validation-status.json`
+- `-b <branch>`가 있으면 타겟 브랜치로 사용
+- 첫 인자가 디렉토리면 작업 디렉토리로 사용
+- 아니면 현재 디렉토리를 사용
 
-**검증 통과 조건**:
-- `ready_for_pr`이 `true`여야 함
-- `intent_validation.status`가 `PASS`여야 함
-- `quality_validation`의 모든 항목이 `PASS` 또는 `WARN`이어야 함
+## 수행 절차
 
-**검증 미통과 시**:
-- PR 생성을 중단하고 미통과 항목을 안내
-- `/commit-and-verify <directory>` 명령으로 검증 단계를 다시 수행하도록 안내
+1. `<directory>/tmp/validation-status.json`을 읽는다
+2. 아래 조건을 만족하는지 확인한다
+   - `overall == PASS || WARN`
+   - `results.intent-validator == PASS`
+   - 어떤 validator도 `FAIL`이 아님
+3. 현재 브랜치와 리모트를 확인한다
+   - `-b`가 없으면 저장소 기본 브랜치를 사용한다
+4. `git push -u origin <branch>`를 수행한다
+5. `gh pr create`로 PR을 생성한다
+   - `-b`가 있으면 `-B <target-branch>` 적용
 
-## 2. 현재 상태 (검증 통과 시에만 진행)
+## PR 본문
 
-작업 디렉토리에서 확인:
-- 브랜치: `git -C <directory> branch --show-current`
-- 커밋 로그: `git -C <directory> log origin/main..HEAD --oneline`
-- 리모트: `git -C <directory> remote -v`
+최소 섹션:
 
-## 3. 수행 작업
+- `Summary`
+- `Changes`
+- `Test Plan`
+- `Validation`
 
-1. 검증 상태 확인 → 미통과 시 중단
-2. 작업 디렉토리로 이동 후 Push: `git -C <directory> push -u origin <branch>`
-3. PR 생성: `gh pr create` (작업 디렉토리에서 실행)
-   - `-b` 옵션이 지정된 경우: `gh pr create -B <target-branch>`
+## 실패 규칙
 
-## 4. PR 형식
+- validation 미통과 시 즉시 중단
+- `/commit-and-verify` 재실행 안내
+- push 또는 `gh pr create` 실패 시 원인만 요약해 안내하고 중단
 
-gh pr create 명령 사용:
+reference를 안 열어도 되는 경우:
 
-```bash
-# 타겟 브랜치 지정 시
-cd <directory> && gh pr create -B <target-branch> --title "..." --body "..."
-
-# 타겟 브랜치 미지정 시 (기본 브랜치 사용)
-cd <directory> && gh pr create --title "..." --body "..."
-```
-
-**PR 본문 형식**:
-
-```bash
-cd <directory> && gh pr create -B <target-branch> --title "<커밋 메시지 기반 제목>" --body "$(cat <<'EOF'
-## Summary
-- 변경 사항 요약
-
-## Changes
-- 주요 변경 파일 목록
-
-## Test Plan
-- 테스트 방법
-
-## Validation
-- Intent: [PASS/FAIL]
-- Documentation: [PASS/WARN/FAIL]
-- Security: [PASS/WARN/FAIL]
-- Code Quality: [PASS/WARN/FAIL]
-EOF
-)"
-```
-
-## 5. 완료 후
-
-- PR URL 출력
-- 검증 상태 파일 초기화 (선택적)
-
-## 사용 예시
-
-```bash
-# 현재 디렉토리, 기본 브랜치로 PR
-/create-pr
-
-# 특정 디렉토리 지정
-/create-pr project-maker
-
-# 타겟 브랜치 지정 (dev 브랜치로 PR)
-/create-pr -b dev
-
-# 디렉토리 + 타겟 브랜치
-/create-pr project-maker -b dev
-```
+- validation이 이미 통과했고 push + PR 생성만 하면 되는 일반 케이스

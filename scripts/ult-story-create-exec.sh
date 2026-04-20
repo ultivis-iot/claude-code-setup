@@ -1,8 +1,8 @@
 #!/bin/bash
 # Plan 발행 실행기 — JSON 입력 받아 Story+Tasks+Issues+브랜치 일괄 생성
 # Usage:
-#   isaac-story-create-exec.sh <spec.json>
-#   echo '<json>' | isaac-story-create-exec.sh -
+#   ult-story-create-exec.sh <spec.json>
+#   echo '<json>' | ult-story-create-exec.sh -
 #
 # spec.json 형식:
 # {
@@ -30,6 +30,7 @@
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/workflow-env.sh"
 . "$SCRIPT_DIR/notion-api.sh"
 
 STORY_DB="338b9757-d10f-462f-92c9-4777cb747c78"
@@ -224,7 +225,7 @@ fi
 
 echo "$RESULTS" | jq -r '.[] | "  ✓ #\(.issue_num) [\(.topic)] \(.name)\n    \(.issue_url)"'
 
-# ---- 3단계: Worktree 생성 (각 Task별, isaac-wt-add.sh 위임) ----
+# ---- 3단계: Worktree 생성 (각 Task별, ult-wt-add.sh 위임) ----
 echo ""
 echo "▸ Worktree 생성 중..."
 
@@ -238,7 +239,7 @@ while IFS= read -r task; do
     slug=$(make_slug "$name")
     branch="${prefix}/${issue_num}-${slug}"
 
-    wt_path=$("$HOME/.claude/scripts/isaac-wt-add.sh" "$branch" --quiet 2>/dev/null) || {
+    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --quiet 2>/dev/null) || {
         echo "  ⚠ #$issue_num worktree 생성 실패"
         continue
     }

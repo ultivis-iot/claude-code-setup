@@ -5,7 +5,7 @@
 ## 실행
 
 ```bash
-~/.claude/scripts/isaac-my-tasks.sh [--week | --all]
+~/.claude/scripts/ult-my-tasks.sh [--week | --all]
 ```
 
 스크립트가 처리하는 것:

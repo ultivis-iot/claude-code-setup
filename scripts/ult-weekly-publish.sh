@@ -1,8 +1,8 @@
 #!/bin/bash
 # 주간 보고서 마크다운을 일일 업무 보고 DB에 발행
 # Usage:
-#   isaac-weekly-publish.sh "<title>" "<YYYY-MM-DD>" < markdown.md
-#   echo "<markdown>" | isaac-weekly-publish.sh "<title>" "<YYYY-MM-DD>"
+#   ult-weekly-publish.sh "<title>" "<YYYY-MM-DD>" < markdown.md
+#   echo "<markdown>" | ult-weekly-publish.sh "<title>" "<YYYY-MM-DD>"
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

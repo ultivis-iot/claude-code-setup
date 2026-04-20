@@ -1,6 +1,6 @@
 #!/bin/bash
 # 현재 브랜치 Task에 코멘트 추가
-# Usage: isaac-task-note.sh "<메모 내용>"
+# Usage: ult-task-note.sh "<메모 내용>"
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 content="$*"
 if [ -z "$content" ]; then
-    echo "사용법: /isaac-task-note \"<메모 내용>\"" >&2
+    echo "사용법: /ult-task-note \"<메모 내용>\"" >&2
     exit 1
 fi
 

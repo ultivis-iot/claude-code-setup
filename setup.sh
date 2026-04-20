@@ -278,7 +278,7 @@ if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
         WORKTREE_ROOT_PATH="${WORKTREE_ROOT_PATH:-$DEFAULT_ROOT}"
 
         cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
-# Isaac dev-tools 환경 설정
+# Ultivis dev-tools 환경 설정
 WORKTREE_ROOT="$WORKTREE_ROOT_PATH"
 
 # Docker 멀티유저 격리 (자동 설정)

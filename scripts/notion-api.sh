@@ -2,6 +2,9 @@
 # Notion API 공통 헬퍼
 # Usage: source 이 파일 후 notion_* 함수 호출
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/workflow-env.sh"
+
 # 토큰 읽기 (user scope 또는 project scope의 mcpServers.notion-api.env.NOTION_TOKEN)
 _notion_token() {
     if [ -n "$NOTION_TOKEN" ]; then
@@ -14,9 +17,9 @@ _notion_token() {
         .mcpServers["notion-api"].env.NOTION_TOKEN //
         ([.projects[]?.mcpServers["notion-api"].env.NOTION_TOKEN] | map(select(. != null)) | .[0]) //
         empty
-    ' "$HOME/.claude.json" 2>/dev/null)
+    ' "$WORKFLOW_CONFIG_JSON" 2>/dev/null)
     if [ -z "$token" ]; then
-        echo "ERROR: Notion 토큰을 찾을 수 없습니다. setup.sh 재실행 권장." >&2
+        echo "ERROR: Notion 토큰을 찾을 수 없습니다. WORKFLOW_CONFIG_JSON 또는 NOTION_TOKEN 확인 필요." >&2
         return 1
     fi
     echo "$token"
@@ -112,7 +115,7 @@ MEMBER_DB="11bab65b-33f6-417a-aaf2-ccdb7f574b71"
 DAILY_REPORT_DB="f365bbd5-d7e3-49c9-bf0d-89c757de27df"
 
 # ---- 캐시 ----
-CACHE_DIR="$HOME/.claude/notion-cache"
+CACHE_DIR="$WORKFLOW_CACHE_DIR"
 mkdir -p "$CACHE_DIR/schemas" 2>/dev/null
 
 # 기존 위치(notion-member.json)와의 호환을 위해 첫 사용 시 이동

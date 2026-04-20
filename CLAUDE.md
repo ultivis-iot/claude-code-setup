@@ -1,6 +1,6 @@
 ﻿# Claude Code Setup 프로젝트
 
-Claude Code 개발 플로우 설정 도구 저장소입니다.
+Claude Code와 Codex 개발 플로우 설정 도구 저장소입니다.
 
 ## 프로젝트 구조
 
@@ -12,7 +12,9 @@ Claude Code 개발 플로우 설정 도구 저장소입니다.
 ├── hooks/              # Git/이벤트 훅
 ├── schemas/            # JSON 스키마 정의
 ├── plugins/            # MCP 플러그인
+├── codex/              # Codex rules/skills
 ├── setup.sh            # Linux/Mac 설치 스크립트
+├── setup-codex.sh      # Codex 설치 스크립트
 └── setup.ps1           # Windows 설치 스크립트
 ```
 
@@ -60,7 +62,9 @@ git push origin master --tags
 
 ### 테스트
 - 설치: `./setup.sh`
+- Codex 설치: `./setup-codex.sh`
 - 업데이트: `./setup.sh --update`
+- 워크플로우 검증: `./scripts/verify-workflow.sh`
 
 ### 업데이트 검증
 `./setup.sh --update` 실행 후 아래 항목 확인:

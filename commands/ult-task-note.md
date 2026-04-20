@@ -5,7 +5,7 @@
 ## 실행
 
 ```bash
-~/.claude/scripts/isaac-task-note.sh "<메모 내용>"
+~/.claude/scripts/ult-task-note.sh "<메모 내용>"
 ```
 
 스크립트가 처리하는 것:
@@ -17,8 +17,8 @@
 ## 사용 예
 
 ```
-/isaac-task-note "Token refresh 흐름 백엔드 확인 대기 (김OO)"
-/isaac-task-note "vite.config에 ESM 호환 옵션 추가로 해결"
+/ult-task-note "Token refresh 흐름 백엔드 확인 대기 (김OO)"
+/ult-task-note "vite.config에 ESM 호환 옵션 추가로 해결"
 ```
 
 ## 실패 케이스

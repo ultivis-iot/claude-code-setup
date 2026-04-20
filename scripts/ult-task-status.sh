@@ -1,8 +1,8 @@
 #!/bin/bash
 # Task 상태 변경
 # Usage:
-#   isaac-task-status.sh                           # 현재 브랜치 Task 대화형
-#   isaac-task-status.sh <issue_num> <action>      # 비대화형
+#   ult-task-status.sh                           # 현재 브랜치 Task 대화형
+#   ult-task-status.sh <issue_num> <action>      # 비대화형
 #     action: cancel | reopen | in-progress | todo
 
 set -e

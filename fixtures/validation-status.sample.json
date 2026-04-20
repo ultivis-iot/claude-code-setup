@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-04-20T12:34:56Z",
+  "branch": "feature/123-add-login",
+  "base_branch": "main",
+  "commits": [
+    {
+      "hash": "abc1234",
+      "message": "feat: add login validation"
+    }
+  ],
+  "results": {
+    "intent-validator": "PASS",
+    "doc-validator": "WARN",
+    "security-validator": "PASS",
+    "code-simplifier": "PASS",
+    "test-validator": "PASS",
+    "cli-validator": "SKIP",
+    "visual-qa": "PENDING"
+  },
+  "overall": "WARN",
+  "warnings": [
+    "Documentation update recommended"
+  ],
+  "errors": []
+}

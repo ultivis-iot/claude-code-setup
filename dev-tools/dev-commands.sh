@@ -1,11 +1,15 @@
 #!/bin/bash
-# Isaac dev-tools: Git Worktree + tmux + Claude Code
+# Ultivis dev-tools: Git Worktree + tmux + Claude Code
 # 여러 프로젝트를 지원 (MAIN_PROJECT 없음, 현재 git 컨텍스트로 동작)
 
 # ============================================================
 # 설정 로드
 # ============================================================
 DEV_TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKFLOW_HOME="${WORKFLOW_HOME:-$(cd "$DEV_TOOLS_DIR/.." && pwd)}"
+WORKFLOW_SCRIPTS_DIR="${WORKFLOW_SCRIPTS_DIR:-$WORKFLOW_HOME/scripts}"
+WORKFLOW_DEV_TOOLS_DIR="${WORKFLOW_DEV_TOOLS_DIR:-$WORKFLOW_HOME/dev-tools}"
+WORKFLOW_HOOKS_DIR="${WORKFLOW_HOOKS_DIR:-$WORKFLOW_HOME/hooks}"
 
 # .env 로드 (없으면 기본값으로 자동 생성)
 if [ -f "$DEV_TOOLS_DIR/.env" ]; then
@@ -13,7 +17,7 @@ if [ -f "$DEV_TOOLS_DIR/.env" ]; then
 else
     echo "ℹ️  .env 없음 — 기본값으로 생성 ($DEV_TOOLS_DIR/.env)"
     cat > "$DEV_TOOLS_DIR/.env" <<EOF
-# Isaac dev-tools 환경 설정 (자동 생성)
+# Ultivis dev-tools 환경 설정 (자동 생성)
 WORKTREE_ROOT="\$HOME/Git"
 EOF
     source "$DEV_TOOLS_DIR/.env"
@@ -201,10 +205,10 @@ wt() {
 #   wa <branch>     — 지정 브랜치로 바로 생성 (비대화형)
 #   wa -r <repo> <branch>  — 다른 repo 지정
 wa() {
-    # 인자 있으면 비대화형 — isaac-wt-add.sh로 위임
+    # 인자 있으면 비대화형 — ult-wt-add.sh로 위임
     if [ $# -gt 0 ]; then
         local wt_path
-        wt_path=$("$HOME/.claude/scripts/isaac-wt-add.sh" "$@") || return 1
+        wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$@") || return 1
         echo "✅ $wt_path"
         cd "$wt_path" 2>/dev/null
         return 0
@@ -256,7 +260,7 @@ wa() {
     [ -z "$branch" ] && { echo "취소"; return 1; }
 
     local wt_path
-    wt_path=$("$HOME/.claude/scripts/isaac-wt-add.sh" "$branch") || return 1
+    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch") || return 1
     echo ""
     echo "✅ $wt_path"
     cd "$wt_path"
@@ -495,7 +499,7 @@ dw() {
 
     # 2-tier Hook 조회
     # 1) repo 내 .isaac/dw.sh (팀 공유)
-    # 2) ~/.claude/dev-tools/hooks/<repo>.sh (개인)
+    # 2) <workflow-home>/dev-tools/hooks/<repo>.sh (개인)
     local hook="" hook_source=""
     local repo_basename
     repo_basename=$(basename "$(git -C "$wt_path" worktree list 2>/dev/null | head -1 | awk '{print $1}')")
@@ -503,8 +507,8 @@ dw() {
     if [ -f "$wt_path/.isaac/dw.sh" ]; then
         hook="$wt_path/.isaac/dw.sh"
         hook_source="repo"
-    elif [ -f "$HOME/.claude/dev-tools/hooks/${repo_basename}.sh" ]; then
-        hook="$HOME/.claude/dev-tools/hooks/${repo_basename}.sh"
+    elif [ -f "$WORKFLOW_HOOKS_DIR/${repo_basename}.sh" ]; then
+        hook="$WORKFLOW_HOOKS_DIR/${repo_basename}.sh"
         hook_source="home"
     fi
 
@@ -529,7 +533,7 @@ dw() {
     echo "ℹ️  hook 없음 — 환경변수만 갱신"
     read -r -p "   지금 dw-hook 생성할까요? (y/N): " ans
     if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
-        (cd "$wt_path" && isaac-init dw-hook)
+        (cd "$wt_path" && ult-init dw-hook)
     fi
 }
 
@@ -591,17 +595,17 @@ alias td='tmux detach'
 alias ccm='cc m'
 
 # ============================================================
-# isaac-init: dev-tools 셋업 도우미
+# ult-init: dev-tools 셋업 도우미
 # ============================================================
 
-isaac-init() {
+ult_init() {
     local sub="${1:-status}"
     local env_file="$DEV_TOOLS_DIR/.env"
 
     case "$sub" in
     status|"")
         echo ""
-        echo "🔧 Isaac dev-tools 상태"
+        echo "🔧 Ultivis dev-tools 상태"
         echo "─────────────────────────────────────────────"
         if [ -d "$WORKTREE_ROOT" ]; then
             echo "  ✓ WORKTREE_ROOT: $WORKTREE_ROOT"
@@ -615,13 +619,13 @@ isaac-init() {
             local repo_basename
             repo_basename=$(basename "$cur_root")
             echo "  📂 현재 프로젝트: $repo_basename ($cur_root)"
-            local home_hook="$HOME/.claude/dev-tools/hooks/${repo_basename}.sh"
+            local home_hook="$WORKFLOW_HOOKS_DIR/${repo_basename}.sh"
             if [ -f "$cur_root/.isaac/dw.sh" ]; then
                 echo "     ✓ hook (팀): $cur_root/.isaac/dw.sh"
             elif [ -f "$home_hook" ]; then
                 echo "     ✓ hook (개인): $home_hook"
             else
-                echo "     ○ hook 없음 → isaac-init dw-hook 으로 생성"
+                echo "     ○ hook 없음 → ult-init dw-hook 으로 생성"
             fi
         else
             echo "  ⚠ 현재 디렉토리가 git repo 아님"
@@ -634,13 +638,13 @@ isaac-init() {
 
         echo ""
         echo "  📋 명령어:  wt, wa, wr, cc <num>, ccs, cca, dw <num>"
-        echo "  📋 셋업:   isaac-init setup | check | dw-hook"
+        echo "  📋 셋업:   ult-init setup | check | dw-hook"
         echo ""
         ;;
 
     setup)
         echo ""
-        echo "🔧 Isaac dev-tools 셋업"
+        echo "🔧 Ultivis dev-tools 셋업"
         echo "─────────────────────────────────────────────"
         local cur_root=""
         [ -n "$WORKTREE_ROOT" ] && cur_root="$WORKTREE_ROOT"
@@ -655,7 +659,7 @@ isaac-init() {
         new_root="${new_root/#\~/$HOME}"
 
         cat > "$env_file" <<EOF
-# Isaac dev-tools 환경 설정
+# Ultivis dev-tools 환경 설정
 WORKTREE_ROOT="$new_root"
 EOF
         echo "✓ 저장: $env_file"
@@ -719,7 +723,7 @@ EOF
         echo "어디에 hook을 저장할까요?"
         echo "   [1] repo 루트 ($cur_root/.isaac/dw.sh)"
         echo "       → git에 커밋해서 팀 공유"
-        echo "   [2] 개인 ($HOME/.claude/dev-tools/hooks/${repo_name}.sh)"
+        echo "   [2] 개인 ($WORKFLOW_HOOKS_DIR/${repo_name}.sh)"
         echo "       → 본인 머신에만 존재, repo에 영향 없음"
         echo ""
         read -r -p "선택 [1-2]: " loc_choice
@@ -729,7 +733,7 @@ EOF
         case "$loc_choice" in
         1) hook_path="$cur_root/.isaac/dw.sh" ;;
         2)
-            hook_path="$HOME/.claude/dev-tools/hooks/${repo_name}.sh"
+            hook_path="$WORKFLOW_HOOKS_DIR/${repo_name}.sh"
             is_personal=true
             ;;
         *) echo "취소"; return 0 ;;
@@ -865,7 +869,7 @@ OVERRIDE
             echo "   1. 필요하면 수정: vi $hook_path"
             echo "   2. git에 커밋:"
             echo "        git add .isaac/dw.sh"
-            echo "        git commit -m 'chore: add isaac dw hook'"
+            echo "        git commit -m 'chore: add ult dw hook'"
             echo "   3. dw로 테스트: dw m"
             echo ""
             if [ ! -f "$cur_root/.gitignore" ] || ! grep -q "^\.isaac/dw\.local\.sh" "$cur_root/.gitignore" 2>/dev/null; then
@@ -879,11 +883,12 @@ OVERRIDE
         ;;
 
     *)
-        echo "사용법: isaac-init [status | setup | check | dw-hook]"
+        echo "사용법: ult-init [status | setup | check | dw-hook]"
         return 1
         ;;
     esac
 }
 
 # ============================================================
-echo "✅ Isaac dev 명령어 로드 (wt, wa, wr, dw, cc, ccs, cca, isaac-init)"
+alias ult-init='ult_init'
+echo "✅ Ultivis dev 명령어 로드 (wt, wa, wr, dw, cc, ccs, cca, ult-init)"

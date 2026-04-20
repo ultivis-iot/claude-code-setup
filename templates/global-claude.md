@@ -11,17 +11,38 @@ Plan 모드 사용 시 반드시 의도 섹션이 포함되어 **사용자의 �
 2. **사용자 승인 완료 후, Build 시작 전에** `tmp/current-plan.md`로 복사
 3. Build 중에는 Plan을 수정하지 않음 (원본 의도 보존)
 
-### Plan 승인 후 분류 + 발행
-Plan 승인 직후 (hook이 `tmp/current-plan.md`를 저장한 직후), Build 시작 전에 Plan 성격을 분류하고 적절한 스킬을 추천:
+### Plan 승인 후 분류 + 확인
+Plan 승인 직후 (hook이 `tmp/current-plan.md`를 저장한 직후), Build 시작 전에 Plan 성격을 분류하고 다음 단계 1개를 제안한다.
 
-| Plan 성격 | 추천 스킬 |
+| Plan 성격 | 기본 제안 |
 |---|---|
-| 거대한 Plan (새 사용자 가치, 여러 단계) | `/isaac-story-create` — 새 Story + Task N개 + Issue N개 + 브랜치 N개 |
-| 기존 Story의 추가 작업 | `/isaac-task-create <story>` — Task 1개 + Issue + 브랜치 |
-| 현재 Task의 보완/메모 | `/isaac-task-note '메모'` |
-| 작은 일회성 변경 | 발행 없이 Build 시작 |
+| 새 Story로 관리할 작업 | `ult-story-create` 흐름 제안 — Story 1개 + Task N개 + Issue N개 + 필요 시 브랜치/worktree |
+| 기존 Story의 추가 작업 | `ult-task-create` 흐름 제안 — Task 1개 + Issue 1개 + 필요 시 브랜치/worktree |
+| 현재 Task의 보완/메모 | `ult-task-note` 흐름 제안 |
+| 발행 없이 바로 구현할 작업 | 바로 Build 시작 제안 |
 
-추천만 하고 **사용자 선택을 받음**. 명시적 거부 시 그대로 Build 시작.
+이때 사용자가 명령어를 직접 고르게 밀어내지 말고, 아래 순서로 진행한다.
+
+1. 추천 흐름 1개를 먼저 제시
+2. 이유를 1줄로 설명
+3. 대안은 최대 2개만 짧게 제시
+4. **사용자 확인을 받은 뒤** 그 흐름을 직접 이어서 수행
+
+권장 응답 형식:
+
+```text
+Plan 승인 완료.
+
+추천 다음 단계: 새 Story 발행
+이유: 독립된 작업 단위가 여러 개라 Story 아래 Task로 나누는 편이 적절합니다.
+
+확인되면 제가 이어서 진행하겠습니다.
+대안:
+- 기존 Story에 Task 1개 추가
+- 발행 없이 바로 구현
+```
+
+사용자가 다른 흐름을 고르면 그 선택을 따른다. 명시적 거부 시 그대로 Build 시작.
 ### 의도 (Intent)
 - 사용자가 원하는 것이 무엇인지 명확히 기술
 - 기대 결과물 정의
