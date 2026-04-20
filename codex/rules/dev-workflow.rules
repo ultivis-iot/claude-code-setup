@@ -1,29 +1,36 @@
-Apply the standard development workflow used in this repository.
-
-Core workflow:
-- Plan -> build -> commit -> validate -> create PR
-- If validation fails, return to build before proceeding.
-
-Plan discipline:
-- Before implementation, capture the user's intent explicitly.
-- The plan should state the expected outcome, scope, and any constraints that matter.
-- Preserve the approved intent as the validation baseline.
-
-Validation discipline:
-- Treat intent validation as the first gate after commit.
-- Quality validation should cover documentation, security, code simplicity, and tests.
-- If frontend files changed, suggest Visual QA instead of silently skipping UI validation.
-
-Execution discipline:
-- Prefer small, conventional commits with clear `type: subject` messages.
-- Do not create a PR before validation artifacts indicate the work is ready.
-- When reviewing PR feedback, classify findings into bug, valid improvement, design improvement, repeated feedback, or false positive.
-- Respond to review findings with code changes or explicit rationale, not vague acknowledgements.
-
-Project artifacts:
-- Use `tmp/current-plan.md` as the working copy of the approved plan when the project follows this repo's workflow.
-- Use `tmp/validation-status.json` as the validation summary artifact when commit validation is performed.
-
-Workflow mapping:
-- The Codex skill for this repository is `dev-workflow`.
-- When the user asks for commit validation, PR creation, review-cycle handling, issue lookup, or Isaac/Notion task flow, consult that skill's references and follow the matching procedure.
+# Repository workflow notes for Codex.
+#
+# This file must remain valid Starlark because Codex parses `~/.codex/rules/*.rules`
+# during startup. The previous plain-text version caused a startup parse error.
+#
+# Workflow guidance:
+# - Plan -> build -> commit -> validate -> create PR
+# - If validation fails, return to build before proceeding.
+#
+# Plan discipline:
+# - Capture the user's intent explicitly before implementation.
+# - The plan should state the expected outcome, scope, and relevant constraints.
+# - Preserve the approved intent as the validation baseline.
+#
+# Validation discipline:
+# - Treat intent validation as the first gate after commit.
+# - Quality validation should cover documentation, security, simplicity, and tests.
+# - If frontend files changed, suggest Visual QA instead of silently skipping it.
+#
+# Execution discipline:
+# - Prefer small, conventional commits with clear `type: subject` messages.
+# - Do not create a PR before validation artifacts indicate readiness.
+# - Classify PR feedback into bug, valid improvement, design improvement,
+#   repeated feedback, or false positive.
+# - Respond to review findings with code changes or explicit rationale.
+#
+# Project artifacts:
+# - Use `tmp/current-plan.md` as the approved-plan working copy.
+# - Use `tmp/validation-status.json` as the validation summary artifact.
+#
+# Workflow mapping:
+# - The Codex skill for this repository is `dev-workflow`.
+# - For commit validation, PR creation, review-cycle handling, issue lookup,
+#   or Ultivis/Notion task flow, consult that skill and its references.
+#
+# Keep this file minimal. Behavioral workflow logic belongs in the skill, not here.

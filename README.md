@@ -53,7 +53,7 @@ cd claude-code-setup
 ./setup-codex.sh
 ```
 
-Codex에서는 Claude의 slash command 대신 `rules + skills` 형태로 동일한 워크플로우를 적용합니다.
+Codex에서는 Claude의 slash command 대신 `skill 중심 + 최소 rules` 형태로 같은 워크플로우를 적용합니다.
 
 ### Linux / macOS
 
@@ -145,7 +145,7 @@ Codex 설치 시:
 ```text
 ~/.codex/
 ├── rules/
-│   └── dev-workflow.rules
+│   └── dev-workflow.rules      # 안전한 최소 rules 파일 (Starlark 파싱용)
 ├── skills/
 │   └── dev-workflow/
 │       ├── SKILL.md
@@ -172,7 +172,7 @@ Codex 설치 시:
 - "validation 통과했으면 PR 만들어줘"
 - "PR 23 review cycle 돌려줘"
 
-Codex는 `dev-workflow` skill과 `~/.codex/rules/dev-workflow.rules`를 기준으로 같은 개발 플로우를 따릅니다.
+Codex 워크플로우의 실제 동작은 `dev-workflow` skill이 담당합니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
 
 ### 1. Plan 모드 진입
 

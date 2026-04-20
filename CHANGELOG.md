@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.1 (2026-04-20)
+- Codex rules 안전성 정리:
+  - `codex/rules/dev-workflow.rules`를 유효한 최소 Starlark 파일로 정리해 startup parse error 방지
+  - Codex 워크플로우의 실제 책임이 `dev-workflow` skill에 있음을 README와 설치 안내에 명시
+  - `setup-codex.sh` 출력 문구를 skill 중심 흐름에 맞게 조정
+
 ## v0.6.0 (2026-04-20)
 - Codex 지원 추가:
   - `setup-codex.sh` 신설 — `~/.codex/rules`, `~/.codex/skills`, `~/.codex/dev-tools` 설치
