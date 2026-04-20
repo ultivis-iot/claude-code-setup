@@ -9,6 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
 SKILL_NAME="dev-workflow"
 RULE_NAME="dev-workflow.rules"
+PLUGIN_SOURCE_DIR="dev-workflow"
+PLUGIN_NAME="ult"
+LEGACY_PLUGIN_NAME="dev-workflow"
+PLUGIN_ROOT="$HOME/plugins"
+PLUGIN_DEST="$PLUGIN_ROOT/$PLUGIN_NAME"
+MARKETPLACE_PATH="$HOME/.agents/plugins/marketplace.json"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -42,7 +48,66 @@ rm -rf "$CODEX_DIR/skills/$SKILL_NAME"
 cp -R "$SCRIPT_DIR/codex/skills/$SKILL_NAME" "$CODEX_DIR/skills/$SKILL_NAME"
 echo -e "${GREEN}   ✓ ~/.codex/skills/$SKILL_NAME${NC}"
 
-echo "4. Dev-tools 설치..."
+echo "4. Plugin 설치..."
+mkdir -p "$PLUGIN_ROOT"
+rm -rf "$PLUGIN_ROOT/$LEGACY_PLUGIN_NAME"
+rm -rf "$PLUGIN_DEST"
+cp -R "$SCRIPT_DIR/codex/plugins/$PLUGIN_SOURCE_DIR" "$PLUGIN_DEST"
+mkdir -p "$(dirname "$MARKETPLACE_PATH")"
+python3 - "$MARKETPLACE_PATH" "$PLUGIN_NAME" "$LEGACY_PLUGIN_NAME" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+marketplace_path = Path(sys.argv[1]).expanduser()
+plugin_name = sys.argv[2]
+legacy_plugin_name = sys.argv[3]
+entry = {
+    "name": plugin_name,
+    "source": {
+        "source": "local",
+        "path": f"./plugins/{plugin_name}",
+    },
+    "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL",
+    },
+    "category": "Coding",
+}
+
+if marketplace_path.exists():
+    with marketplace_path.open() as handle:
+        payload = json.load(handle)
+else:
+    payload = {
+        "name": "local",
+        "interface": {"displayName": "Local Plugins"},
+        "plugins": [],
+    }
+
+plugins = payload.setdefault("plugins", [])
+plugins = [
+    item for item in plugins
+    if not (isinstance(item, dict) and item.get("name") == legacy_plugin_name)
+]
+for index, existing in enumerate(plugins):
+    if isinstance(existing, dict) and existing.get("name") == plugin_name:
+        plugins[index] = entry
+        break
+else:
+    plugins.append(entry)
+payload["plugins"] = plugins
+
+marketplace_path.parent.mkdir(parents=True, exist_ok=True)
+with marketplace_path.open("w") as handle:
+    json.dump(payload, handle, indent=2)
+    handle.write("\n")
+PY
+echo -e "${GREEN}   ✓ ~/plugins/$PLUGIN_NAME${NC}"
+echo -e "${GREEN}   ✓ ~/.agents/plugins/marketplace.json${NC}"
+echo -e "${YELLOW}     Codex에서 /ult:commit-and-verify 같은 짧은 namespaced slash command를 기본 노출합니다.${NC}"
+
+echo "5. Dev-tools 설치..."
 DEV_TOOLS_DEST="$CODEX_DIR/dev-tools"
 mkdir -p "$DEV_TOOLS_DEST"
 
@@ -102,11 +167,14 @@ echo "설치된 파일:"
 echo "  ~/.codex/rules/$RULE_NAME"
 echo "  ~/.codex/skills/$SKILL_NAME/SKILL.md"
 echo "  ~/.codex/skills/$SKILL_NAME/references/*.md"
+echo "  ~/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
+echo "  ~/plugins/$PLUGIN_NAME/commands/*.md"
+echo "  ~/.agents/plugins/marketplace.json"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
 echo "  ~/.codex/dev-tools/.env"
 echo ""
 echo "사용 방법:"
 echo "  1. 새 Codex 세션 시작"
 echo "  2. Plan 작성 시 Intent를 명확히 문서화"
-echo "  3. 구현 후 'commit and verify', 'create PR', 'review cycle'처럼 요청"
-echo "  4. 실제 워크플로우는 ~/.codex/skills/$SKILL_NAME 기준으로 동작"
+echo "  3. /ult:commit-and-verify, /ult:create-pr 같은 slash command 사용"
+echo "  4. 자연어 요청과 ~/.codex/skills/$SKILL_NAME 기반 workflow도 함께 사용 가능"

@@ -53,7 +53,7 @@ cd claude-code-setup
 ./setup-codex.sh
 ```
 
-Codex에서는 Claude의 slash command 대신 `skill 중심 + 최소 rules` 형태로 같은 워크플로우를 적용합니다.
+Codex에서는 `skill + plugin commands + minimal rules` 형태로 같은 워크플로우를 적용합니다. 현재 Codex 명령 진입점은 짧은 `/ult:...` 네임스페이스를 사용합니다.
 
 ### Linux / macOS
 
@@ -159,6 +159,21 @@ Codex 설치 시:
     ├── dev-commands.sh
     ├── .env.example
     └── .env
+
+~/plugins/
+└── ult/
+    ├── .codex-plugin/
+    │   └── plugin.json
+    ├── commands/
+    │   ├── commit-and-verify.md
+    │   ├── create-pr.md
+    │   ├── review-cycle.md
+    │   └── ...
+    └── skills/
+        └── dev-workflow/
+
+~/.agents/plugins/
+└── marketplace.json
 ```
 
 ## 사용 방법
@@ -167,12 +182,16 @@ Codex 설치 시:
 
 `setup-codex.sh` 실행 후 새 Codex 세션에서 다음처럼 요청하면 됩니다:
 
+- `/ult:commit-and-verify feat: 새로운 기능 추가`
+- `/ult:create-pr`
+- `/ult:review-cycle 23`
+- `/ult:ult-my-tasks`
 - "이 작업 plan 먼저 잡고 intent 명시해줘"
 - "commit and verify 해줘"
 - "validation 통과했으면 PR 만들어줘"
 - "PR 23 review cycle 돌려줘"
 
-Codex 워크플로우의 실제 동작은 `dev-workflow` skill이 담당합니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
+Codex에서는 로컬 문서/예제 기준으로 루트 slash command 등록 경로를 확인하지 못해, `~/plugins/ult`와 `~/.agents/plugins/marketplace.json`를 통해 `/ult:...` 형식의 짧은 slash command를 등록합니다. `dev-workflow` skill은 같은 워크플로우를 자연어 요청에도 적용하고, `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
 
 ### 1. Plan 모드 진입
 

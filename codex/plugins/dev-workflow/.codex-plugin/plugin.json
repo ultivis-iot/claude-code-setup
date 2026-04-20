@@ -1,0 +1,42 @@
+{
+  "name": "ult",
+  "version": "0.6.1",
+  "description": "Ultivis development workflow plugin for Codex with short ult: slash commands and skill guidance.",
+  "author": {
+    "name": "Ultivis",
+    "url": "https://github.com/ultivis-iot/claude-code-setup"
+  },
+  "homepage": "https://github.com/ultivis-iot/claude-code-setup",
+  "repository": "https://github.com/ultivis-iot/claude-code-setup",
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "codex",
+    "validation",
+    "pr",
+    "notion",
+    "ultivis"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Ult",
+    "shortDescription": "Short ult: commands for the Ultivis development workflow",
+    "longDescription": "Adds short ult: slash-command entry points for commit-and-verify, PR creation, review-cycle handling, Visual QA, and Ultivis task workflows while keeping the same dev-workflow skill guidance available in Codex.",
+    "developerName": "Ultivis",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/ultivis-iot/claude-code-setup",
+    "privacyPolicyURL": "https://github.com/ultivis-iot/claude-code-setup",
+    "termsOfServiceURL": "https://github.com/ultivis-iot/claude-code-setup",
+    "defaultPrompt": [
+      "Run /commit-and-verify for this change.",
+      "Create a PR after validation passes.",
+      "Check my Ultivis tasks and start work."
+    ],
+    "brandColor": "#1F6FEB"
+  }
+}

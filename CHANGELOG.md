@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.2 (2026-04-20)
+- Codex command discovery 실험 정리:
+  - `setup-codex.sh`가 Codex용 로컬 plugin marketplace와 workflow plugin 설치를 함께 처리하도록 확장
+  - Codex용 workflow plugin 번들을 `codex/plugins/dev-workflow`에 추가
+  - README에 Codex command/plugin 제약과 현재 설치 구조를 반영
+
 ## v0.6.1 (2026-04-20)
 - Codex rules 안전성 정리:
   - `codex/rules/dev-workflow.rules`를 유효한 최소 Starlark 파일로 정리해 startup parse error 방지
