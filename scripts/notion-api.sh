@@ -264,13 +264,18 @@ template_blocks_cached() {
     local cache_path="$CACHE_DIR/templates/${template_id}.json"
     mkdir -p "$CACHE_DIR/templates"
     if _cache_fresh "$cache_path" 10080; then
-        cat "$cache_path"
+        jq 'def clean_nulls:
+                walk(if type == "object" then with_entries(select(.value != null)) else . end);
+            clean_nulls' "$cache_path"
         return 0
     fi
     notion_api GET "/blocks/${template_id}/children?page_size=100" \
-        | jq '[.results[]
+        | jq 'def clean_nulls:
+                walk(if type == "object" then with_entries(select(.value != null)) else . end);
+            [.results[]
             | select(.type != "child_database" and .type != "child_page" and .type != "unsupported")
             | del(.id, .parent, .created_time, .last_edited_time, .created_by, .last_edited_by, .has_children, .in_trash, .archived, .request_id)
+            | clean_nulls
         ]' | tee "$cache_path"
 }
 

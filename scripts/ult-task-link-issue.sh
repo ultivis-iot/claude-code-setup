@@ -166,13 +166,13 @@ if [ -n "$TASK_REF" ]; then
     exit 0
 fi
 
-task=$(find_task_by_issue "$ISSUE_NUM")
+task=$(find_task_by_issue_url "$issue_url")
 if [ -n "$task" ]; then
     patch_issue_url "$task"
     exit 0
 fi
 
-task=$(find_task_by_issue_url "$issue_url")
+task=$(find_task_by_issue "$ISSUE_NUM")
 if [ -n "$task" ]; then
     patch_issue_url "$task"
     exit 0

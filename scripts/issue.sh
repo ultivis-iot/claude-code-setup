@@ -30,9 +30,12 @@ echo "$issue_json" | jq -r --arg branch "$BRANCH" --arg num "$ISSUE_NUM" '
 
 issue_url=$(echo "$issue_json" | jq -r '.url')
 
-task=$(find_task_by_issue "$ISSUE_NUM" 2>/dev/null || true)
-if [ -z "$task" ] && [ -n "$issue_url" ]; then
+task=""
+if [ -n "$issue_url" ]; then
     task=$(find_task_by_issue_url "$issue_url" 2>/dev/null || true)
+fi
+if [ -z "$task" ]; then
+    task=$(find_task_by_issue "$ISSUE_NUM" 2>/dev/null || true)
 fi
 
 if [ -n "$task" ]; then
