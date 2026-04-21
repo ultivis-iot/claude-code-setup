@@ -289,4 +289,6 @@ echo "  Task: #${ISSUE_NUM} $TASK_NAME"
 echo "  Issue: $ISSUE_URL"
 echo "  Notion: $TASK_URL"
 echo "  Branch: $branch"
-[ -n "$WT_PATH" ] && echo "  Worktree: $WT_PATH"
+if [ -n "$WT_PATH" ]; then
+    echo "  Worktree: $WT_PATH"
+fi
