@@ -263,7 +263,9 @@ template_blocks_cached() {
     local template_id="$1"
     local cache_path="$CACHE_DIR/templates/${template_id}.json"
     mkdir -p "$CACHE_DIR/templates"
-    if _cache_fresh "$cache_path" 10080; then
+    if _cache_fresh "$cache_path" 10080 \
+        && [ -s "$cache_path" ] \
+        && jq -e 'type == "array"' "$cache_path" >/dev/null 2>&1; then
         jq 'def clean_nulls:
                 walk(if type == "object" then with_entries(select(.value != null)) else . end);
             clean_nulls' "$cache_path"
