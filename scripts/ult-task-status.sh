@@ -37,11 +37,18 @@ if [ -z "$ISSUE_NUM" ]; then
     ISSUE_NUM=$(issue_num_from_branch) || { echo "브랜치에서 Issue 번호를 찾을 수 없음" >&2; exit 1; }
 fi
 
-task=$(find_task_by_issue "$ISSUE_NUM")
+issue_url=$(gh issue view "$ISSUE_NUM" --json url --jq .url 2>/dev/null || echo "")
+
+task=""
+if [ -n "$issue_url" ]; then
+    task=$(find_task_by_issue_url "$issue_url" 2>/dev/null || true)
+fi
+if [ -z "$task" ]; then
+    task=$(find_task_by_issue "$ISSUE_NUM" 2>/dev/null || true)
+fi
 if [ -z "$task" ]; then
     echo "Task #$ISSUE_NUM 을(를) Notion에서 찾을 수 없음. Issue URL 자동 연결을 시도합니다." >&2
     if "$SCRIPT_DIR/ult-task-link-issue.sh" "$ISSUE_NUM" --auto >/dev/null; then
-        issue_url=$(gh issue view "$ISSUE_NUM" --json url --jq .url 2>/dev/null || echo "")
         [ -n "$issue_url" ] && task=$(find_task_by_issue_url "$issue_url")
         [ -z "$task" ] && task=$(find_task_by_issue "$ISSUE_NUM")
     fi
@@ -105,4 +112,6 @@ comment="[${author}] 상태 변경: ${current_status} → ${new_status}"
 notion_add_comment "$task_id" "$comment" >/dev/null
 
 echo "✓ Task #${ISSUE_NUM} 상태: ${current_status} → ${new_status}"
-[ -n "$reason" ] && echo "  사유: $reason"
+if [ -n "$reason" ]; then
+    echo "  사유: $reason"
+fi
