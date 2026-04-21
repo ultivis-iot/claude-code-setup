@@ -27,3 +27,7 @@ body
 ```
 
 Use conventional commit types such as `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, and `perf`.
+
+Branch creation rule:
+
+- For Ultivis repositories, create task branches from `dev` when `origin/dev` exists. Use another base only when the user explicitly asks for it or the repository has no `dev` branch.

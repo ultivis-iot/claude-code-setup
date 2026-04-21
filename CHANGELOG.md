@@ -3,6 +3,8 @@
 ## Unreleased
 - Codex skill display name/path renamed from `dev-workflow` to `ultivis-flow`.
 - `setup-codex.sh --update` now removes the legacy `~/.codex/skills/dev-workflow` directory before installing `~/.codex/skills/ultivis-flow`.
+- `ult-task-create.sh` now supports `--project` as an explicit recovery path when a Notion Repository has no Project relation.
+- Ultivis task branch creation now prefers `origin/dev` when available instead of blindly following the remote default branch.
 
 ## v0.6.2 (2026-04-20)
 - Codex command discovery 실험 정리:

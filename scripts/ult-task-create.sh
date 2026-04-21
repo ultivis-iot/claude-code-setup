@@ -2,6 +2,7 @@
 # 기존 Notion Story에 Task 1개 + GitHub Issue 1개 추가
 # Usage:
 #   ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
+#   ult-task-create.sh --story <story-title-or-url> --project <project-name-or-id> --name <task>
 #   ult-task-create.sh --story <story-title-or-url> --name <task> [--here | --no-checkout]
 
 set -e
@@ -13,37 +14,44 @@ usage() {
     cat >&2 <<'EOF'
 사용법:
   ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
+  ult-task-create.sh --story <story-title-or-url> --project <project-name-or-id> --name <task>
   ult-task-create.sh --story <story-title-or-url> --name <task> [--planned-start YYYY-MM-DD] [--planned-end YYYY-MM-DD]
 
 옵션:
   --story, -s        Story title, Notion page URL, page id
+  --project, -p      Repository의 Project relation이 비어 있을 때 사용할 Project name/page id/URL
   --name, -n         Task 이름
   --topic, -t        Feature|Fix|Update|Refactor|Style|Other (기본 Feature)
   --description, -d  GitHub Issue body 및 Task 본문
   --planned-start    Planned Date 시작일
   --planned-end      Planned Date 종료일
+  --base             브랜치 생성 기준 브랜치 (기본: origin/dev가 있으면 dev, 없으면 origin HEAD)
   --here             Issue/Task만 만들고 브랜치/worktree 생성 안 함
   --no-checkout      worktree 없이 로컬 브랜치만 생성
 EOF
 }
 
 STORY_REF=""
+PROJECT_REF=""
 TASK_NAME=""
 TOPIC="Feature"
 DESCRIPTION=""
 PLANNED_START=""
 PLANNED_END=""
+BASE_BRANCH=""
 HERE=0
 NO_CHECKOUT=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --story|-s) STORY_REF="$2"; shift 2 ;;
+        --project|-p) PROJECT_REF="$2"; shift 2 ;;
         --name|-n) TASK_NAME="$2"; shift 2 ;;
         --topic|-t) TOPIC="$2"; shift 2 ;;
         --description|-d) DESCRIPTION="$2"; shift 2 ;;
         --planned-start) PLANNED_START="$2"; shift 2 ;;
         --planned-end) PLANNED_END="$2"; shift 2 ;;
+        --base) BASE_BRANCH="$2"; shift 2 ;;
         --here) HERE=1; shift ;;
         --no-checkout) NO_CHECKOUT=1; shift ;;
         --help|-h) usage; exit 0 ;;
@@ -96,9 +104,35 @@ if [ -n "$REPO_ID" ]; then
     fi
 fi
 
-if [ "$(echo "$REPO_PROJECT_IDS_JSON" | jq 'length')" -eq 0 ]; then
+resolve_project_ref() {
+    local ref="$1" id
+    [ -n "$ref" ] || return 1
+    if id=$(normalize_notion_page_id "$ref" 2>/dev/null); then
+        printf '%s\n' "$id"
+        return 0
+    fi
+    project_id_by_name "$ref"
+}
+
+if [ -n "$PROJECT_REF" ]; then
+    PROJECT_OVERRIDE_ID=$(resolve_project_ref "$PROJECT_REF" | head -1)
+    [ -n "$PROJECT_OVERRIDE_ID" ] || {
+        echo "Project를 찾을 수 없습니다: $PROJECT_REF" >&2
+        echo "Project name, Notion page id, 또는 URL을 확인하세요." >&2
+        exit 1
+    }
+    if [ "$(echo "$REPO_PROJECT_IDS_JSON" | jq 'length')" -gt 0 ] \
+        && ! echo "$REPO_PROJECT_IDS_JSON" | jq -e --arg pid "$PROJECT_OVERRIDE_ID" 'index($pid)' >/dev/null; then
+        echo "지정한 Project가 현재 repository의 Project relation에 포함되지 않습니다." >&2
+        echo "  Repository: $GITHUB_REPO" >&2
+        echo "  Project: $PROJECT_REF ($PROJECT_OVERRIDE_ID)" >&2
+        echo "  Repository Project(s): $(echo "$REPO_PROJECT_IDS_JSON" | jq -r 'join(", ")')" >&2
+        exit 1
+    fi
+    REPO_PROJECT_IDS_JSON=$(jq -nc --arg pid "$PROJECT_OVERRIDE_ID" '[$pid]')
+elif [ "$(echo "$REPO_PROJECT_IDS_JSON" | jq 'length')" -eq 0 ]; then
     echo "Repository에서 Project relation을 찾을 수 없습니다: $GITHUB_REPO" >&2
-    echo "Story 선택 전에 Notion Repository DB에서 repo와 Project 연결을 먼저 확인하세요." >&2
+    echo "Notion Repository DB에서 repo와 Project 연결을 수정하거나, 이번 실행에 한해 --project <Project name|id|url>을 지정하세요." >&2
     exit 1
 fi
 
@@ -264,11 +298,24 @@ branch_topic=$(topic_branch_component "$TOPIC")
 branch="${ISSUE_NUM}-${branch_topic}-$(make_slug "$TASK_NAME")"
 WT_PATH=""
 
+resolve_base_branch() {
+    if [ -n "$BASE_BRANCH" ]; then
+        echo "$BASE_BRANCH"
+        return 0
+    fi
+    if git show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
+        echo "dev"
+        return 0
+    fi
+    local base
+    base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    echo "${base:-main}"
+}
+
 if [ "$HERE" -eq 1 ]; then
     echo "▸ --here: 브랜치/worktree 생성 생략"
 elif [ "$NO_CHECKOUT" -eq 1 ]; then
-    base_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-    [ -z "$base_branch" ] && base_branch="main"
+    base_branch=$(resolve_base_branch)
     base_ref="$base_branch"
     git show-ref --verify --quiet "refs/remotes/origin/$base_branch" 2>/dev/null && base_ref="origin/$base_branch"
     if git show-ref --verify --quiet "refs/heads/$branch"; then
@@ -279,7 +326,7 @@ elif [ "$NO_CHECKOUT" -eq 1 ]; then
     fi
 else
     echo "▸ Worktree 생성 중..."
-    WT_PATH=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch")
+    WT_PATH=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --base "$(resolve_base_branch)")
 fi
 
 echo ""
