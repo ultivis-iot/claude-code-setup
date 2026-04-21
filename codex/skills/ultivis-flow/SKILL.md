@@ -1,5 +1,5 @@
 ---
-name: dev-workflow
+name: ultivis-flow
 description: Use when working in repositories that follow this setup's development workflow and the user wants the same flow in Codex. Covers plan intent capture, commit-and-verify style validation, PR creation, AI review-cycle handling, visual QA prompting, issue lookup, and Isaac/Notion task flow.
 ---
 

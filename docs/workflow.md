@@ -25,7 +25,7 @@ setup.sh가 대화형으로 묻는 것:
 
 ### Claude Code 재시작
 
-Notion MCP 도구(`mcp__notion-api__*`)를 로드하려면 `/exit` 후 재실행 필요.
+설치 후 새 명령/스크립트 로드를 위해 `/exit` 후 재실행합니다. Notion 연동은 기본적으로 설치된 workflow 스크립트가 API를 직접 호출하며, MCP 도구는 보조 경로입니다.
 
 ### 프로젝트별 셋업 (선택, 필요 시)
 
@@ -93,7 +93,7 @@ Plan 모드(`Shift+Tab×2`)에서 작성 → 승인하면 hook이 `tmp/current-p
 |---|---|---|
 | `/ult-my-tasks` | 본인 Task 조회 + worktree 자동 생성 | ~2s |
 | `/ult-story-create` | Plan → Story + Task N + Issue N + worktree N | LLM + 3s |
-| `/ult-task-create` | 기존 Story에 Task 1개 추가 | LLM + 2s |
+| `/ult-task-create` | 기존 Story에 Task 1개 추가 | ~2s |
 | `/ult-task-note` | 현재 Task에 메모 코멘트 | ~1s |
 | `/ult-task-status` | 비정형 상태 변경 (취소/재개) | ~1.5s |
 | `/ult-weekly-report` | 주간 작업 정리 + 발행 | 5s + LLM |

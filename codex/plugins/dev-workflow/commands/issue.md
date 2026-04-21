@@ -11,41 +11,18 @@
 
 ## 실행
 
-### 1. Github 이슈 조회
-
 ```bash
-~/.claude/scripts/issue.sh
+~/.codex/scripts/issue.sh
 ```
 
-→ `브랜치`, `이슈 번호`, `gh issue view` JSON 출력.
+스크립트가 처리하는 것:
+- 현재 브랜치에서 Issue 번호 추출
+- GitHub Issue 조회
+- Notion Task를 `Issue Number`/`Issue URL`로 조회
+- 연결된 Story, Project, Repository 조회
+- Task가 없으면 GitHub 정보만 출력하고 연결 복구 명령 안내
 
-### 2. Notion Task 조회
-
-`mcp__notion-api__API-query-data-source` (Task DB)로 `Issue Number` formula 필드가 1단계의 이슈 번호와 일치하는 Task 검색:
-
-```json
-{
-  "data_source_id": "b89060b1-037c-480d-8671-f206aec117b6",
-  "filter": {
-    "property": "Issue Number",
-    "formula": {"string": {"equals": "<ISSUE_NUM>"}}
-  },
-  "page_size": 1
-}
-```
-
-매치 없으면 Notion 섹션 생략하고 Github 정보만 출력.
-
-### 3. Story / Project 조회
-
-Task에서 다음 relation 추출:
-- `📜 Story` → `mcp__notion-api__API-retrieve-a-page`로 Story 페이지 가져오기
-- `🛡️ Project` → 같은 방식
-
-Story에서 가져올 필드: Title, Tag, Priority, Status, Work Progress
-Project에서 가져올 필드: Title, Manager, Project Duration, Status, Work Progress
-
-### 4. 출력 형식
+## 출력 형식
 
 ```
 ### Issue #<번호>: <제목>
@@ -92,7 +69,7 @@ Project에서 가져올 필드: Title, Manager, Project Duration, Status, Work P
 - **<author>** (<date>): <body>
 ```
 
-### 5. 컨텍스트 안내
+## 컨텍스트 안내
 
 마지막에 한 줄 요약 추가:
 ```
@@ -101,6 +78,5 @@ Project에서 가져올 필드: Title, Manager, Project Duration, Status, Work P
 
 ## 주의
 
-- mcp__notion-api__* 도구가 로드되어 있어야 함 (없으면 ToolSearch로 로드)
 - Task가 Notion에 없으면 Github 정보만 출력
 - Issue Number formula는 Task의 Issue URL이 채워졌을 때만 작동

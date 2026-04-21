@@ -7,7 +7,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
-SKILL_NAME="dev-workflow"
+SKILL_NAME="ultivis-flow"
+LEGACY_SKILL_NAME="dev-workflow"
 RULE_NAME="dev-workflow.rules"
 PLUGIN_SOURCE_DIR="dev-workflow"
 PLUGIN_NAME="ult"
@@ -44,6 +45,7 @@ echo -e "${GREEN}   ✓ ~/.codex/rules/$RULE_NAME${NC}"
 echo -e "${YELLOW}     실제 워크플로우 동작은 skill이 담당하고, rules는 안전한 최소 파일입니다.${NC}"
 
 echo "3. Skill 설치..."
+rm -rf "$CODEX_DIR/skills/$LEGACY_SKILL_NAME"
 rm -rf "$CODEX_DIR/skills/$SKILL_NAME"
 cp -R "$SCRIPT_DIR/codex/skills/$SKILL_NAME" "$CODEX_DIR/skills/$SKILL_NAME"
 echo -e "${GREEN}   ✓ ~/.codex/skills/$SKILL_NAME${NC}"
@@ -107,7 +109,19 @@ echo -e "${GREEN}   ✓ ~/plugins/$PLUGIN_NAME${NC}"
 echo -e "${GREEN}   ✓ ~/.agents/plugins/marketplace.json${NC}"
 echo -e "${YELLOW}     Codex에서 /ult:commit-and-verify 같은 짧은 namespaced slash command를 기본 노출합니다.${NC}"
 
-echo "5. Dev-tools 설치..."
+echo "5. Scripts 설치..."
+SCRIPTS_DEST="$CODEX_DIR/scripts"
+mkdir -p "$SCRIPTS_DEST"
+for file in "$SCRIPT_DIR/scripts"/*.sh; do
+    if [ -f "$file" ]; then
+        filename=$(basename "$file")
+        cp "$file" "$SCRIPTS_DEST/$filename"
+        chmod +x "$SCRIPTS_DEST/$filename"
+        echo -e "${GREEN}   ✓ ~/.codex/scripts/$filename${NC}"
+    fi
+done
+
+echo "6. Dev-tools 설치..."
 DEV_TOOLS_DEST="$CODEX_DIR/dev-tools"
 mkdir -p "$DEV_TOOLS_DEST"
 
@@ -127,6 +141,9 @@ if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
         cat > "$DEV_TOOLS_DEST/.env" << ENV_EOF
 # Codex dev-tools 환경 설정
 WORKTREE_ROOT="$WORKTREE_ROOT_PATH"
+
+# Notion API 직접 호출 스크립트용 토큰 (Codex 단독 설치 시 필요)
+# export NOTION_TOKEN="ntn_..."
 
 # Docker 멀티유저 격리 (자동 설정)
 # dev-commands.sh가 사용자명 기반으로 포트/COMPOSE_PROJECT_NAME을 자동 계산합니다.
@@ -170,6 +187,7 @@ echo "  ~/.codex/skills/$SKILL_NAME/references/*.md"
 echo "  ~/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
 echo "  ~/plugins/$PLUGIN_NAME/commands/*.md"
 echo "  ~/.agents/plugins/marketplace.json"
+echo "  ~/.codex/scripts/*.sh"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
 echo "  ~/.codex/dev-tools/.env"
 echo ""

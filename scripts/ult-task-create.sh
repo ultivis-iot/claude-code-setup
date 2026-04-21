@@ -1,0 +1,239 @@
+#!/bin/bash
+# 기존 Notion Story에 Task 1개 + GitHub Issue 1개 추가
+# Usage:
+#   ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
+#   ult-task-create.sh --story <story-title-or-url> --name <task> [--here | --no-checkout]
+
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/workflow-env.sh"
+. "$SCRIPT_DIR/notion-api.sh"
+
+usage() {
+    cat >&2 <<'EOF'
+사용법:
+  ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
+  ult-task-create.sh --story <story-title-or-url> --name <task> [--planned-start YYYY-MM-DD] [--planned-end YYYY-MM-DD]
+
+옵션:
+  --story, -s        Story title, Notion page URL, page id
+  --name, -n         Task 이름
+  --topic, -t        Feature|Fix|Update|Refactor|Style|Other (기본 Feature)
+  --description, -d  GitHub Issue body 및 Task 본문
+  --planned-start    Planned Date 시작일
+  --planned-end      Planned Date 종료일
+  --here             Issue/Task만 만들고 브랜치/worktree 생성 안 함
+  --no-checkout      worktree 없이 로컬 브랜치만 생성
+EOF
+}
+
+STORY_REF=""
+TASK_NAME=""
+TOPIC="Feature"
+DESCRIPTION=""
+PLANNED_START=""
+PLANNED_END=""
+HERE=0
+NO_CHECKOUT=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --story|-s) STORY_REF="$2"; shift 2 ;;
+        --name|-n) TASK_NAME="$2"; shift 2 ;;
+        --topic|-t) TOPIC="$2"; shift 2 ;;
+        --description|-d) DESCRIPTION="$2"; shift 2 ;;
+        --planned-start) PLANNED_START="$2"; shift 2 ;;
+        --planned-end) PLANNED_END="$2"; shift 2 ;;
+        --here) HERE=1; shift ;;
+        --no-checkout) NO_CHECKOUT=1; shift ;;
+        --help|-h) usage; exit 0 ;;
+        -*)
+            echo "알 수 없는 옵션: $1" >&2
+            usage
+            exit 1
+            ;;
+        *)
+            if [ -z "$STORY_REF" ]; then
+                STORY_REF="$1"
+            else
+                echo "알 수 없는 인자: $1" >&2
+                usage
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+case "$TOPIC" in
+    Feature|Fix|Update|Refactor|Style|Other) ;;
+    feature) TOPIC="Feature" ;;
+    fix) TOPIC="Fix" ;;
+    update) TOPIC="Update" ;;
+    refactor) TOPIC="Refactor" ;;
+    style) TOPIC="Style" ;;
+    other|chore) TOPIC="Other" ;;
+    *) echo "알 수 없는 topic: $TOPIC" >&2; exit 1 ;;
+esac
+
+gh_user=$(gh api user --jq .login 2>/dev/null) || { echo "gh CLI 인증 필요" >&2; exit 1; }
+ASSIGNEE_ID=$(member_notion_id "$gh_user")
+[ -n "$ASSIGNEE_ID" ] || { echo "Member DB에 Github 계정($gh_user)이 등록되지 않았습니다." >&2; exit 1; }
+
+repo_json=$(gh repo view --json name,nameWithOwner 2>/dev/null) || { echo "현재 git remote에서 GitHub repo를 확인할 수 없습니다." >&2; exit 1; }
+GITHUB_REPO=$(echo "$repo_json" | jq -r .nameWithOwner)
+REPO_NAME=$(echo "$repo_json" | jq -r .name)
+REPO_ID=$(repository_id_by_github_slug "$GITHUB_REPO" 2>/dev/null || true)
+[ -n "$REPO_ID" ] || REPO_ID=$(repository_id_by_name "$GITHUB_REPO" 2>/dev/null || true)
+[ -n "$REPO_ID" ] || REPO_ID=$(repository_id_by_name "$REPO_NAME" 2>/dev/null || true)
+
+story_title() {
+    echo "$1" | jq -r '.properties.Title.title[0].plain_text // .properties.Name.title[0].plain_text // "(제목 없음)"'
+}
+
+story_project_id() {
+    echo "$1" | jq -r '.properties["🛡️ Project "].relation[0].id // .properties["🛡️ Project"].relation[0].id // empty'
+}
+
+select_story_from_json() {
+    local rows="$1"
+    local count
+    count=$(echo "$rows" | jq 'length')
+    [ "$count" -gt 0 ] || { echo "조건에 맞는 Story가 없습니다." >&2; return 1; }
+    if [ "$count" -eq 1 ]; then
+        echo "$rows" | jq -c '.[0]'
+        return 0
+    fi
+    echo "Story를 선택하세요." >&2
+    echo "$rows" | jq -r 'to_entries[] | "  [\(.key + 1)] \(.value.properties.Title.title[0].plain_text // .value.properties.Name.title[0].plain_text // "(제목 없음)") [\(.value.properties.Status.status.name // "")]"' >&2
+    read -r -p "선택 [1-${count}/q]: " pick
+    [ "$pick" = "q" ] || [ -z "$pick" ] && return 1
+    [ "$pick" -ge 1 ] 2>/dev/null && [ "$pick" -le "$count" ] || { echo "잘못된 선택" >&2; return 1; }
+    echo "$rows" | jq -c ".[$((pick - 1))]"
+}
+
+load_story() {
+    local ref="$1"
+    local page_id filter rows
+    if [ -n "$ref" ] && page_id=$(normalize_notion_page_id "$ref" 2>/dev/null); then
+        notion_get_page "$page_id" | jq -c '.'
+        return 0
+    fi
+
+    if [ -n "$ref" ]; then
+        filter=$(jq -nc --arg q "$ref" '{property: "Title", title: {contains: $q}}')
+        rows=$(notion_query_ds "$STORY_DB" "$filter" | jq -c '.results')
+        select_story_from_json "$rows"
+        return
+    fi
+
+    filter=$(jq -nc --arg uid "$ASSIGNEE_ID" '{
+        or: [
+            {property: "Status", status: {equals: "진행 중"}},
+            {property: "Assignee", people: {contains: $uid}}
+        ]
+    }')
+    rows=$(notion_query_ds "$STORY_DB" "$filter" | jq -c '.results')
+    select_story_from_json "$rows"
+}
+
+STORY=$(load_story "$STORY_REF") || exit 1
+STORY_ID=$(echo "$STORY" | jq -r .id)
+STORY_TITLE=$(story_title "$STORY")
+PROJECT_ID=$(story_project_id "$STORY")
+[ -n "$PROJECT_ID" ] || { echo "Story에서 Project relation을 찾을 수 없습니다: $STORY_TITLE" >&2; exit 1; }
+
+if [ -z "$TASK_NAME" ]; then
+    echo "Story: $STORY_TITLE"
+    read -r -p "Task Name: " TASK_NAME
+fi
+[ -n "$TASK_NAME" ] || { echo "Task Name은 필수입니다." >&2; exit 1; }
+
+if [ -z "$PLANNED_START" ] && [ -t 0 ]; then
+    default_start=$(date +%Y-%m-%d)
+    read -r -p "Planned start [$default_start]: " PLANNED_START
+    PLANNED_START="${PLANNED_START:-$default_start}"
+fi
+if [ -z "$PLANNED_END" ] && [ -t 0 ]; then
+    read -r -p "Planned end [same]: " PLANNED_END
+fi
+if [ -z "$DESCRIPTION" ] && [ -t 0 ]; then
+    read -r -p "Description (선택): " DESCRIPTION
+fi
+
+WEEK_ID=$(current_week_id 2>/dev/null || true)
+
+echo "▸ GitHub Issue 생성 중..."
+ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$TASK_NAME" --body "$DESCRIPTION") || {
+    echo "GitHub Issue 생성 실패" >&2
+    exit 1
+}
+ISSUE_NUM=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
+
+echo "▸ Notion Task 생성 중..."
+props=$(jq -nc \
+    --arg name "$TASK_NAME" \
+    --arg topic "$TOPIC" \
+    --arg sid "$STORY_ID" \
+    --arg pid "$PROJECT_ID" \
+    --arg uid "$ASSIGNEE_ID" \
+    --arg iurl "$ISSUE_URL" \
+    --arg rid "$REPO_ID" \
+    --arg wid "$WEEK_ID" \
+    --arg ps "$PLANNED_START" \
+    --arg pe "$PLANNED_END" \
+    '{
+        Name: {title: [{type: "text", text: {content: $name}}]},
+        Topic: {select: {name: $topic}},
+        "📜 Story": {relation: [{id: $sid}]},
+        "🛡️ Project": {relation: [{id: $pid}]},
+        Assignee: {people: [{id: $uid}]},
+        "Issue URL": {url: $iurl}
+    }
+    + (if $rid != "" then {"🥨 Repository": {relation: [{id: $rid}]}} else {} end)
+    + (if $wid != "" then {"❤️‍🔥 Week": {relation: [{id: $wid}]}} else {} end)
+    + (if $ps != "" then {"Planned Date": {date: ({start: $ps} + (if $pe != "" then {end: $pe} else {} end))}} else {} end)
+    ')
+
+task_template_b=$(task_template_blocks)
+desc_blocks=$(md_to_blocks "$DESCRIPTION")
+task_blocks=$(jq -nc --argjson t "$task_template_b" --argjson d "$desc_blocks" '$t + $d')
+task_resp=$(notion_create_page "$TASK_DB" "$props" "$task_blocks")
+TASK_ID=$(echo "$task_resp" | jq -r .id)
+TASK_URL=$(echo "$task_resp" | jq -r .url)
+if ! echo "$task_resp" | jq -e .id >/dev/null 2>&1; then
+    echo "Notion Task 생성 실패" >&2
+    echo "$task_resp" >&2
+    exit 1
+fi
+
+branch_topic=$(topic_branch_component "$TOPIC")
+branch="${ISSUE_NUM}-${branch_topic}-$(make_slug "$TASK_NAME")"
+WT_PATH=""
+
+if [ "$HERE" -eq 1 ]; then
+    echo "▸ --here: 브랜치/worktree 생성 생략"
+elif [ "$NO_CHECKOUT" -eq 1 ]; then
+    base_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    [ -z "$base_branch" ] && base_branch="main"
+    base_ref="$base_branch"
+    git show-ref --verify --quiet "refs/remotes/origin/$base_branch" 2>/dev/null && base_ref="origin/$base_branch"
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
+        echo "▸ 기존 브랜치 사용: $branch"
+    else
+        git branch "$branch" "$base_ref"
+        echo "▸ 브랜치 생성: $branch"
+    fi
+else
+    echo "▸ Worktree 생성 중..."
+    WT_PATH=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch")
+fi
+
+echo ""
+echo "✅ Task 생성 완료"
+echo "  Story: $STORY_TITLE"
+echo "  Task: #${ISSUE_NUM} $TASK_NAME"
+echo "  Issue: $ISSUE_URL"
+echo "  Notion: $TASK_URL"
+echo "  Branch: $branch"
+[ -n "$WT_PATH" ] && echo "  Worktree: $WT_PATH"

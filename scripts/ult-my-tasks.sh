@@ -93,6 +93,75 @@ wait
 # 6. 포맷 출력 + 선택지 수집
 today=$(date +%Y-%m-%d)
 
+github_repo_for_task() {
+    local repo_id="$1"
+    local repo=""
+    if [ -n "$repo_id" ]; then
+        repo=$(repository_github_slug_by_id "$repo_id" 2>/dev/null || true)
+    fi
+    if [ -z "$repo" ]; then
+        repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)
+    fi
+    [ -n "$repo" ] || return 1
+    echo "$repo"
+}
+
+task_blocks_markdown() {
+    local task_id="$1"
+    notion_api GET "/blocks/${task_id}/children?page_size=100" \
+        | jq -r '
+            def text($rt): [$rt[]?.plain_text] | join("");
+            .results[]?
+            | if .type == "heading_1" then "# " + text(.heading_1.rich_text)
+              elif .type == "heading_2" then "## " + text(.heading_2.rich_text)
+              elif .type == "heading_3" then "### " + text(.heading_3.rich_text)
+              elif .type == "paragraph" then text(.paragraph.rich_text)
+              elif .type == "bulleted_list_item" then "- " + text(.bulleted_list_item.rich_text)
+              elif .type == "numbered_list_item" then "1. " + text(.numbered_list_item.rich_text)
+              elif .type == "to_do" then "- [" + (if .to_do.checked then "x" else " " end) + "] " + text(.to_do.rich_text)
+              elif .type == "quote" then "> " + text(.quote.rich_text)
+              elif .type == "code" then "```" + (.code.language // "") + "\n" + text(.code.rich_text) + "\n```"
+              else empty
+              end
+        ' | sed '/^$/N;/^\n$/D'
+}
+
+publish_issue_for_task() {
+    local row="$1"
+    local task_id task_name repo_id page_url repo content body issue_url props resp
+
+    task_id=$(echo "$row" | jq -r '.id')
+    task_name=$(echo "$row" | jq -r '.properties.Name.title[0].plain_text // "(제목 없음)"')
+    repo_id=$(echo "$row" | jq -r '.properties["🥨 Repository"].relation[0].id // ""')
+    page_url=$(echo "$row" | jq -r '.url // ""')
+    repo=$(github_repo_for_task "$repo_id") || {
+        echo "GitHub repository를 확인할 수 없어 Issue를 만들 수 없습니다." >&2
+        echo "Task의 Repository relation 또는 현재 git remote를 확인하세요." >&2
+        return 1
+    }
+
+    content=$(task_blocks_markdown "$task_id" || true)
+    if [ -n "$content" ]; then
+        body=$(printf 'Notion Task: %s\n\n%s\n' "$page_url" "$content")
+    else
+        body="Notion Task: ${page_url}"
+    fi
+    issue_url=$(gh issue create --repo "$repo" --title "$task_name" --body "$body") || {
+        echo "GitHub Issue 생성 실패: ${repo} / ${task_name}" >&2
+        return 1
+    }
+
+    props=$(jq -nc --arg u "$issue_url" '{"Issue URL": {url: $u}}')
+    resp=$(notion_patch_page "$task_id" "$props")
+    if ! echo "$resp" | jq -e .id >/dev/null 2>&1; then
+        echo "ERROR: Task Issue URL 업데이트 실패" >&2
+        echo "$resp" >&2
+        return 1
+    fi
+
+    echo "$issue_url"
+}
+
 render_task() {
     local row="$1" idx="$2"
     local name topic status planned story_id repo_id issue_num issue_url
@@ -166,8 +235,21 @@ read -r -p "선택 [1-$((idx-1)) / q]: " pick
 selected="${choices[$pick]}"
 status=$(echo "$selected" | jq -r '.properties.Status.status.name')
 issue_num=$(echo "$selected" | jq -r '.properties["Issue Number"].formula.string // ""')
+issue_url=$(echo "$selected" | jq -r '.properties["Issue URL"].url // ""')
 topic=$(echo "$selected" | jq -r '.properties.Topic.select.name // "Other"' | tr '[:upper:]' '[:lower:]')
 task_name=$(echo "$selected" | jq -r '.properties.Name.title[0].plain_text')
+
+if [ -z "$issue_num" ] && [ -n "$issue_url" ]; then
+    issue_num=$(echo "$issue_url" | grep -oE '[0-9]+$' || echo "")
+fi
+
+if [ -z "$issue_num" ]; then
+    echo ""
+    echo "선택한 Task에 Issue URL이 없어 GitHub Issue를 생성하고 연결합니다."
+    issue_url=$(publish_issue_for_task "$selected") || exit 1
+    issue_num=$(echo "$issue_url" | grep -oE '[0-9]+$' || echo "")
+    echo "✓ GitHub Issue 생성 및 Task 연결: ${issue_url}"
+fi
 
 # 기존 브랜치 검색 (Issue 번호 포함)
 existing_branch=""
@@ -182,8 +264,8 @@ if [ -n "$existing_branch" ]; then
 else
     slug=$(echo "$task_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 ]//g' | tr ' ' '-' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
     [ -z "$slug" ] && slug="task"
-    [ -z "$issue_num" ] && issue_num="no-issue"
-    branch="${topic}/${issue_num}-${slug}"
+    [ -z "$issue_num" ] && { echo "Issue 번호가 없어 브랜치를 만들 수 없습니다." >&2; exit 1; }
+    branch="${issue_num}-${topic}-${slug}"
 fi
 
 # Worktree 생성 (또는 기존 worktree 경로 얻기) — ult-wt-add.sh 위임

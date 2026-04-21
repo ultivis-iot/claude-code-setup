@@ -18,6 +18,11 @@ export WORKFLOW_PLANS_DIR="${WORKFLOW_PLANS_DIR:-$WORKFLOW_HOME/plans}"
 export WORKFLOW_CACHE_DIR="${WORKFLOW_CACHE_DIR:-$WORKFLOW_HOME/notion-cache}"
 export WORKFLOW_CONFIG_JSON="${WORKFLOW_CONFIG_JSON:-$HOME/.claude.json}"
 
+if [ -f "$WORKFLOW_DEV_TOOLS_DIR/.env" ]; then
+    # shellcheck disable=SC1091
+    . "$WORKFLOW_DEV_TOOLS_DIR/.env"
+fi
+
 # 하위 호환 alias
 export APP_HOME="$WORKFLOW_HOME"
 

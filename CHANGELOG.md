@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Codex skill display name/path renamed from `dev-workflow` to `ultivis-flow`.
+- `setup-codex.sh --update` now removes the legacy `~/.codex/skills/dev-workflow` directory before installing `~/.codex/skills/ultivis-flow`.
+
 ## v0.6.2 (2026-04-20)
 - Codex command discovery 실험 정리:
   - `setup-codex.sh`가 Codex용 로컬 plugin marketplace와 workflow plugin 설치를 함께 처리하도록 확장

@@ -65,7 +65,7 @@ md_to_blocks() {
     '
 }
 
-# topic → 브랜치 prefix
+# topic → 브랜치명 구성 요소
 topic_prefix() {
     case "$1" in
         Feature) echo "feature" ;;
@@ -237,7 +237,7 @@ while IFS= read -r task; do
     issue_num=$(echo "$task" | jq -r .issue_num)
     prefix=$(topic_prefix "$topic")
     slug=$(make_slug "$name")
-    branch="${prefix}/${issue_num}-${slug}"
+    branch="${issue_num}-${prefix}-${slug}"
 
     wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --quiet 2>/dev/null) || {
         echo "  ⚠ #$issue_num worktree 생성 실패"

@@ -16,7 +16,17 @@ issue_num=$(issue_num_from_branch) || { echo "브랜치에서 Issue 번호를 �
 
 task=$(find_task_by_issue "$issue_num")
 if [ -z "$task" ]; then
+    echo "Task #$issue_num 을(를) Notion에서 찾을 수 없음. Issue URL 자동 연결을 시도합니다." >&2
+    if "$SCRIPT_DIR/ult-task-link-issue.sh" "$issue_num" --auto >/dev/null; then
+        issue_url=$(gh issue view "$issue_num" --json url --jq .url 2>/dev/null || echo "")
+        [ -n "$issue_url" ] && task=$(find_task_by_issue_url "$issue_url")
+        [ -z "$task" ] && task=$(find_task_by_issue "$issue_num")
+    fi
+fi
+
+if [ -z "$task" ]; then
     echo "Task #$issue_num 을(를) Notion에서 찾을 수 없음 (Issue URL 미등록 상태일 수 있음)" >&2
+    echo "수동 연결: $SCRIPT_DIR/ult-task-link-issue.sh #$issue_num --task <notion_task_url>" >&2
     exit 1
 fi
 

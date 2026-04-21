@@ -6,20 +6,15 @@ argument-hint: [note-or-action]
 
 # Task 동기화
 
-사용자가 현재 Task 정보를 동기화하거나 맥락을 업데이트하려 할 때 사용하는 단일 진입점.
+현재 Task 컨텍스트 확인, 상태 변경, 메모 추가를 하나의 스크립트로 처리합니다.
 
-## 선택 규칙
+## 실행
 
-1. 인자가 없으면:
-   - `/issue`와 동일하게 현재 브랜치의 Issue + Task 컨텍스트를 보여준다.
+```bash
+~/.claude/scripts/ult-sync-task.sh [note-or-action]
+```
 
-2. 인자가 `cancel`, `reopen`, `todo`, `in-progress`, `done` 중 하나면:
-   - `/ult-task-status`와 동일하게 현재 Task 상태를 갱신한다.
-
-3. 그 외 자유 텍스트가 들어오면:
-   - `/ult-task-note`와 동일하게 현재 Task에 메모 코멘트를 추가한다.
-
-## 출력
-
-- 어떤 동기화 동작을 수행했는지 먼저 명시한다.
-- 변경된 Task 상태나 추가된 메모를 마지막에 요약한다.
+동작:
+- 인자 없음 → `issue.sh`로 Issue + Notion 컨텍스트 출력
+- `cancel`, `reopen`, `todo`, `in-progress`, `done` → Task 상태 변경
+- 그 외 텍스트 → 현재 Task에 Notion 코멘트 추가

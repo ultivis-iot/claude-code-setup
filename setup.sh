@@ -281,6 +281,9 @@ if [ ! -f "$DEV_TOOLS_DEST/.env" ]; then
 # Ultivis dev-tools 환경 설정
 WORKTREE_ROOT="$WORKTREE_ROOT_PATH"
 
+# Notion API 직접 호출 스크립트용 토큰 (Claude MCP 설정이 없을 때 사용)
+# export NOTION_TOKEN="ntn_..."
+
 # Docker 멀티유저 격리 (자동 설정)
 # dev-commands.sh가 사용자명 기반으로 포트/COMPOSE_PROJECT_NAME을 자동 계산합니다.
 # 오버라이드 필요 시 아래 주석 해제:
@@ -380,7 +383,7 @@ echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
 echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
 echo "  ~/.claude/settings.json (hooks 설정 포함)"
-echo "  ~/.claude/scripts/issue.sh (이슈 조회 스크립트)"
+echo "  ~/.claude/scripts/*.sh (workflow 실행 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
 echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
 echo "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"

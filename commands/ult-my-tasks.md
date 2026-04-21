@@ -15,7 +15,8 @@
 - 상태별 그룹핑 출력 + 마감 표시
 - 선택 시:
   - 진행 중 + 기존 브랜치 있음 → 체크아웃
-  - 시작 전 → `<topic>/<issue_num>-<slug>` 브랜치 생성
+  - Issue URL이 없으면 Task 본문으로 GitHub Issue 생성 후 Task에 URL 반영
+  - 시작 전 → `<issue_num>-<topic>-<slug>` 브랜치 생성
 
 ## 옵션
 

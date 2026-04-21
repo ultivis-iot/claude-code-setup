@@ -193,6 +193,34 @@ repository_project_ids() {
     _cache_fresh "$REPO_CACHE" 360 || repo_cache_refresh >/dev/null || return 1
     jq -r --arg id "$1" '.items[] | select(.id == $id) | .project_ids[]' "$REPO_CACHE"
 }
+repository_url_by_id() {
+    _cache_fresh "$REPO_CACHE" 360 || repo_cache_refresh >/dev/null || return 1
+    jq -r --arg id "$1" '.items[] | select(.id == $id) | .url // empty' "$REPO_CACHE" | head -1
+}
+github_repo_from_url() {
+    local url="$1"
+    [ -n "$url" ] || return 1
+    printf '%s\n' "$url" \
+        | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#^http://github.com/##; s#\.git$##' \
+        | grep -E '^[^/]+/[^/]+$' || return 1
+}
+repository_github_slug_by_id() {
+    local url
+    url=$(repository_url_by_id "$1") || return 1
+    github_repo_from_url "$url"
+}
+repository_id_by_github_slug() {
+    local slug="$1"
+    _cache_fresh "$REPO_CACHE" 360 || repo_cache_refresh >/dev/null || return 1
+    jq -r --arg slug "$slug" '
+        .items[]
+        | select(
+            (.name == $slug)
+            or (.url | sub("^git@github.com:"; "") | sub("^https://github.com/"; "") | sub("^http://github.com/"; "") | sub("\\.git$"; "") == $slug)
+        )
+        | .id
+    ' "$REPO_CACHE" | head -1
+}
 repositories_list_json() {
     _cache_fresh "$REPO_CACHE" 360 || repo_cache_refresh >/dev/null || return 1
     jq '.items' "$REPO_CACHE"
@@ -279,14 +307,63 @@ current_week_id() {
 
 # ---- 유틸 ----
 
+normalize_notion_page_id() {
+    local ref="$1"
+    local uuid compact
+    uuid=$(printf '%s\n' "$ref" | grep -oE '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}' | tail -1 || true)
+    if [ -n "$uuid" ]; then
+        printf '%s\n' "$uuid"
+        return 0
+    fi
+    compact=$(printf '%s\n' "$ref" | grep -oE '[0-9a-fA-F]{32}' | tail -1 || true)
+    if [ -n "$compact" ]; then
+        printf '%s-%s-%s-%s-%s\n' \
+            "${compact:0:8}" "${compact:8:4}" "${compact:12:4}" "${compact:16:4}" "${compact:20:12}"
+        return 0
+    fi
+    return 1
+}
+
+md_to_blocks() {
+    local md="$1"
+    echo "$md" | jq -R -s '
+        split("\n")
+        | map(select(length > 0))
+        | map({
+            object: "block",
+            type: "paragraph",
+            paragraph: {rich_text: [{type: "text", text: {content: .}}]}
+        })
+    '
+}
+
+topic_branch_component() {
+    case "$1" in
+        Feature|feature) echo "feature" ;;
+        Fix|fix) echo "fix" ;;
+        Update|update) echo "update" ;;
+        Refactor|refactor) echo "refactor" ;;
+        Style|style) echo "style" ;;
+        Other|other) echo "chore" ;;
+        *) echo "chore" ;;
+    esac
+}
+
+make_slug() {
+    local s="$1"
+    s=$(echo "$s" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 ]//g' | tr ' ' '-' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+    [ -z "$s" ] && s="task"
+    echo "${s:0:50}"
+}
+
 # 현재 브랜치에서 Issue 번호 추출
 issue_num_from_branch() {
     local branch="${1:-$(git branch --show-current 2>/dev/null)}"
     [ -z "$branch" ] && return 1
     local num
-    num=$(echo "$branch" | grep -oE '^[a-zA-Z]+/([0-9]+)' | grep -oE '[0-9]+')
+    num=$(echo "$branch" | grep -oE '^[0-9]+')
+    [ -n "$num" ] || num=$(echo "$branch" | grep -oE '^[a-zA-Z]+/([0-9]+)' | grep -oE '[0-9]+')
     [ -n "$num" ] || num=$(echo "$branch" | grep -oE 'pm-([0-9]+)' | grep -oE '[0-9]+')
-    [ -n "$num" ] || num=$(echo "$branch" | grep -oE '^[0-9]+')
     [ -n "$num" ] && echo "$num"
 }
 
@@ -296,4 +373,23 @@ find_task_by_issue() {
     local filter
     filter=$(jq -nc --arg n "$num" '{property: "Issue Number", formula: {string: {equals: $n}}}')
     notion_query_ds "$TASK_DB" "$filter" | jq -r '.results[0] // empty'
+}
+
+find_task_by_issue_url() {
+    local url="$1"
+    local filter
+    filter=$(jq -nc --arg u "$url" '{property: "Issue URL", url: {equals: $u}}')
+    notion_query_ds "$TASK_DB" "$filter" | jq -r '.results[0] // empty'
+}
+
+find_unlinked_tasks_by_title() {
+    local title="$1"
+    local filter
+    filter=$(jq -nc --arg t "$title" '{
+        and: [
+            {property: "Name", title: {contains: $t}},
+            {property: "Issue URL", url: {is_empty: true}}
+        ]
+    }')
+    notion_query_ds "$TASK_DB" "$filter" | jq -c '.results'
 }

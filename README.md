@@ -147,7 +147,7 @@ Codex 설치 시:
 ├── rules/
 │   └── dev-workflow.rules      # 안전한 최소 rules 파일 (Starlark 파싱용)
 ├── skills/
-│   └── dev-workflow/
+│   └── ultivis-flow/
 │       ├── SKILL.md
 │       └── references/
 │           ├── core-workflow.md
@@ -170,7 +170,7 @@ Codex 설치 시:
     │   ├── review-cycle.md
     │   └── ...
     └── skills/
-        └── dev-workflow/
+        └── ultivis-flow/
 
 ~/.agents/plugins/
 └── marketplace.json
@@ -191,7 +191,7 @@ Codex 설치 시:
 - "validation 통과했으면 PR 만들어줘"
 - "PR 23 review cycle 돌려줘"
 
-Codex에서는 로컬 문서/예제 기준으로 루트 slash command 등록 경로를 확인하지 못해, `~/plugins/ult`와 `~/.agents/plugins/marketplace.json`를 통해 `/ult:...` 형식의 짧은 slash command를 등록합니다. `dev-workflow` skill은 같은 워크플로우를 자연어 요청에도 적용하고, `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
+Codex에서는 로컬 문서/예제 기준으로 루트 slash command 등록 경로를 확인하지 못해, `~/plugins/ult`와 `~/.agents/plugins/marketplace.json`를 통해 `/ult:...` 형식의 짧은 slash command를 등록합니다. `ultivis-flow` skill은 같은 워크플로우를 자연어 요청에도 적용하고, `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
 
 ### 1. Plan 모드 진입
 

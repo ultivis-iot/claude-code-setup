@@ -5,12 +5,13 @@
 ## 실행
 
 ```bash
-~/.claude/scripts/ult-task-note.sh "<메모 내용>"
+~/.codex/scripts/ult-task-note.sh "<메모 내용>"
 ```
 
 스크립트가 처리하는 것:
 - 현재 브랜치 → Issue 번호 추출
 - Issue 번호로 Notion Task 검색
+- 검색 실패 시 title 매칭으로 Issue URL 자동 연결 시도
 - Member 캐시에서 작성자 이름 조회 (git user → Notion 이름)
 - `[작성자] 내용` 형식으로 코멘트 추가
 
@@ -24,5 +25,5 @@
 ## 실패 케이스
 
 - 브랜치명에서 Issue 번호 추출 실패 → 사용자에게 안내
-- Task DB에 해당 Issue가 등록되지 않음 → 안내
+- Task DB에 해당 Issue가 등록되지 않음 → 자동 연결 시도 후 안내
 - Notion 토큰 없음 → setup 재실행 안내

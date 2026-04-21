@@ -19,7 +19,7 @@ n8n이 자동 처리하지 못하는 비정형 상태 전이를 수동으로 적
 ## 실행
 
 ```bash
-~/.claude/scripts/ult-task-status.sh [<issue_num>] [<action>]
+~/.codex/scripts/ult-task-status.sh [<issue_num>] [<action>]
 ```
 
 ### 사용 예
@@ -44,9 +44,10 @@ n8n이 자동 처리하지 못하는 비정형 상태 전이를 수동으로 적
 ## 동작
 
 1. Issue 번호로 Task 검색
-2. 현재 상태 표시 + 전이 선택 (대화형)
-3. Status 속성 업데이트
-4. `[<이름>] 상태 변경: <old> → <new>` 코멘트 추가 (사유 포함 가능)
+2. 검색 실패 시 title 매칭으로 Issue URL 자동 연결 시도
+3. 현재 상태 표시 + 전이 선택 (대화형)
+4. Status 속성 업데이트
+5. `[<이름>] 상태 변경: <old> → <new>` 코멘트 추가 (사유 포함 가능)
 
 ## 주의
 

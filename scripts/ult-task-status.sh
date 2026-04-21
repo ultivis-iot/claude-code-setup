@@ -39,7 +39,17 @@ fi
 
 task=$(find_task_by_issue "$ISSUE_NUM")
 if [ -z "$task" ]; then
+    echo "Task #$ISSUE_NUM 을(를) Notion에서 찾을 수 없음. Issue URL 자동 연결을 시도합니다." >&2
+    if "$SCRIPT_DIR/ult-task-link-issue.sh" "$ISSUE_NUM" --auto >/dev/null; then
+        issue_url=$(gh issue view "$ISSUE_NUM" --json url --jq .url 2>/dev/null || echo "")
+        [ -n "$issue_url" ] && task=$(find_task_by_issue_url "$issue_url")
+        [ -z "$task" ] && task=$(find_task_by_issue "$ISSUE_NUM")
+    fi
+fi
+
+if [ -z "$task" ]; then
     echo "Task #$ISSUE_NUM 을(를) Notion에서 찾을 수 없음" >&2
+    echo "수동 연결: $SCRIPT_DIR/ult-task-link-issue.sh #$ISSUE_NUM --task <notion_task_url>" >&2
     exit 1
 fi
 

@@ -29,7 +29,7 @@
 # - Use `tmp/validation-status.json` as the validation summary artifact.
 #
 # Workflow mapping:
-# - The Codex skill for this repository is `dev-workflow`.
+# - The Codex skill for this repository is `ultivis-flow`.
 # - For commit validation, PR creation, review-cycle handling, issue lookup,
 #   or Ultivis/Notion task flow, consult that skill and its references.
 #

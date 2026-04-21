@@ -16,6 +16,9 @@ Prefer the repository scripts under `scripts/` when they already implement the o
 - `scripts/issue.sh`
 - `scripts/ult-my-tasks.sh`
 - `scripts/ult-story-create-exec.sh`
+- `scripts/ult-sync-task.sh`
+- `scripts/ult-task-create.sh`
+- `scripts/ult-task-link-issue.sh`
 - `scripts/ult-task-note.sh`
 - `scripts/ult-task-status.sh`
 - `scripts/ult-weekly-collect.sh`
