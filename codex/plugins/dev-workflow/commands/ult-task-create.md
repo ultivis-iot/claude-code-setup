@@ -9,11 +9,21 @@
 ```
 
 스크립트가 처리하는 것:
+- 현재 GitHub 계정, repository, repository에 연결된 Project, Week 조회
 - Story 선택 또는 title/URL/id로 Story 조회
-- 현재 GitHub 계정, repository, Week, Story의 Project relation 추론
+- Story는 현재 repository의 Project에 연결된 후보만 허용
 - Task 내용으로 GitHub Issue 생성
 - Notion Task 생성과 동시에 `Issue URL` 반영
 - `<issue_num>-<topic>-<slug>` 브랜치/worktree 생성
+
+## Story 선택 원칙
+
+Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
+
+- Story 선택 전에 현재 repository의 Notion Project를 먼저 확인합니다.
+- 후보 Story는 해당 Project에 연결된 것만 유효합니다.
+- 후보가 애매하면 Story를 고르거나 만들기 전에 사용자 확인을 받습니다.
+- Project가 불명확하면 아무 Story나 고르지 말고 중단합니다.
 
 ## 사용 예
 

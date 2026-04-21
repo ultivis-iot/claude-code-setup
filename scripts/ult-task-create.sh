@@ -87,12 +87,63 @@ REPO_ID=$(repository_id_by_github_slug "$GITHUB_REPO" 2>/dev/null || true)
 [ -n "$REPO_ID" ] || REPO_ID=$(repository_id_by_name "$GITHUB_REPO" 2>/dev/null || true)
 [ -n "$REPO_ID" ] || REPO_ID=$(repository_id_by_name "$REPO_NAME" 2>/dev/null || true)
 
+REPO_PROJECT_IDS_JSON="[]"
+if [ -n "$REPO_ID" ]; then
+    repo_project_ids=$(repository_project_ids "$REPO_ID" 2>/dev/null || true)
+    if [ -n "$repo_project_ids" ]; then
+        REPO_PROJECT_IDS_JSON=$(printf '%s\n' "$repo_project_ids" \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+    fi
+fi
+
+if [ "$(echo "$REPO_PROJECT_IDS_JSON" | jq 'length')" -eq 0 ]; then
+    echo "Repository에서 Project relation을 찾을 수 없습니다: $GITHUB_REPO" >&2
+    echo "Story 선택 전에 Notion Repository DB에서 repo와 Project 연결을 먼저 확인하세요." >&2
+    exit 1
+fi
+
 story_title() {
     echo "$1" | jq -r '.properties.Title.title[0].plain_text // .properties.Name.title[0].plain_text // "(제목 없음)"'
 }
 
 story_project_id() {
     echo "$1" | jq -r '.properties["🛡️ Project "].relation[0].id // .properties["🛡️ Project"].relation[0].id // empty'
+}
+
+filter_stories_for_repo_project() {
+    local rows="$1"
+    echo "$rows" | jq -c --argjson projectIds "$REPO_PROJECT_IDS_JSON" '
+        if ($projectIds | length) == 0 then
+            .
+        else
+            map(
+                . as $story
+                | ($story.properties["🛡️ Project "].relation[0].id // $story.properties["🛡️ Project"].relation[0].id // "") as $pid
+                | select($projectIds | index($pid))
+            )
+        end
+    '
+}
+
+validate_story_project_for_repo() {
+    local story="$1"
+    local project_id title
+    project_id=$(story_project_id "$story")
+    title=$(story_title "$story")
+
+    [ -n "$project_id" ] || {
+        echo "Story에서 Project relation을 찾을 수 없습니다: $title" >&2
+        return 1
+    }
+
+    if ! echo "$REPO_PROJECT_IDS_JSON" | jq -e --arg pid "$project_id" 'index($pid)' >/dev/null; then
+        echo "Story의 Project가 현재 repository의 Project와 일치하지 않습니다." >&2
+        echo "  Repository: $GITHUB_REPO" >&2
+        echo "  Story: $title" >&2
+        echo "  Story Project: $project_id" >&2
+        echo "  Repository Project(s): $(echo "$REPO_PROJECT_IDS_JSON" | jq -r 'join(", ")')" >&2
+        return 1
+    fi
 }
 
 select_story_from_json() {
@@ -123,6 +174,7 @@ load_story() {
     if [ -n "$ref" ]; then
         filter=$(jq -nc --arg q "$ref" '{property: "Title", title: {contains: $q}}')
         rows=$(notion_query_ds "$STORY_DB" "$filter" | jq -c '.results')
+        rows=$(filter_stories_for_repo_project "$rows")
         select_story_from_json "$rows"
         return
     fi
@@ -134,6 +186,7 @@ load_story() {
         ]
     }')
     rows=$(notion_query_ds "$STORY_DB" "$filter" | jq -c '.results')
+    rows=$(filter_stories_for_repo_project "$rows")
     select_story_from_json "$rows"
 }
 
@@ -141,7 +194,7 @@ STORY=$(load_story "$STORY_REF") || exit 1
 STORY_ID=$(echo "$STORY" | jq -r .id)
 STORY_TITLE=$(story_title "$STORY")
 PROJECT_ID=$(story_project_id "$STORY")
-[ -n "$PROJECT_ID" ] || { echo "Story에서 Project relation을 찾을 수 없습니다: $STORY_TITLE" >&2; exit 1; }
+validate_story_project_for_repo "$STORY" || exit 1
 
 if [ -z "$TASK_NAME" ]; then
     echo "Story: $STORY_TITLE"

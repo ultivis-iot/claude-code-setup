@@ -51,6 +51,8 @@
 - Story priority
 - Task 분해 결과
 
+Project 확인은 필수다. Story는 Project 산하 작업 단위이므로, repository에 연결된 Project 후보 밖의 Story를 재사용하거나 비슷한 이름의 전역 Story를 임의로 고르지 않는다.
+
 ## 옵션
 
 - 기본: `tmp/current-plan.md`
