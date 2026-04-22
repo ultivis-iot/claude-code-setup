@@ -81,10 +81,11 @@ Story 기반 작업은 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유
 
 Story/Task page는 빈 page로 만들지 않는다.
 
-- Story는 Tag에 맞는 configured template blocks를 사용한다.
-- Task는 configured Task template blocks를 사용한다.
-- template blocks가 비어 있거나 로드에 실패하면 page 생성을 중단한다.
-- template 뒤에 붙이는 markdown body는 Notion blocks로 변환한다.
+- Story는 Tag에 맞는 configured Notion template ID로 생성한다.
+- Task는 configured Task template ID로 생성한다.
+- template ID가 없거나 Notion template 적용이 확인되지 않으면 page 생성을 중단한다.
+- template 적용 뒤에 붙이는 markdown body는 Notion blocks로 변환해 `설명` block 뒤에 삽입한다.
+- `설명` block을 찾지 못하면 page 끝에 append한다.
 - raw markdown syntax가 최종 Notion page에 그대로 남지 않아야 한다.
 
 ## Review Cycle

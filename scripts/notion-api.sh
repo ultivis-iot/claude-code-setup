@@ -94,6 +94,116 @@ notion_create_page() {
     notion_api POST "/pages" "$body"
 }
 
+# 템플릿 적용 페이지 생성
+# notion_create_page_from_template <parent_data_source_id> <properties_json> <template_id> [timezone]
+notion_create_page_from_template() {
+    local ds="$1"
+    local props="$2"
+    local template_id="$3"
+    local timezone="${4:-Asia/Seoul}"
+    local body
+    body=$(jq -nc \
+        --arg ds "$ds" \
+        --argjson p "$props" \
+        --arg tid "$template_id" \
+        --arg tz "$timezone" \
+        '{
+            parent: {data_source_id: $ds},
+            properties: $p,
+            template: {type: "template_id", template_id: $tid, timezone: $tz}
+        }')
+    notion_api POST "/pages" "$body"
+}
+
+# 페이지/블록 children append
+# notion_append_blocks <block_id> <children_json> [position_json]
+notion_append_blocks() {
+    local block_id="$1"
+    local children="$2"
+    local position="${3:-}"
+    local total offset chunk body resp last_id
+
+    total=$(echo "$children" | jq 'length')
+    [ "$total" -gt 0 ] || return 0
+
+    offset=0
+    while [ "$offset" -lt "$total" ]; do
+        chunk=$(echo "$children" | jq ".[$offset:$((offset + 100))]")
+        if [ -n "$position" ]; then
+            body=$(jq -nc --argjson c "$chunk" --argjson pos "$position" '{children: $c, position: $pos}')
+        else
+            body=$(jq -nc --argjson c "$chunk" '{children: $c}')
+        fi
+        resp=$(notion_api PATCH "/blocks/${block_id}/children" "$body") || return 1
+        last_id=$(echo "$resp" | jq -r '.results[-1].id // empty' 2>/dev/null || true)
+        if [ -n "$last_id" ]; then
+            position=$(jq -nc --arg id "$last_id" '{type: "after_block", after_block: {id: $id}}')
+        fi
+        offset=$((offset + 100))
+    done
+}
+
+notion_find_child_block_by_text() {
+    local page_id="$1"
+    local text="$2"
+
+    notion_api GET "/blocks/${page_id}/children?page_size=100" \
+        | jq -r --arg text "$text" '
+            def rich_text_plain($block):
+                (if ($block[$block.type].rich_text? // null) then
+                    [$block[$block.type].rich_text[]?.plain_text] | join("")
+                else
+                    ""
+                end);
+            def matches($block):
+                (rich_text_plain($block)) as $plain
+                | ($plain == $text) or ($plain | contains($text));
+            .results[]
+            | select(matches(.))
+            | .id
+        ' | head -1
+}
+
+notion_insert_blocks_after_text() {
+    local page_id="$1"
+    local children="$2"
+    local text="$3"
+    local anchor_id position
+
+    anchor_id=$(notion_find_child_block_by_text "$page_id" "$text" || true)
+    if [ -z "$anchor_id" ]; then
+        notion_append_blocks "$page_id" "$children"
+        return
+    fi
+
+    position=$(jq -nc --arg id "$anchor_id" '{type: "after_block", after_block: {id: $id}}')
+    notion_append_blocks "$page_id" "$children" "$position"
+}
+
+# 템플릿은 비동기로 적용되므로 children이 채워질 때까지 기다린다.
+notion_wait_for_template_applied() {
+    local page_id="$1"
+    local timeout="${2:-${ULT_NOTION_TEMPLATE_WAIT_SECONDS:-60}}"
+    local start now resp count
+
+    start=$(date +%s)
+    while true; do
+        resp=$(notion_api GET "/blocks/${page_id}/children?page_size=1") || return 1
+        count=$(echo "$resp" | jq -r '.results | length' 2>/dev/null || echo 0)
+        if [ "$count" -gt 0 ]; then
+            return 0
+        fi
+
+        now=$(date +%s)
+        if [ $((now - start)) -ge "$timeout" ]; then
+            echo "ERROR: Notion template 적용 대기 시간이 초과되었습니다: $page_id" >&2
+            echo "템플릿이 비어 있거나 적용 권한/처리가 실패했을 수 있습니다." >&2
+            return 1
+        fi
+        sleep 2
+    done
+}
+
 # 코멘트 추가
 # notion_add_comment <page_id> <content>
 notion_add_comment() {

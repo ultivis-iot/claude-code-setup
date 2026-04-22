@@ -117,9 +117,10 @@ A Story may span multiple repositories.
 
 When creating Notion Story or Task pages:
 
-- Always use configured Notion template blocks.
+- Always create pages with the configured Notion template ID.
 - Do not create blank pages with properties only.
-- If template blocks are empty or cannot be loaded, stop instead of silently creating a blank page.
+- If the template ID is missing or template application cannot be confirmed, stop instead of silently creating a blank page.
+- Insert markdown body after the template's `설명` block when present; fall back to appending at the end.
 - Convert appended markdown body to real Notion blocks; raw markdown headings, bullets, or checkboxes should not remain as plain text.
 
 ## Story Review Cycle Rules

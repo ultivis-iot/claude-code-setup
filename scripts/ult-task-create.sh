@@ -504,15 +504,13 @@ props=$(jq -nc \
     + (if $ps != "" then {"Planned Date": {date: ({start: $ps} + (if $pe != "" then {end: $pe} else {} end))}} else {} end)
     ')
 
-task_template_b=$(task_template_blocks)
-if ! echo "$task_template_b" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
-    echo "ERROR: Task template blocks are empty" >&2
-    echo "빈 Task page 생성을 중단합니다. TASK_TEMPLATE_ID와 Notion template 접근 권한을 확인하세요." >&2
+if [ -z "$TASK_TEMPLATE_ID" ]; then
+    echo "ERROR: Task template id is empty" >&2
+    echo "빈 Task page 생성을 중단합니다. TASK_TEMPLATE_ID 설정을 확인하세요." >&2
     exit 1
 fi
 desc_blocks=$(md_to_blocks "$DESCRIPTION")
-task_blocks=$(jq -nc --argjson t "$task_template_b" --argjson d "$desc_blocks" '$t + $d')
-task_resp=$(notion_create_page "$TASK_DB" "$props" "$task_blocks")
+task_resp=$(notion_create_page_from_template "$TASK_DB" "$props" "$TASK_TEMPLATE_ID")
 TASK_ID=$(echo "$task_resp" | jq -r .id)
 TASK_URL=$(echo "$task_resp" | jq -r .url)
 if ! echo "$task_resp" | jq -e .id >/dev/null 2>&1; then
@@ -520,6 +518,11 @@ if ! echo "$task_resp" | jq -e .id >/dev/null 2>&1; then
     echo "$task_resp" >&2
     exit 1
 fi
+notion_wait_for_template_applied "$TASK_ID" || exit 1
+notion_insert_blocks_after_text "$TASK_ID" "$desc_blocks" "설명" || {
+    echo "Notion Task description 삽입 실패" >&2
+    exit 1
+}
 
 branch_topic=$(topic_branch_component "$TOPIC")
 branch="${ISSUE_NUM}-${branch_topic}-$(make_slug "$TASK_NAME")"

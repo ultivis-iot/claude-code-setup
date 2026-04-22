@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Notion Story/Task 생성 시 template block 복사 대신 Notion template API를 사용하고, markdown body를 `설명` block 뒤에 삽입하도록 수정.
 - Story 기반 agent/worktree flow, cross-repo Story, `Parent Task` dependency 규칙을 workflow 문서와 Codex skill/plugin reference에 반영.
 - Plan 작성/발행 전에 blocking question을 먼저 묻고, 사용자가 스스로 판단할 수 있도록 decision tradeoff를 제시하는 규칙을 추가.
 - Story DB에 `Issue URL`/`PR URL` 프로퍼티를 추가하고, Story 생성 시 GitHub Story Issue와 Story branch/worktree, `tmp/story-handoff.md`를 함께 생성하도록 확장.
@@ -10,7 +11,7 @@
 - `ult-cache-refresh.sh`를 추가하고 `setup.sh`, `setup-codex.sh`, `setup.ps1` 설치 시 사용자별 `~/.claude/notion-cache` / `~/.codex/notion-cache`를 자동 준비하도록 개선.
 - `verify-workflow.sh`가 Claude Code 설치본과 Codex 설치본을 구분해 검증하도록 수정.
 - branch ancestry를 `gh-merge-base`, Notion/GitHub comments, Story handoff에 기록하고 review-cycle을 Task PR/Story PR 양쪽에서 수행하도록 문서화.
-- Notion Story/Task 생성 시 template blocks가 비어 있으면 중단하고, appended markdown을 heading/list/todo Notion block으로 변환하도록 개선.
+- Notion Story/Task 생성 시 template 적용 실패를 감지하고, markdown body를 heading/list/todo Notion block으로 변환하도록 개선.
 - `ult-task-create.sh`가 `--parent-task` 옵션으로 선행 Task relation을 설정할 수 있도록 확장.
 - Codex skill display name/path renamed from `dev-workflow` to `ultivis-flow`.
 - `setup-codex.sh --update` now removes the legacy `~/.codex/skills/dev-workflow` directory before installing `~/.codex/skills/ultivis-flow`.

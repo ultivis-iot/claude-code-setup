@@ -110,20 +110,24 @@ story_props=$(jq -nc \
         Assignee: {people: [{id: $uid}]}
     }')
 
-# 템플릿 + Plan 본문 조합
-TEMPLATE_BLOCKS=$(story_template_blocks "$STORY_TAG")
-if ! echo "$TEMPLATE_BLOCKS" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
-    echo "ERROR: Story template blocks are empty for tag: $STORY_TAG" >&2
-    echo "빈 Story page 생성을 중단합니다. story_template_id 매핑과 Notion template 접근 권한을 확인하세요." >&2
+# 템플릿 적용 후 Plan 본문 삽입
+STORY_TEMPLATE_ID=$(story_template_id "$STORY_TAG")
+if [ -z "$STORY_TEMPLATE_ID" ]; then
+    echo "ERROR: Story template id is empty for tag: $STORY_TAG" >&2
+    echo "빈 Story page 생성을 중단합니다. story_template_id 매핑을 확인하세요." >&2
     exit 1
 fi
 PLAN_BLOCKS=$(md_to_blocks "$STORY_BODY")
-story_blocks=$(jq -nc --argjson t "$TEMPLATE_BLOCKS" --argjson p "$PLAN_BLOCKS" '$t + $p')
 
-story_resp=$(notion_create_page "$STORY_DB" "$story_props" "$story_blocks")
+story_resp=$(notion_create_page_from_template "$STORY_DB" "$story_props" "$STORY_TEMPLATE_ID")
 STORY_ID=$(echo "$story_resp" | jq -r .id)
 STORY_URL=$(echo "$story_resp" | jq -r .url)
 [ "$STORY_ID" = "null" ] && { echo "ERROR: Story 생성 실패"; echo "$story_resp" >&2; exit 1; }
+notion_wait_for_template_applied "$STORY_ID" || exit 1
+notion_insert_blocks_after_text "$STORY_ID" "$PLAN_BLOCKS" "설명" || {
+    echo "ERROR: Story Plan 본문 삽입 실패" >&2
+    exit 1
+}
 echo "  ✓ $STORY_TITLE"
 echo "    $STORY_URL"
 
@@ -248,22 +252,30 @@ process_task() {
         + (if $ps != "" then {"Planned Date": {date: ({start: $ps} + (if $pe != "" then {end: $pe} else {} end))}} else {} end)
         ')
 
-    # Task 본문: 템플릿 + 설명
-    local task_template_b desc_blocks task_blocks
-    task_template_b=$(task_template_blocks)
-    if ! echo "$task_template_b" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
-        echo '{"error": "Task template blocks are empty"}' > "$out"
+    # Task 본문: 템플릿 적용 후 설명 삽입
+    local desc_blocks
+    if [ -z "$TASK_TEMPLATE_ID" ]; then
+        echo '{"error": "Task template id is empty"}' > "$out"
         return
     fi
     desc_blocks=$(md_to_blocks "$desc")
-    task_blocks=$(jq -nc --argjson t "$task_template_b" --argjson d "$desc_blocks" '$t + $d')
 
     local resp
-    resp=$(notion_create_page "$TASK_DB" "$props" "$task_blocks")
+    resp=$(notion_create_page_from_template "$TASK_DB" "$props" "$TASK_TEMPLATE_ID")
     local task_id
     task_id=$(echo "$resp" | jq -r .id)
     if ! echo "$resp" | jq -e .id >/dev/null 2>&1; then
         jq -nc --arg error "Notion Task 생성 실패" --arg response "$resp" \
+            '{error: $error, response: $response}' > "$out"
+        return
+    fi
+    if ! notion_wait_for_template_applied "$task_id"; then
+        jq -nc --arg error "Notion Task template 적용 실패" --arg response "$resp" \
+            '{error: $error, response: $response}' > "$out"
+        return
+    fi
+    if ! notion_insert_blocks_after_text "$task_id" "$desc_blocks" "설명"; then
+        jq -nc --arg error "Notion Task description 삽입 실패" --arg response "$resp" \
             '{error: $error, response: $response}' > "$out"
         return
     fi
@@ -276,7 +288,7 @@ process_task() {
 }
 
 # 병렬 실행
-export -f process_task notion_create_page notion_api _notion_token md_to_blocks task_template_blocks template_blocks_cached _cache_fresh
+export -f process_task notion_create_page notion_create_page_from_template notion_append_blocks notion_find_child_block_by_text notion_insert_blocks_after_text notion_wait_for_template_applied notion_api _notion_token md_to_blocks task_template_blocks template_blocks_cached _cache_fresh
 export SPEC STORY_ID STORY_URL STORY_ISSUE_URL STORY_BRANCH STORY_PROJECT STORY_ASSIGNEE GITHUB_REPO TASK_DB WORKDIR CACHE_DIR TASK_TEMPLATE_ID
 
 for i in $(seq 0 $((TASK_COUNT - 1))); do
