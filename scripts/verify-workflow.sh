@@ -24,6 +24,7 @@ check_script() {
 if [ "$MODE" = "repo" ]; then
     check_script "$WORKFLOW_ROOT/setup.sh"
     check_script "$WORKFLOW_ROOT/setup-codex.sh"
+    check_file "$WORKFLOW_ROOT/setup.ps1"
     check_file "$WORKFLOW_ROOT/codex/skills/ultivis-flow/SKILL.md"
     check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/ultivis-flow/SKILL.md"
 else

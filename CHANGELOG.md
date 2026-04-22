@@ -5,7 +5,7 @@
 - Story DB에 `Issue URL`/`PR URL` 프로퍼티를 추가하고, Story 생성 시 GitHub Story Issue와 Story branch/worktree, `tmp/story-handoff.md`를 함께 생성하도록 확장.
 - `ult-story-run.sh` / `/ult-story-run`을 추가해 Story의 Ready/Blocked Task를 분석하고 subagent 실행 프롬프트를 생성하도록 지원.
 - Story 생성 시 `tmp/story-handoff.json`을 함께 만들고, `ult-story-run.sh`이 로컬/GitHub Story Issue handoff를 먼저 사용한 뒤 Notion은 fallback으로만 조회하도록 개선.
-- `ult-cache-refresh.sh`를 추가하고 설치 시 사용자별 `~/.claude/notion-cache` / `~/.codex/notion-cache`를 자동 준비하도록 개선.
+- `ult-cache-refresh.sh`를 추가하고 `setup.sh`, `setup-codex.sh`, `setup.ps1` 설치 시 사용자별 `~/.claude/notion-cache` / `~/.codex/notion-cache`를 자동 준비하도록 개선.
 - branch ancestry를 `gh-merge-base`, Notion/GitHub comments, Story handoff에 기록하고 review-cycle을 Task PR/Story PR 양쪽에서 수행하도록 문서화.
 - Notion Story/Task 생성 시 template blocks가 비어 있으면 중단하고, appended markdown을 heading/list/todo Notion block으로 변환하도록 개선.
 - `ult-task-create.sh`가 `--parent-task` 옵션으로 선행 Task relation을 설정할 수 있도록 확장.

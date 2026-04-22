@@ -139,6 +139,9 @@ git pull
 │   └── copy-plan-on-accept.sh  # Plan 승인 시 자동 복사
 ├── plugins/
 │   └── security-guidance/      # 실시간 보안 검사 Plugin
+├── scripts/
+│   ├── ult-cache-refresh.sh    # Notion cache 준비/갱신
+│   └── ...                     # workflow 실행 스크립트
 ├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
 └── dev-tools/
     ├── dev-commands.sh         # 개발 환경 셸 명령어
@@ -203,7 +206,7 @@ Codex 설치 시:
 
 Codex에서는 로컬 문서/예제 기준으로 루트 slash command 등록 경로를 확인하지 못해, `~/plugins/ult`와 `~/.agents/plugins/marketplace.json`를 통해 `/ult:...` 형식의 짧은 slash command를 등록합니다. `ultivis-flow` skill은 같은 워크플로우를 자연어 요청에도 적용하고, `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
 
-설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다.
+설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `bash`가 있으면 같은 refresh 스크립트로 warm-up을 시도합니다.
 
 ### 1. Plan 모드 진입
 

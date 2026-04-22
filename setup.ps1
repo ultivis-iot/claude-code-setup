@@ -97,8 +97,20 @@ if (Test-Path $SchemasSource) {
     }
 }
 
+# Scripts 설치
+Write-Host "6. Scripts 설치..."
+$ScriptsSource = Join-Path $ScriptDir "scripts"
+$ScriptsDest = Join-Path $ClaudeDir "scripts"
+if (Test-Path $ScriptsSource) {
+    New-Item -ItemType Directory -Force -Path $ScriptsDest | Out-Null
+    Get-ChildItem -Path $ScriptsSource -Filter "*.sh" | ForEach-Object {
+        Copy-Item $_.FullName -Destination $ScriptsDest -Force
+        Write-Host "   $($_.Name)" -ForegroundColor Green
+    }
+}
+
 # Plugins 설치
-Write-Host "6. Plugins 설치..."
+Write-Host "7. Plugins 설치..."
 $PluginsSource = Join-Path $ScriptDir "plugins"
 $PluginsDest = Join-Path $ClaudeDir "plugins"
 if (Test-Path $PluginsSource) {
@@ -111,7 +123,7 @@ if (Test-Path $PluginsSource) {
 }
 
 # Notion MCP 설정
-Write-Host "7. Notion MCP 설정..."
+Write-Host "8. Notion MCP 설정..."
 $ClaudeCmd = Get-Command claude -ErrorAction SilentlyContinue
 if (-not $ClaudeCmd) {
     Write-Host "   claude CLI를 찾을 수 없어 Notion MCP 등록을 건너뜁니다." -ForegroundColor Yellow
@@ -151,6 +163,41 @@ if (-not $ClaudeCmd) {
     }
 }
 
+# Notion cache 준비
+Write-Host "9. Notion cache 준비..."
+$NotionCacheDir = Join-Path $ClaudeDir "notion-cache"
+New-Item -ItemType Directory -Force -Path $NotionCacheDir | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $NotionCacheDir "schemas") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $NotionCacheDir "templates") | Out-Null
+
+$CacheRefreshScript = Join-Path $ScriptsDest "ult-cache-refresh.sh"
+$BashCmd = Get-Command bash -ErrorAction SilentlyContinue
+if ($BashCmd -and (Test-Path $CacheRefreshScript)) {
+    $PreviousWorkflowHome = $env:WORKFLOW_HOME
+    $env:WORKFLOW_HOME = $ClaudeDir
+    $CacheRefreshOutput = & bash "$CacheRefreshScript" --quiet 2>&1
+    $CacheRefreshExit = $LASTEXITCODE
+    if ($null -eq $PreviousWorkflowHome) {
+        Remove-Item Env:\WORKFLOW_HOME -ErrorAction SilentlyContinue
+    } else {
+        $env:WORKFLOW_HOME = $PreviousWorkflowHome
+    }
+
+    $CacheRefreshText = ($CacheRefreshOutput | Out-String)
+    if ($CacheRefreshText -match "(?m)^DONE:") {
+        Write-Host "   ~/.claude/notion-cache 준비 완료" -ForegroundColor Green
+    } elseif ($CacheRefreshText -match "(?m)^SKIP:") {
+        Write-Host "   건너뜀. Notion token 설정 후 첫 Notion 명령 실행 시 cache가 생성됩니다." -ForegroundColor Yellow
+    } elseif ($CacheRefreshExit -ne 0) {
+        Write-Host "   Notion cache refresh 실패. 첫 Notion 명령 실행 시 다시 시도됩니다." -ForegroundColor Yellow
+    } else {
+        Write-Host "   ~/.claude/notion-cache 디렉토리 준비 완료" -ForegroundColor Green
+    }
+} else {
+    Write-Host "   ~/.claude/notion-cache 디렉토리 준비 완료" -ForegroundColor Green
+    Write-Host "   bash를 찾을 수 없어 cache warm-up은 건너뜁니다." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host "설치 완료!" -ForegroundColor Green
@@ -167,6 +214,8 @@ Write-Host "  ~/.claude/agents/security-validator.md"
 Write-Host "  ~/.claude/agents/code-simplifier.md"
 Write-Host "  ~/.claude/schemas/validation-status.schema.json"
 Write-Host "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
+Write-Host "  ~/.claude/scripts/*.sh (workflow 실행 스크립트)"
+Write-Host "  ~/.claude/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
 Write-Host "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"
 Write-Host ""
 Write-Host "사용 방법:"
