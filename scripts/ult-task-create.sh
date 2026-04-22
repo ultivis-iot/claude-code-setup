@@ -18,7 +18,7 @@ usage() {
   ult-task-create.sh --story <story-title-or-url> --name <task> [--planned-start YYYY-MM-DD] [--planned-end YYYY-MM-DD]
 
 옵션:
-  --story, -s        Story title, Notion page URL, page id
+  --story, -s        Story title, Notion page URL/id, GitHub Story/Task Issue URL, repo#issue
   --project, -p      Repository의 Project relation이 비어 있을 때 사용할 Project name/page id/URL
   --name, -n         Task 이름
   --topic, -t        Feature|Fix|Update|Refactor|Style|Other (기본 Feature)
@@ -154,6 +154,190 @@ story_project_id() {
     echo "$1" | jq -r '.properties["🛡️ Project "].relation[0].id // .properties["🛡️ Project"].relation[0].id // empty'
 }
 
+CONTEXT_STORY_BRANCH=""
+CONTEXT_STORY_WT_PATH=""
+CONTEXT_HANDOFF_PATH=""
+
+story_issue_url() {
+    echo "$1" | jq -r '.properties["Issue URL"].url // empty'
+}
+
+repo_slug_from_issue_url() {
+    printf '%s\n' "$1" | sed -E 's#^https://github.com/##; s#/issues/[0-9]+$##'
+}
+
+issue_num_from_url() {
+    printf '%s\n' "$1" | grep -oE '[0-9]+$' || true
+}
+
+extract_handoff_json_from_text() {
+    awk '
+        /<!-- ult-story-handoff-json/ {
+            inside = 1
+            sub(/^.*<!-- ult-story-handoff-json[[:space:]]*/, "")
+            if ($0 ~ /-->/) {
+                sub(/[[:space:]]*-->.*$/, "")
+                print
+                inside = 0
+            } else if (length($0) > 0) {
+                print
+            }
+            next
+        }
+        inside && /-->/ {
+            sub(/[[:space:]]*-->.*$/, "")
+            if (length($0) > 0) print
+            inside = 0
+            next
+        }
+        inside { print }
+    '
+}
+
+load_story_from_handoff_json() {
+    local handoff="$1"
+    local notion_url issue_url page_id story
+    printf '%s\n' "$handoff" | jq -e '(.story | type == "object")' >/dev/null 2>&1 || return 1
+
+    CONTEXT_STORY_BRANCH=$(printf '%s\n' "$handoff" | jq -r '.story.branch // empty')
+    CONTEXT_STORY_WT_PATH=$(printf '%s\n' "$handoff" | jq -r '.story.worktree // empty')
+
+    notion_url=$(printf '%s\n' "$handoff" | jq -r '.story.notion_url // empty')
+    if [ -n "$notion_url" ] && page_id=$(normalize_notion_page_id "$notion_url" 2>/dev/null); then
+        notion_get_page "$page_id" | jq -c '.'
+        return 0
+    fi
+
+    issue_url=$(printf '%s\n' "$handoff" | jq -r '.story.github_issue_url // empty')
+    if [ -n "$issue_url" ]; then
+        story=$(find_story_by_issue_url "$issue_url" 2>/dev/null || true)
+        if [ -n "$story" ] && [ "$story" != "null" ]; then
+            printf '%s\n' "$story" | jq -c '.'
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+worktree_for_branch() {
+    local branch="$1"
+    [ -n "$branch" ] || return 1
+    git worktree list --porcelain 2>/dev/null \
+        | awk -v target="refs/heads/$branch" '
+            $1 == "worktree" { wt = $2 }
+            $1 == "branch" && $2 == target { print wt; exit }
+        '
+}
+
+branch_for_issue() {
+    local issue_num="$1"
+    [ -n "$issue_num" ] || return 1
+    local current
+    current=$(git branch --show-current 2>/dev/null || true)
+    if printf '%s\n' "$current" | grep -Eq "^${issue_num}($|[-_/])"; then
+        printf '%s\n' "$current"
+        return 0
+    fi
+    git branch --format='%(refname:short)' 2>/dev/null \
+        | grep -E "^${issue_num}($|[-_/])" \
+        | head -1
+}
+
+github_issue_url_from_ref() {
+    local ref="$1"
+    local repo num
+    [ -n "$ref" ] || return 1
+
+    if printf '%s\n' "$ref" | grep -Eq '^https://github.com/.+/issues/[0-9]+$'; then
+        printf '%s\n' "$ref"
+        return 0
+    fi
+
+    if printf '%s\n' "$ref" | grep -Eq '^[^/[:space:]]+/[^/#[:space:]]+#[0-9]+$'; then
+        repo=$(printf '%s\n' "$ref" | sed -E 's/#([0-9]+)$//')
+        num=$(printf '%s\n' "$ref" | grep -oE '[0-9]+$')
+        printf 'https://github.com/%s/issues/%s\n' "$repo" "$num"
+        return 0
+    fi
+
+    if printf '%s\n' "${ref#\#}" | grep -Eq '^[0-9]+$'; then
+        printf 'https://github.com/%s/issues/%s\n' "$GITHUB_REPO" "${ref#\#}"
+        return 0
+    fi
+
+    return 1
+}
+
+load_story_from_issue_url() {
+    local issue_url="$1"
+    local story task story_id repo num payload row body handoff
+
+    story=$(find_story_by_issue_url "$issue_url" 2>/dev/null || true)
+    if [ -n "$story" ] && [ "$story" != "null" ]; then
+        printf '%s\n' "$story" | jq -c '.'
+        return 0
+    fi
+
+    task=$(find_task_by_issue_url "$issue_url" 2>/dev/null || true)
+    story_id=$(printf '%s\n' "$task" | jq -r '.properties["📜 Story"].relation[0].id // empty' 2>/dev/null || true)
+    if [ -n "$story_id" ]; then
+        notion_get_page "$story_id" | jq -c '.'
+        return 0
+    fi
+
+    repo=$(repo_slug_from_issue_url "$issue_url")
+    num=$(issue_num_from_url "$issue_url")
+    if [ -n "$repo" ] && [ -n "$num" ]; then
+        payload=$(gh issue view "$num" --repo "$repo" --json body,comments 2>/dev/null || true)
+        while IFS= read -r row; do
+            body=$(printf '%s' "$row" | base64 -d | jq -r '.body // ""')
+            handoff=$(printf '%s\n' "$body" | extract_handoff_json_from_text)
+            if [ -n "$handoff" ] && load_story_from_handoff_json "$handoff"; then
+                return 0
+            fi
+        done < <(printf '%s\n' "$payload" | jq -r '([{body: .body}] + (.comments // [] | map({body: .body}))) | reverse | .[] | @base64' 2>/dev/null)
+    fi
+
+    return 1
+}
+
+load_story_from_handoff_file() {
+    local path="$1"
+    local issue_url
+    [ -f "$path" ] || return 1
+    jq -e '(.story | type == "object")' "$path" >/dev/null 2>&1 || return 1
+
+    CONTEXT_HANDOFF_PATH="$path"
+    load_story_from_handoff_json "$(cat "$path")" && return 0
+
+    issue_url=$(jq -r '.story.github_issue_url // empty' "$path")
+    [ -n "$issue_url" ] && load_story_from_issue_url "$issue_url"
+}
+
+load_story_from_local_context() {
+    local current base base_wt issue_num issue_url
+
+    load_story_from_handoff_file "tmp/story-handoff.json" && return 0
+
+    current=$(git branch --show-current 2>/dev/null || true)
+    if [ -n "$current" ]; then
+        base=$(git config "branch.$current.gh-merge-base" 2>/dev/null || true)
+        if [ -n "$base" ]; then
+            base_wt=$(worktree_for_branch "$base" 2>/dev/null || true)
+            [ -n "$base_wt" ] && load_story_from_handoff_file "$base_wt/tmp/story-handoff.json" && return 0
+        fi
+    fi
+
+    issue_num=$(issue_num_from_branch 2>/dev/null || true)
+    if [ -n "$issue_num" ]; then
+        issue_url=$(gh issue view "$issue_num" --repo "$GITHUB_REPO" --json url --jq .url 2>/dev/null || true)
+        [ -n "$issue_url" ] && load_story_from_issue_url "$issue_url" && return 0
+    fi
+
+    return 1
+}
+
 filter_stories_for_repo_project() {
     local rows="$1"
     echo "$rows" | jq -c --argjson projectIds "$REPO_PROJECT_IDS_JSON" '
@@ -209,10 +393,18 @@ select_story_from_json() {
 
 load_story() {
     local ref="$1"
-    local page_id filter rows
+    local page_id issue_url filter rows
     if [ -n "$ref" ] && page_id=$(normalize_notion_page_id "$ref" 2>/dev/null); then
         notion_get_page "$page_id" | jq -c '.'
         return 0
+    fi
+
+    if [ -n "$ref" ] && [ -f "$ref" ]; then
+        load_story_from_handoff_file "$ref" && return 0
+    fi
+
+    if [ -n "$ref" ] && issue_url=$(github_issue_url_from_ref "$ref" 2>/dev/null); then
+        load_story_from_issue_url "$issue_url" && return 0
     fi
 
     if [ -n "$ref" ]; then
@@ -222,6 +414,8 @@ load_story() {
         select_story_from_json "$rows"
         return
     fi
+
+    load_story_from_local_context && return 0
 
     filter=$(jq -nc --arg uid "$ASSIGNEE_ID" '{
         or: [
@@ -237,6 +431,11 @@ load_story() {
 STORY=$(load_story "$STORY_REF") || exit 1
 STORY_ID=$(echo "$STORY" | jq -r .id)
 STORY_TITLE=$(story_title "$STORY")
+STORY_URL=$(echo "$STORY" | jq -r '.url // empty')
+STORY_ISSUE_URL=$(story_issue_url "$STORY")
+STORY_ISSUE_NUM=$(issue_num_from_url "$STORY_ISSUE_URL")
+STORY_BRANCH="${CONTEXT_STORY_BRANCH:-$(branch_for_issue "$STORY_ISSUE_NUM" 2>/dev/null || true)}"
+STORY_WT_PATH="${CONTEXT_STORY_WT_PATH:-$(worktree_for_branch "$STORY_BRANCH" 2>/dev/null || true)}"
 PROJECT_ID=$(story_project_id "$STORY")
 validate_story_project_for_repo "$STORY" || exit 1
 
@@ -262,7 +461,17 @@ WEEK_ID=$(current_week_id 2>/dev/null || true)
 PARENT_TASK_IDS_JSON=$(printf '%s\n' "${PARENT_TASK_IDS[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
 echo "▸ GitHub Issue 생성 중..."
-ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$TASK_NAME" --body "$DESCRIPTION") || {
+ISSUE_BODY=$(mktemp)
+trap 'rm -f "$ISSUE_BODY"' EXIT
+{
+    echo "$DESCRIPTION"
+    echo ""
+    echo "---"
+    [ -n "$STORY_ISSUE_URL" ] && echo "Parent Story: $STORY_ISSUE_URL"
+    [ -n "$STORY_URL" ] && echo "Notion Story: $STORY_URL"
+    [ -n "$STORY_BRANCH" ] && echo "Story Branch: $STORY_BRANCH"
+} > "$ISSUE_BODY"
+ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$TASK_NAME" --body-file "$ISSUE_BODY") || {
     echo "GitHub Issue 생성 실패" >&2
     exit 1
 }
@@ -322,6 +531,10 @@ resolve_base_branch() {
         echo "$BASE_BRANCH"
         return 0
     fi
+    if [ -n "$STORY_BRANCH" ]; then
+        echo "$STORY_BRANCH"
+        return 0
+    fi
     if git show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
         echo "dev"
         return 0
@@ -359,6 +572,84 @@ Worktree: $WT_PATH"
     notion_add_comment "$TASK_ID" "$branch_note" >/dev/null || true
     gh issue comment "$ISSUE_NUM" --body "$branch_note" >/dev/null || true
 fi
+
+append_task_to_handoff() {
+    local handoff_json handoff_md task_item parent_issue_urls parent_id parent_page parent_issue parent_summary tmp_json handoff_comment story_repo
+    [ -n "$STORY_WT_PATH" ] || return 0
+    handoff_json="$STORY_WT_PATH/tmp/story-handoff.json"
+    handoff_md="$STORY_WT_PATH/tmp/story-handoff.md"
+    [ -f "$handoff_json" ] || return 0
+
+    parent_issue_urls='[]'
+    for parent_id in "${PARENT_TASK_IDS[@]}"; do
+        parent_page=$(notion_get_page "$parent_id" 2>/dev/null || true)
+        parent_issue=$(printf '%s\n' "$parent_page" | jq -r '.properties["Issue URL"].url // empty' 2>/dev/null || true)
+        if [ -n "$parent_issue" ]; then
+            parent_issue_urls=$(printf '%s\n' "$parent_issue_urls" | jq -c --arg u "$parent_issue" '. + [$u]')
+        fi
+    done
+    parent_summary=$(printf '%s\n' "$parent_issue_urls" | jq -r 'if length == 0 then "-" else join(", ") end')
+
+    task_item=$(jq -nc \
+        --arg name "$TASK_NAME" \
+        --arg topic "$TOPIC" \
+        --arg repo "$GITHUB_REPO" \
+        --arg id "$TASK_ID" \
+        --arg issue "$ISSUE_URL" \
+        --arg num "$ISSUE_NUM" \
+        --arg branch "$branch" \
+        --arg base "$BASE_USED" \
+        --arg wt "$WT_PATH" \
+        --argjson parent_ids "$PARENT_TASK_IDS_JSON" \
+        --argjson parent_urls "$parent_issue_urls" \
+        '{
+            name: $name,
+            topic: $topic,
+            repo: $repo,
+            notion_task_id: $id,
+            issue_url: $issue,
+            issue_num: $num,
+            pr_url: "",
+            branch: $branch,
+            base_branch: $base,
+            worktree: $wt,
+            parent_task_ids: $parent_ids,
+            parent_issue_urls: $parent_urls,
+            status: "Ready"
+        }')
+
+    tmp_json=$(mktemp)
+    jq --argjson task "$task_item" '.updated_at = (now | todate) | .tasks += [$task]' "$handoff_json" > "$tmp_json" \
+        && mv "$tmp_json" "$handoff_json" \
+        || { rm -f "$tmp_json"; return 0; }
+
+    if [ -f "$handoff_md" ]; then
+        printf '| %s | %s | %s | %s | %s | %s | %s | Ready |\n' \
+            "$TASK_NAME" "$GITHUB_REPO" "$ISSUE_URL" "$branch" "${BASE_USED:-"-"}" "${WT_PATH:-"-"}" "$parent_summary" >> "$handoff_md"
+    fi
+
+    story_repo=$(repo_slug_from_issue_url "$STORY_ISSUE_URL")
+    if [ -n "$STORY_ISSUE_NUM" ] && [ -n "$story_repo" ]; then
+        handoff_comment=$(mktemp)
+        {
+            echo "## Story Handoff Update"
+            echo ""
+            echo "Added Task: $TASK_NAME"
+            echo "Issue: $ISSUE_URL"
+            echo "Branch: $branch"
+            echo "Base Branch: ${BASE_USED:-"-"}"
+            [ -n "$WT_PATH" ] && echo "Worktree: $WT_PATH"
+            echo ""
+            echo "<!-- ult-story-handoff-json"
+            cat "$handoff_json"
+            echo "-->"
+        } > "$handoff_comment"
+        gh issue comment "$STORY_ISSUE_NUM" --repo "$story_repo" --body-file "$handoff_comment" >/dev/null || true
+        rm -f "$handoff_comment"
+    fi
+}
+
+append_task_to_handoff
 
 echo ""
 echo "✅ Task 생성 완료"

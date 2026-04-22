@@ -1,4 +1,4 @@
-# Isaac 개발 워크플로우
+# Ultivis 개발 워크플로우
 
 Notion + Github + Claude Code + n8n 자동화가 한 몸으로 움직이는 워크플로우. 개발자는 Claude 안에서 Plan부터 PR 머지까지 끝냅니다.
 

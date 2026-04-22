@@ -1,11 +1,11 @@
-# Isaac / Notion Flow
+# Ultivis / Notion Flow
 
-Use this reference when the user asks for issue lookup, Task/Story handling, or weekly Isaac flow that originally lived in Claude slash commands.
+Use this reference when the user asks for issue lookup, Task/Story handling, or weekly Ultivis workflow that originally lived in Claude slash commands.
 
 ## Scope
 
 - issue lookup from branch name or issue number
-- Isaac task creation and status updates
+- Ultivis task creation and status updates
 - Story/task note publishing
 - weekly report collection and publishing
 
@@ -89,6 +89,8 @@ The handoff should include:
 After creation, GitHub Story Issue is the mutable handoff source. Notion is used for inspection and fallback lookup only.
 
 Use `scripts/ult-story-run.sh` to generate a current run summary and Ready Task prompts. It reads local handoff first, then GitHub Story Issue handoff, and only falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
+
+When adding a Task to an existing Story, prefer passing the GitHub Story Issue URL or running from the Story/Task worktree. `scripts/ult-task-create.sh` resolves Story context from local handoff, GitHub Story Issue, GitHub Task Issue, current branch issue, and then Notion title search. New Task branches should base on the Story branch, and new Tasks should be appended to Story handoff when available.
 
 ## Task Dependency Rules
 

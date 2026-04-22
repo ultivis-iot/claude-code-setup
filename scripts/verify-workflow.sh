@@ -31,6 +31,21 @@ if [ "$MODE" = "repo" ]; then
     check_file "$WORKFLOW_ROOT/setup.ps1"
     check_file "$WORKFLOW_ROOT/codex/skills/ultivis-flow/SKILL.md"
     check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/ultivis-flow/SKILL.md"
+
+    for command_file in "$WORKFLOW_ROOT"/commands/*.md; do
+        command_name="$(basename "$command_file")"
+        check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/commands/$command_name"
+    done
+
+    while IFS= read -r skill_file; do
+        rel="${skill_file#"$WORKFLOW_ROOT/codex/skills/ultivis-flow/"}"
+        plugin_file="$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/ultivis-flow/$rel"
+        check_file "$plugin_file"
+        cmp -s "$skill_file" "$plugin_file" || {
+            echo "ERROR: plugin skill copy differs: $rel" >&2
+            exit 1
+        }
+    done < <(find "$WORKFLOW_ROOT/codex/skills/ultivis-flow" -type f | sort)
 elif [ "$MODE" = "installed-codex" ]; then
     check_file "$WORKFLOW_ROOT/skills/ultivis-flow/SKILL.md"
     check_file "$HOME/plugins/ult/.codex-plugin/plugin.json"

@@ -30,4 +30,5 @@ Use conventional commit types such as `feat`, `fix`, `docs`, `refactor`, `test`,
 
 Branch creation rule:
 
-- For Ultivis repositories, create task branches from `dev` when `origin/dev` exists. Use another base only when the user explicitly asks for it or the repository has no `dev` branch.
+- For standalone tasks, create branches from `dev` when `origin/dev` exists. Use another base only when the user explicitly asks for it or the repository has no `dev` branch.
+- For Story-based tasks, create Task branches from the Story branch. The Story branch itself should come from `dev` when available.
