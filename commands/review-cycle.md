@@ -53,7 +53,7 @@ argument-hint: [PR번호]
 
 - Task PR은 AI 리뷰/CI가 clear될 때까지 반복한 뒤 Story branch로 merge한다.
 - Story PR은 모든 Task가 Story branch에 merge된 뒤 `dev` 대상으로 열고 다시 review-cycle을 반복한다.
-- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`, Notion Story, GitHub Story Issue에 carryover로 기록한다.
+- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`와 GitHub Story Issue에 carryover로 기록한다.
 - Task PR merge 후 dependent Task를 시작하기 전에 Story handoff를 갱신한다.
 
 ## 검증 명령 선택

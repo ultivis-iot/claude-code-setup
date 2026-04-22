@@ -1,23 +1,24 @@
 # Story 실행 준비
 
-Story에 연결된 Task들을 읽고, dependency 기준으로 Ready/Blocked를 판정한 뒤 서브에이전트에 넘길 실행 프롬프트를 생성합니다.
+Story handoff를 읽고, dependency 기준으로 Ready/Blocked를 판정한 뒤 서브에이전트에 넘길 실행 프롬프트를 생성합니다.
 
 ## 실행
 
 ```bash
-~/.claude/scripts/ult-story-run.sh [story-issue|story-issue-url|notion-story-url]
+~/.claude/scripts/ult-story-run.sh [story-issue|story-issue-url|handoff-json|notion-story-url]
 ```
 
 Codex에서는:
 
 ```bash
-~/.codex/scripts/ult-story-run.sh [story-issue|story-issue-url|notion-story-url]
+~/.codex/scripts/ult-story-run.sh [story-issue|story-issue-url|handoff-json|notion-story-url]
 ```
 
 ## 동작
 
-- Notion Story를 찾는다.
-- Story에 연결된 Task를 조회한다.
+- 로컬 `tmp/story-handoff.json`을 먼저 찾는다.
+- 없으면 GitHub Story Issue의 handoff comment를 읽는다.
+- 그래도 없을 때만 Notion Story/Task를 fallback으로 조회한다.
 - `Parent Task` dependency를 평가한다.
 - Ready Task와 Blocked Task를 구분한다.
 - Task별 branch/base/worktree 상태를 정리한다.
@@ -28,7 +29,7 @@ Codex에서는:
 
 | 옵션 | 동작 |
 |---|---|
-| `--publish` | 실행 요약을 Notion Story와 GitHub Story Issue에 코멘트로 남김 |
+| `--publish` | 실행 요약을 GitHub Story Issue에 코멘트로 남김 |
 | `--json` | markdown 대신 JSON summary 출력 |
 
 ## 에이전트 실행 규칙

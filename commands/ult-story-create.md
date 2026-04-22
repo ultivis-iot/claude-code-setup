@@ -48,7 +48,8 @@
 - Task dependency가 있으면 `Parent Task` relation을 사용한다
 - Story GitHub Issue를 만들고 Story `Issue URL`에 기록한다
 - Story branch/worktree를 먼저 만들고 Task branch는 Story branch를 base로 만든다
-- `tmp/story-handoff.md`를 만들고 같은 내용을 Notion Story와 GitHub Story Issue에 남긴다
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 만들고 초기 handoff를 Notion Story와 GitHub Story Issue에 동일하게 남긴다
+- 생성 이후 handoff 변경사항은 GitHub Story Issue에 반영한다
 
 ## Agent Worktree 규칙
 

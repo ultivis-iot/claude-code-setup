@@ -50,7 +50,7 @@ Use this model for multi-task Story work. These rules are the operating checklis
 - Task branches are created from the Story branch. Task PRs target the Story branch. Only the final Story PR targets `dev`.
 - `Parent Task` means prerequisite/dependency, not hierarchy. Only dependency-ready Tasks may run in parallel.
 - Task `Repository` relation is the source of truth for repo ownership. Cross-repo references must use `repo#issue` or Issue URL, never bare issue numbers.
-- Maintain `tmp/story-handoff.md` and publish the same state to the Notion Story and GitHub Story Issue.
+- Maintain `tmp/story-handoff.md` and `tmp/story-handoff.json`. Publish the initial handoff to both the Notion Story and GitHub Story Issue, then record execution updates only on the GitHub Story Issue.
 - Run review-cycle twice: once for each Task PR before merging to Story branch, and again for the Story PR before merging to `dev`.
 - Story/Task Notion pages must use configured templates; appended markdown must render as Notion blocks, not raw markdown.
 - Before assigning Task work, run `scripts/ult-story-run.sh` to classify Ready/Blocked Tasks and generate subagent prompts.
@@ -71,13 +71,13 @@ Additional rules:
 
 - Create a GitHub Story Issue for the Story and store it in Notion Story `Issue URL`.
 - Store the final Story PR in Notion Story `PR URL`.
-- Preserve branch ancestry with git `branch.<name>.gh-merge-base`, Notion comments, and `tmp/story-handoff.md`.
+- Preserve branch ancestry with git `branch.<name>.gh-merge-base`, the initial Notion comment, and the GitHub Story Issue handoff.
 - Branch names do not need `story/` or `task/` prefixes. Story/Task identity is determined by Notion relation, GitHub issue relation, branch base, and PR target.
 - Agents must not edit another agent's worktree.
 
 ## Story Handoff Rules
 
-For Story-based work, maintain `tmp/story-handoff.md` in the Story worktree and publish the same content to the Notion Story and GitHub Story Issue.
+For Story-based work, maintain `tmp/story-handoff.md` and `tmp/story-handoff.json` in the Story worktree. Publish the same initial content to the Notion Story and GitHub Story Issue.
 
 The handoff should include:
 
@@ -86,7 +86,9 @@ The handoff should include:
 - Task issue, branch, base branch, worktree, status, and owner.
 - Cross-repo dependencies and review carryover.
 
-Use `scripts/ult-story-run.sh` to generate a current run summary and Ready Task prompts. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
+After creation, GitHub Story Issue is the mutable handoff source. Notion is used for inspection and fallback lookup only.
+
+Use `scripts/ult-story-run.sh` to generate a current run summary and Ready Task prompts. It reads local handoff first, then GitHub Story Issue handoff, and only falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
 
 ## Task Dependency Rules
 
@@ -124,7 +126,7 @@ Story-based work has two review-cycle layers.
 
 - Run review-cycle on each Task PR until AI review and CI are clear, then merge the Task PR into the Story branch.
 - After all Task PRs are merged, open the Story PR to `dev` and run review-cycle again for integrated behavior.
-- If Task PR feedback belongs to Story-wide design or another Task scope, do not expand the Task PR. Record it in `tmp/story-handoff.md`, the Notion Story, and the GitHub Story Issue.
+- If Task PR feedback belongs to Story-wide design or another Task scope, do not expand the Task PR. Record it in `tmp/story-handoff.md` and the GitHub Story Issue.
 - Do not mark the Story complete until every repository Story PR is merged, review-cycle is clear, and cross-repo validation is done.
 
 ## Repository Project Relation Gaps

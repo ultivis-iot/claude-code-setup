@@ -97,7 +97,7 @@ Plan 모드(`Shift+Tab×2`)에서 작성 → 승인하면 hook이 `tmp/current-p
 - Task branch는 Story branch에서 만들고, Task PR은 Story branch를 target으로 합니다. 최종 Story PR만 `dev`를 target으로 합니다.
 - `Parent Task`는 hierarchy가 아니라 prerequisite/dependency입니다. dependency가 충족된 Task만 병렬 실행합니다.
 - Task `Repository` relation이 repo ownership의 source of truth입니다. cross-repo reference는 bare issue number가 아니라 `repo#issue` 또는 Issue URL을 씁니다.
-- `tmp/story-handoff.md`를 유지하고 같은 상태를 Notion Story와 GitHub Story Issue에 남깁니다.
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. 초기 handoff는 Notion Story와 GitHub Story Issue에 동일하게 남기고, 이후 변경은 GitHub Story Issue에 반영합니다.
 - review-cycle은 두 번 돕니다. Task PR마다 Story branch merge 전에 한 번, Story PR에서 `dev` merge 전에 한 번 돕니다.
 
 ```text
@@ -127,7 +127,7 @@ Story branch -> PR to dev
 - Task PR은 Story branch를 target으로 합니다.
 - 모든 Task가 Story branch에 merge되고 통합 검증이 끝난 뒤 Story PR을 `dev`로 보냅니다.
 - Story PR URL은 Notion Story의 `PR URL`에 기록합니다.
-- branch ancestry는 `branch.<name>.gh-merge-base`, Notion comment, Story handoff에 남깁니다.
+- branch ancestry는 `branch.<name>.gh-merge-base`, 초기 Notion comment, GitHub Story Issue handoff에 남깁니다.
 - 브랜치 이름에 `story/`, `task/` prefix는 필수 아닙니다. 중요한 기준은 branch base와 PR target입니다.
 
 ### Dependency 규칙
@@ -152,7 +152,7 @@ Notion의 `Parent Task`를 선행관계로 사용합니다.
 
 ### Handoff / Review Cycle
 
-Story 기반 작업은 Story worktree의 `tmp/story-handoff.md`를 유지합니다. 같은 내용을 Notion Story comment와 GitHub Story Issue comment에도 남겨 다음 에이전트가 같은 맥락으로 이어받을 수 있게 합니다.
+Story 기반 작업은 Story worktree의 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. 초기 handoff는 Notion Story comment와 GitHub Story Issue comment에 동일하게 남겨 확인 가능하게 만들고, 이후 실행 중 변경사항은 GitHub Story Issue에만 반영합니다. `/ult-story-run`은 로컬/GitHub handoff를 먼저 읽고 Notion은 handoff가 없을 때만 fallback으로 조회합니다.
 
 리뷰 사이클은 두 단계입니다.
 

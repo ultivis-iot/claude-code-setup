@@ -20,10 +20,10 @@
 - Task branch는 Story branch에서 만들고, Task PR은 Story branch를 target으로 한다. 최종 Story PR만 `dev`를 target으로 한다.
 - `Parent Task`는 hierarchy가 아니라 prerequisite/dependency다. dependency가 충족된 Task만 병렬 실행한다.
 - Task `Repository` relation이 repo ownership의 source of truth다. cross-repo reference는 bare issue number가 아니라 `repo#issue` 또는 Issue URL을 쓴다.
-- `tmp/story-handoff.md`를 유지하고 같은 상태를 Notion Story와 GitHub Story Issue에 남긴다.
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지한다. 초기 handoff는 Notion Story와 GitHub Story Issue에 동일하게 남기고, 이후 변경은 GitHub Story Issue에 반영한다.
 - review-cycle은 두 번 돈다. Task PR마다 Story branch merge 전에 한 번, Story PR에서 `dev` merge 전에 한 번 돈다.
 - Story/Task Notion page는 configured template을 사용하고, appended markdown은 raw markdown이 아니라 Notion block으로 렌더링한다.
-- 실행 전에는 `/ult-story-run`으로 Ready/Blocked Task를 확인하고 Ready Task별 subagent prompt를 생성한다.
+- 실행 전에는 `/ult-story-run`으로 Ready/Blocked Task를 확인하고 Ready Task별 subagent prompt를 생성한다. 이때 runner는 로컬/GitHub handoff를 먼저 읽고 Notion은 fallback으로만 쓴다.
 
 Branch flow:
 
@@ -41,19 +41,19 @@ Story branch -> PR to dev
 
 - Story 생성 시 Story GitHub Issue를 만들고 Notion Story `Issue URL`에 기록한다.
 - Story PR URL은 Notion Story `PR URL`에 기록한다.
-- branch ancestry는 git `branch.<name>.gh-merge-base`, Notion comment, handoff에 기록한다.
+- branch ancestry는 git `branch.<name>.gh-merge-base`, 초기 Notion comment, GitHub Story Issue handoff에 기록한다.
 - 브랜치 이름에 `story/`, `task/` prefix는 필수 아니다. Story/Task 여부는 Notion relation, GitHub issue 관계, PR target branch로 판단한다.
 
 ## Story Handoff
 
-Story 기반 작업은 `tmp/story-handoff.md`를 유지한다.
+Story 기반 작업은 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지한다.
 
 - Story title, Notion Story URL, GitHub Story Issue URL
 - Story branch, base branch, worktree
 - Task issue, branch, base branch, worktree, status
 - cross-repo dependency 또는 리뷰에서 나온 carryover
 
-동일한 handoff 내용을 Notion Story comment와 GitHub Story Issue comment에도 남긴다.
+초기 handoff는 Notion Story comment와 GitHub Story Issue comment에 동일하게 남긴다. 이후 실행 중 변경사항, PR URL, 리뷰 carryover, 상태 갱신은 GitHub Story Issue에만 반영한다. Notion은 생성 결과를 확인하거나 fallback으로 조회할 때만 사용한다.
 
 ## Parent Task Dependency
 
