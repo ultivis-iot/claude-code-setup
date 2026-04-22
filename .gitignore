@@ -1,5 +1,6 @@
 # 임시 파일
 tmp/
+notion-cache/
 
 # dev-tools 사용자 환경 설정
 dev-tools/.env

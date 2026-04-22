@@ -243,6 +243,14 @@ dw ub-234                          # 프로젝트별 .isaac/dw.sh 실행
 - `dev-tools/hooks/<repo>.sh` — 개인용 dw hook
 - `notion-cache/` — Members/Projects/Repositories/Schemas/Templates 캐시
 
+### Codex 전역 (`~/.codex/`)
+- `skills/ultivis-flow/` — Codex workflow skill
+- `scripts/*.sh` — workflow 실행 스크립트
+- `dev-tools/.env` — `WORKTREE_ROOT`, 선택적 `NOTION_TOKEN`
+- `notion-cache/` — Members/Projects/Repositories/Schemas/Templates 캐시
+
+설치 시 Notion token을 찾을 수 있으면 cache를 한 번 준비합니다. token이 없거나 접근 권한이 부족하면 설치는 실패하지 않고, 첫 Notion 관련 명령 실행 시 다시 생성합니다.
+
 ### 프로젝트별 (`<repo>/`)
 - `.isaac/dw.sh` — 팀 공유 dw hook (커밋 권장)
 - `.isaac/dw.local.sh` — 개인 오버라이드 (gitignore)

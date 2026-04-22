@@ -19,7 +19,7 @@ Plan을 작업 단위로 발행할 때는 다음 관계를 기준으로 움직�
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 생성
 - 여러 Task로 나뉘는 Story는 메인 에이전트가 Story worktree를 소유하고, 각 서브에이전트가 Task worktree를 소유
 - Task branch는 Story branch에서 만들고, Task PR은 Story branch로 보낸 뒤 최종 Story PR만 `dev`로 보냄
-- Story 자체도 GitHub Issue/PR URL을 Notion Story에 기록하고, Story handoff를 Notion Story와 GitHub Story Issue에 함께 남김
+- Story 자체도 GitHub Issue/PR URL을 Notion Story에 기록하고, 초기 Story handoff는 Notion Story와 GitHub Story Issue에 함께 남긴 뒤 이후 변경은 GitHub Story Issue에 반영
 
 즉 큰 Plan은 `ult-story-create`로 `Story + Task N개 + Issue N개`로 발행하고, 기존 Story에 작업 하나를 붙일 때는 `ult-task-create`로 `Task 1개 + Issue 1개`를 만듭니다.
 
@@ -139,6 +139,7 @@ git pull
 │   └── copy-plan-on-accept.sh  # Plan 승인 시 자동 복사
 ├── plugins/
 │   └── security-guidance/      # 실시간 보안 검사 Plugin
+├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
 └── dev-tools/
     ├── dev-commands.sh         # 개발 환경 셸 명령어
     ├── .env.example            # 환경 설정 템플릿
@@ -164,6 +165,9 @@ Codex 설치 시:
     ├── dev-commands.sh
     ├── .env.example
     └── .env
+
+~/.codex/notion-cache/
+└── ...                         # Notion token 사용 가능 시 설치 중 자동 준비
 
 ~/plugins/
 └── ult/
@@ -198,6 +202,8 @@ Codex 설치 시:
 - "PR 23 review cycle 돌려줘"
 
 Codex에서는 로컬 문서/예제 기준으로 루트 slash command 등록 경로를 확인하지 못해, `~/plugins/ult`와 `~/.agents/plugins/marketplace.json`를 통해 `/ult:...` 형식의 짧은 slash command를 등록합니다. `ultivis-flow` skill은 같은 워크플로우를 자연어 요청에도 적용하고, `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
+
+설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다.
 
 ### 1. Plan 모드 진입
 

@@ -44,6 +44,7 @@ check_script "$WORKFLOW_ROOT/scripts/ult-task-note.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-task-status.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-wt-add.sh"
 check_script "$WORKFLOW_ROOT/scripts/check-validation-status.sh"
+check_script "$WORKFLOW_ROOT/scripts/ult-cache-refresh.sh"
 
 if [ "$MODE" = "repo" ]; then
     "$WORKFLOW_ROOT/scripts/check-validation-status.sh" "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"

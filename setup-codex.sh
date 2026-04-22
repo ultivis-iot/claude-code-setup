@@ -175,6 +175,16 @@ else
     echo -e "${GREEN}   ✓ ~/.bashrc 생성 및 Codex dev-tools source 추가${NC}"
 fi
 
+echo "7. Notion cache 준비..."
+CACHE_REFRESH_OUTPUT=$("$SCRIPTS_DEST/ult-cache-refresh.sh" --quiet 2>&1 || true)
+if printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^DONE:'; then
+    echo -e "${GREEN}   ✓ ~/.codex/notion-cache 준비 완료${NC}"
+elif printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^SKIP:'; then
+    echo -e "${YELLOW}   건너뜀. Notion token 설정 후 첫 Notion 명령 실행 시 cache가 생성됩니다.${NC}"
+else
+    echo -e "${YELLOW}   ⚠ Notion cache 준비 실패. 첫 Notion 명령 실행 시 다시 시도됩니다.${NC}"
+fi
+
 echo ""
 echo "==================================="
 echo -e "${GREEN}설치 완료!${NC}"
@@ -190,6 +200,7 @@ echo "  ~/.agents/plugins/marketplace.json"
 echo "  ~/.codex/scripts/*.sh"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
 echo "  ~/.codex/dev-tools/.env"
+echo "  ~/.codex/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
 echo ""
 echo "사용 방법:"
 echo "  1. 새 Codex 세션 시작"

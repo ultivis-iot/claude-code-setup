@@ -164,6 +164,16 @@ echo ""
 echo "▸ Task 생성 중..."
 
 TASK_COUNT=$(echo "$SPEC" | jq '.tasks | length')
+SPEC=$(echo "$SPEC" | jq -c --arg repo "$GITHUB_REPO" '.tasks |= map(. + {github_repo: (.github_repo // $repo)})')
+for i in $(seq 0 $((TASK_COUNT - 1))); do
+    repo_id=$(echo "$SPEC" | jq -r ".tasks[$i].repository_id // empty")
+    if [ -n "$repo_id" ]; then
+        repo_slug=$(repository_github_slug_by_id "$repo_id" 2>/dev/null || true)
+        if [ -n "$repo_slug" ]; then
+            SPEC=$(echo "$SPEC" | jq -c --argjson idx "$i" --arg repo "$repo_slug" '.tasks[$idx].github_repo = $repo')
+        fi
+    fi
+done
 
 # 한 Task 처리 (Issue → Task) — 백그라운드 실행
 process_task() {
@@ -180,7 +190,8 @@ process_task() {
     repo_id=$(echo "$task" | jq -r '.repository_id // empty')
     week_id=$(echo "$task" | jq -r '.week_id // empty')
     parent_task_ids=$(echo "$task" | jq -c '[.parent_task_ids[]? | select(. != null and . != "")]')
-    task_repo="$GITHUB_REPO"
+    task_repo=$(echo "$task" | jq -r '.github_repo // empty')
+    [ -n "$task_repo" ] || task_repo="$GITHUB_REPO"
 
     # Github Issue 생성
     local issue_url issue_num issue_body

@@ -348,6 +348,16 @@ else
     echo -e "${YELLOW}   notion-api 미등록 (업데이트 모드에서는 자동 등록 안 함)${NC}"
 fi
 
+echo "11. Notion cache 준비..."
+CACHE_REFRESH_OUTPUT=$("$CLAUDE_DIR/scripts/ult-cache-refresh.sh" --quiet 2>&1 || true)
+if printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^DONE:'; then
+    echo -e "${GREEN}   ✓ ~/.claude/notion-cache 준비 완료${NC}"
+elif printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^SKIP:'; then
+    echo -e "${YELLOW}   건너뜀. Notion token 설정 후 첫 Notion 명령 실행 시 cache가 생성됩니다.${NC}"
+else
+    echo -e "${YELLOW}   ⚠ Notion cache 준비 실패. 첫 Notion 명령 실행 시 다시 시도됩니다.${NC}"
+fi
+
 # 설치된 버전 기록
 echo "$CURRENT_VERSION" > "$INSTALLED_VERSION_FILE"
 
@@ -386,6 +396,7 @@ echo "  ~/.claude/settings.json (hooks 설정 포함)"
 echo "  ~/.claude/scripts/*.sh (workflow 실행 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
 echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
+echo "  ~/.claude/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
 echo "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"
 echo ""
 echo "사용 방법:"
