@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Story 기반 agent/worktree flow, cross-repo Story, `Parent Task` dependency 규칙을 workflow 문서와 Codex skill/plugin reference에 반영.
+- Plan 작성/발행 전에 blocking question을 먼저 묻고, 사용자가 스스로 판단할 수 있도록 decision tradeoff를 제시하는 규칙을 추가.
 - Story DB에 `Issue URL`/`PR URL` 프로퍼티를 추가하고, Story 생성 시 GitHub Story Issue와 Story branch/worktree, `tmp/story-handoff.md`를 함께 생성하도록 확장.
 - `ult-story-run.sh` / `/ult-story-run`을 추가해 Story의 Ready/Blocked Task를 분석하고 subagent 실행 프롬프트를 생성하도록 지원.
 - Story 생성 시 `tmp/story-handoff.json`을 함께 만들고, `ult-story-run.sh`이 로컬/GitHub Story Issue handoff를 먼저 사용한 뒤 Notion은 fallback으로만 조회하도록 개선.

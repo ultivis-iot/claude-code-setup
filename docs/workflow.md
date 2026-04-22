@@ -68,6 +68,13 @@ ult-init check      # 필수 요소 검증
 
 Plan 모드(`Shift+Tab×2`)에서 작성 → 승인하면 hook이 `tmp/current-plan.md`를 저장하고, 그 다음 단계는 AI가 먼저 제안합니다.
 
+Plan이 크거나 애매하면 승인/발행 전에 AI가 먼저 질문합니다.
+
+- 질문은 blocking point 위주로 한 번에 1~3개만 묻습니다.
+- 질문은 사용자가 스스로 판단할 수 있도록 결정 기준과 tradeoff를 함께 제시합니다.
+- 목표/성공 기준, 포함/제외 범위, 대상 repo/Project/Story, dependency, 검증 기준이 불명확하면 Story/Task/Issue를 만들지 않습니다.
+- 사용자의 답변은 Plan의 결정사항에 남기고, 진행 가능한 미확정 사항만 가정으로 명시합니다.
+
 | Plan 성격 | 기본 제안 |
 |---|---|
 | 새 Story로 관리할 작업 | `ult-story-create` 흐름 제안 |

@@ -13,6 +13,10 @@ Apply this sequence by default:
 Key expectations:
 
 - The plan must include the user's intent, expected outcome, and meaningful constraints.
+- Before writing or publishing a plan, ask blocking clarification questions when scope, success criteria, target repo/project/story, dependencies, or verification expectations are unclear.
+- Ask questions that help the user think and decide. Present the decision point and tradeoff briefly instead of filling gaps with hidden assumptions.
+- Ask only the next 1-3 important questions at a time. Record answers as plan decisions, and record non-blocking assumptions explicitly.
+- Do not create Story/Task/Issue records until the plan is approved and the Story/Task breakdown has been confirmed.
 - Preserve the approved plan in `tmp/current-plan.md` when the project already uses that artifact.
 - Validation is a gate, not a summary. If intent validation fails, stop and fix the implementation before moving on.
 - Quality validation should cover docs, security, code simplicity, tests, and CLI sync when relevant.

@@ -23,20 +23,28 @@
 
 1. `tmp/current-plan.md`를 우선 읽고, 없으면 인자 경로를 사용한다
    - 둘 다 없으면 중단한다
-2. 현재 사용자, Repository, Project 후보, 현재 Week를 조회한다
-3. Plan을 읽고 아래를 결정한다
+2. Plan에 아래 항목이 불명확하면 발행 전에 사용자에게 먼저 질문한다
+   - 목표/성공 기준
+   - 포함/제외 범위
+   - 대상 repo/Project/Story
+   - 선행 Task/dependency
+   - 검증/리뷰 기준
+3. 질문은 사용자가 스스로 판단할 수 있도록 선택 기준과 tradeoff를 짧게 제시하고, 한 번에 1~3개만 묻는다
+4. 사용자의 답변은 Plan의 결정사항으로 반영하고, 위험하지 않은 미확정 사항만 가정으로 남긴다
+5. 현재 사용자, Repository, Project 후보, 현재 Week를 조회한다
+6. Plan을 읽고 아래를 결정한다
    - Story title
    - Story tag
    - Story priority
    - Task N개 분해
-4. 사용자에게 Project와 최종 발행 미리보기를 확인받는다
-5. 아래 JSON spec을 생성한다
+7. 사용자에게 Project와 최종 발행 미리보기를 확인받는다
+8. 아래 JSON spec을 생성한다
    - `github_repo`
    - `story`
    - `tasks`
    - 실행 전 최소 확정값은 Project, Story title, priority, Task 목록이다
-6. `--dry-run`이 아니면 확정된 spec을 `scripts/ult-story-create-exec.sh`에 전달한다
-7. Story URL, 생성된 Task/Issue 목록, worktree 결과를 요약해 출력한다
+9. `--dry-run`이 아니면 확정된 spec을 `scripts/ult-story-create-exec.sh`에 전달한다
+10. Story URL, 생성된 Task/Issue 목록, worktree 결과를 요약해 출력한다
 
 ## 출력 규칙
 
@@ -65,12 +73,14 @@
 
 ## 사용자 확인 항목
 
+- Plan 질문 답변이 결정사항으로 반영됐는지
 - Project 선택
 - Story title
 - Story priority
 - Task 분해 결과
 
 Project 확인은 필수다. Story는 Project 산하 작업 단위이므로, repository에 연결된 Project 후보 밖의 Story를 재사용하거나 비슷한 이름의 전역 Story를 임의로 고르지 않는다.
+Story/Task/Issue 생성은 Plan 승인과 발행 미리보기 확인 이후에만 수행한다.
 
 ## 옵션
 
