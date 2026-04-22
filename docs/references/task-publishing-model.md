@@ -23,6 +23,7 @@
 - `tmp/story-handoff.md`를 유지하고 같은 상태를 Notion Story와 GitHub Story Issue에 남긴다.
 - review-cycle은 두 번 돈다. Task PR마다 Story branch merge 전에 한 번, Story PR에서 `dev` merge 전에 한 번 돈다.
 - Story/Task Notion page는 configured template을 사용하고, appended markdown은 raw markdown이 아니라 Notion block으로 렌더링한다.
+- 실행 전에는 `/ult-story-run`으로 Ready/Blocked Task를 확인하고 Ready Task별 subagent prompt를 생성한다.
 
 Branch flow:
 
@@ -98,6 +99,7 @@ Story 기반 작업은 Task PR과 Story PR 모두에서 review-cycle을 돌린�
 명령 선택 기준:
 
 - 새 Story가 필요하면 `/ult-story-create`
+- 기존 Story의 Ready Task를 실행 준비하면 `/ult-story-run`
 - 기존 Story에 Task 1개를 추가하면 `/ult-task-create`
 - 현재 Task에 메모만 남기면 `/ult-task-note`
 

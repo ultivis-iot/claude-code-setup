@@ -53,6 +53,7 @@ Use this model for multi-task Story work. These rules are the operating checklis
 - Maintain `tmp/story-handoff.md` and publish the same state to the Notion Story and GitHub Story Issue.
 - Run review-cycle twice: once for each Task PR before merging to Story branch, and again for the Story PR before merging to `dev`.
 - Story/Task Notion pages must use configured templates; appended markdown must render as Notion blocks, not raw markdown.
+- Before assigning Task work, run `scripts/ult-story-run.sh` to classify Ready/Blocked Tasks and generate subagent prompts.
 
 Branch flow:
 
@@ -84,6 +85,8 @@ The handoff should include:
 - Story branch, base branch, and worktree.
 - Task issue, branch, base branch, worktree, status, and owner.
 - Cross-repo dependencies and review carryover.
+
+Use `scripts/ult-story-run.sh` to generate a current run summary and Ready Task prompts. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
 
 ## Task Dependency Rules
 

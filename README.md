@@ -191,6 +191,7 @@ Codex 설치 시:
 - `/ult:create-pr`
 - `/ult:review-cycle 23`
 - `/ult:ult-my-tasks`
+- `/ult:ult-story-run`
 - "이 작업 plan 먼저 잡고 intent 명시해줘"
 - "commit and verify 해줘"
 - "validation 통과했으면 PR 만들어줘"
@@ -231,6 +232,7 @@ Plan에 따라 코드를 구현합니다.
 
 - `/ult-my-tasks` - 내 Task 조회 후 선택, 필요 시 브랜치/worktree 연결
 - `/ult-story-create` - Plan을 새 Story와 Task들로 발행
+- `/ult-story-run` - Story의 Task dependency를 분석하고 Ready Task 실행 프롬프트 생성
 - `/ult-task-create` - 기존 Story에 Task 1개와 Issue 1개 추가
 - `/ult-task-note` - 현재 Task에 메모 추가
 - `/ult-task-status` - 현재 Task 상태 수동 변경

@@ -171,6 +171,7 @@ Task PR의 리뷰 코멘트가 Story 전체 설계나 다른 Task 범위에 해�
 |---|---|---|
 | `/ult-my-tasks` | 본인 Task 조회 + worktree 자동 생성 | ~2s |
 | `/ult-story-create` | Plan → Story + Task N + Issue N + worktree N | LLM + 3s |
+| `/ult-story-run` | Story Task dependency 분석 + Ready Task subagent prompt 생성 | ~2s |
 | `/ult-task-create` | 기존 Story에 Task 1개 추가 | ~2s |
 | `/ult-task-note` | 현재 Task에 메모 코멘트 | ~1s |
 | `/ult-task-status` | 비정형 상태 변경 (취소/재개) | ~1.5s |

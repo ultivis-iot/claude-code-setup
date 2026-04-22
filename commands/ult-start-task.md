@@ -26,7 +26,10 @@ argument-hint: [story-or-task-context]
 3. 기존 Story에 Task 하나만 추가하는 상황이면:
    - `/ult-task-create`의 절차를 따른다.
 
-4. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
+4. 기존 Story의 Ready Task를 실행하거나 병렬 서브에이전트 작업을 준비하는 상황이면:
+   - `/ult-story-run`의 절차를 따른다.
+
+5. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
    - `/ult-task-note`의 절차를 따른다.
 
 ## 출력
