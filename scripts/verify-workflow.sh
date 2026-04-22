@@ -5,9 +5,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKFLOW_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-MODE="installed"
+MODE="installed-unknown"
 if [ -f "$WORKFLOW_ROOT/setup.sh" ] && [ -d "$WORKFLOW_ROOT/codex" ]; then
     MODE="repo"
+elif [ "$(basename "$WORKFLOW_ROOT")" = ".codex" ]; then
+    MODE="installed-codex"
+elif [ "$(basename "$WORKFLOW_ROOT")" = ".claude" ]; then
+    MODE="installed-claude"
 fi
 
 check_file() {
@@ -27,10 +31,19 @@ if [ "$MODE" = "repo" ]; then
     check_file "$WORKFLOW_ROOT/setup.ps1"
     check_file "$WORKFLOW_ROOT/codex/skills/ultivis-flow/SKILL.md"
     check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/ultivis-flow/SKILL.md"
-else
+elif [ "$MODE" = "installed-codex" ]; then
     check_file "$WORKFLOW_ROOT/skills/ultivis-flow/SKILL.md"
     check_file "$HOME/plugins/ult/.codex-plugin/plugin.json"
     check_file "$HOME/plugins/ult/skills/ultivis-flow/SKILL.md"
+elif [ "$MODE" = "installed-claude" ]; then
+    check_file "$WORKFLOW_ROOT/CLAUDE.md"
+    check_file "$WORKFLOW_ROOT/commands/commit-and-verify.md"
+    check_file "$WORKFLOW_ROOT/commands/ult-story-run.md"
+    check_file "$WORKFLOW_ROOT/agents/intent-validator.md"
+    check_file "$WORKFLOW_ROOT/schemas/validation-status.schema.json"
+else
+    echo "ERROR: unknown workflow install mode: $WORKFLOW_ROOT" >&2
+    exit 1
 fi
 
 check_script "$WORKFLOW_ROOT/scripts/issue.sh"
