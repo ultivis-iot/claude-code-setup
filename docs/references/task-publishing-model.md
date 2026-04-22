@@ -77,6 +77,14 @@ Story 기반 작업은 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유
 - GitHub issue 번호는 repository별 namespace이므로 cross-repo 문서에서는 bare `#123`를 쓰지 않는다.
 - cross-repo 식별은 `repo#issue` 또는 Issue URL을 사용한다.
 
+## Task Creation Guard
+
+Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만들지 않는다.
+
+- `ult-task-create`는 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행한다.
+- 현재 Task 범위를 벗어난 후속 작업은 새 하위 Task로 만들지 않고 Story handoff와 GitHub Story Issue에 carryover로 기록한다.
+- 리뷰에서 발견한 Story-wide 또는 다른 Task 범위의 이슈도 동일하게 carryover로 남긴다.
+
 ## Notion Template and Markdown Rule
 
 Story/Task page는 빈 page로 만들지 않는다.

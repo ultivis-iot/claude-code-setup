@@ -443,6 +443,8 @@ Rules:
 - Use only the assigned Task worktree.
 - Preserve Story context and Task scope.
 - Do not edit another Task owner's worktree.
+- Do not create additional Notion Tasks, GitHub Issues, branches, or worktrees unless the user explicitly approves that new Task creation.
+- If you find out-of-scope follow-up work, record it as carryover in the Story handoff/GitHub Story Issue instead of creating a subtask.
 - Verify locally using the repository's existing commands.
 - Commit and push the Task branch.
 - Create the Task PR targeting the Story branch: ${story_branch:-"(story branch required)"}.
@@ -707,6 +709,8 @@ Rules:
 - Use only the assigned Task worktree.
 - Preserve Story context and Task scope.
 - Do not edit another Task owner's worktree.
+- Do not create additional Notion Tasks, GitHub Issues, branches, or worktrees unless the user explicitly approves that new Task creation.
+- If you find out-of-scope follow-up work, record it as carryover in the Story handoff/GitHub Story Issue instead of creating a subtask.
 - Verify locally using the repository's existing commands.
 - Commit and push the Task branch.
 - Create the Task PR targeting the Story branch: ${story_branch:-"(story branch required)"}.

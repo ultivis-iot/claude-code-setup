@@ -54,6 +54,7 @@ Use this model for multi-task Story work. These rules are the operating checklis
 - Run review-cycle twice: once for each Task PR before merging to Story branch, and again for the Story PR before merging to `dev`.
 - Story/Task Notion pages must use configured templates; appended markdown must render as Notion blocks, not raw markdown.
 - Before assigning Task work, run `scripts/ult-story-run.sh` to classify Ready/Blocked Tasks and generate subagent prompts.
+- During Task execution, do not create additional Notion Tasks, GitHub Issues, branches, or worktrees unless the user explicitly approves that new Task creation. Record out-of-scope follow-up work as Story carryover instead.
 
 Branch flow:
 

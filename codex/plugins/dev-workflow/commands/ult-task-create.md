@@ -2,6 +2,8 @@
 
 기존 Story에 Task 1개, GitHub Issue 1개, Issue URL 연결, 브랜치/worktree 생성을 한 번에 처리합니다.
 
+이 명령은 새 Task/Issue/branch/worktree를 만드는 발행 명령입니다. 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행하고, 현재 Task 수행 중 발견한 후속 작업은 임의로 생성하지 말고 Story handoff와 GitHub Story Issue에 carryover로 기록합니다.
+
 ## 실행
 
 ```bash

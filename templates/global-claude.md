@@ -22,6 +22,13 @@ Plan이 크거나 애매하면 바로 Story/Task를 만들지 말고, 먼저 사
 - 답이 없지만 진행 가능한 내용은 `가정`에 적고, 위험한 가정이면 진행하지 않는다.
 - Story/Task/Issue 생성은 Plan 승인 이후에만 한다.
 
+### Task 생성 제한
+작업 수행 중 새 Notion Task, GitHub Issue, 하위 Task를 임의로 만들지 않는다.
+
+- `ult-task-create`는 사용자가 명시적으로 “Task를 추가/생성하라”고 승인한 경우에만 실행한다.
+- 현재 Task 범위를 벗어난 후속 작업은 새 Task를 만들지 말고 Story handoff와 GitHub Story Issue에 carryover로 기록한다.
+- 리뷰나 구현 중 발견한 추가 범위도 동일하다. 사용자가 승인하기 전까지 Task/Issue/branch/worktree를 새로 만들지 않는다.
+
 ### Plan 저장 시점
 1. Plan 모드 진입 시 프로젝트 루트에 tmp 디렉토리가 없으면 생성
 2. **사용자 승인 완료 후, Build 시작 전에** `tmp/current-plan.md`로 복사

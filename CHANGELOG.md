@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Notion Story/Task 생성 시 template block 복사 대신 Notion template API를 사용하고, markdown body를 `설명` block 뒤에 삽입하도록 수정.
+- Task 실행 중 사용자 승인 없이 후속 Task/Issue/branch/worktree를 생성하지 않고 carryover로 기록하도록 Story runner prompt와 workflow 문서를 강화.
 - Story 기반 agent/worktree flow, cross-repo Story, `Parent Task` dependency 규칙을 workflow 문서와 Codex skill/plugin reference에 반영.
 - Plan 작성/발행 전에 blocking question을 먼저 묻고, 사용자가 스스로 판단할 수 있도록 decision tradeoff를 제시하는 규칙을 추가.
 - Story DB에 `Issue URL`/`PR URL` 프로퍼티를 추가하고, Story 생성 시 GitHub Story Issue와 Story branch/worktree, `tmp/story-handoff.md`를 함께 생성하도록 확장.

@@ -147,6 +147,14 @@ Notion의 `Parent Task`를 선행관계로 사용합니다.
 - 병렬 실행은 dependency가 없는 Task 또는 dependency가 충족된 Task만 대상으로 합니다.
 - 같은 파일을 수정할 가능성이 있으면 병렬화하지 않습니다.
 
+### Task 생성 제한
+
+Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만들지 않습니다.
+
+- `ult-task-create`는 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행합니다.
+- 현재 Task 범위를 벗어난 후속 작업은 새 하위 Task로 만들지 않고 Story handoff와 GitHub Story Issue에 carryover로 기록합니다.
+- 리뷰에서 나온 Story-wide 또는 다른 Task 범위의 이슈도 현재 Task에서 억지로 확장하거나 새 Task로 발행하지 않습니다.
+
 ### Cross-Repo Story
 
 하나의 Story가 여러 repository를 건드릴 수 있습니다.
