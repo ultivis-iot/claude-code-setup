@@ -24,6 +24,13 @@ Inspect the latest AI PR feedback, classify each finding, make the required chan
 6. Commit and push the follow-up changes.
 7. Continue checking for new feedback until the review stream is exhausted or the user stops the loop.
 
+## Story-based PRs
+
+- For Task PRs, the base branch is the Story branch. Continue review-cycle until AI review and CI are clear, then merge into the Story branch.
+- For Story PRs, the base branch is `dev`. Continue review-cycle until integrated behavior is clear.
+- If Task PR feedback is Story-wide or belongs to another Task, do not expand the Task PR. Record it in `tmp/story-handoff.md`, the Notion Story, and the GitHub Story Issue.
+- After each Task PR merge, update the Story handoff before starting dependent Tasks.
+
 ## Boundaries
 
 - Do not expand the PR scope for broad refactors unless the user asks.

@@ -72,6 +72,9 @@ _log() { $QUIET || echo "$@" >&2; }
 # 이미 존재하면 경로만 반환 (idempotent)
 if [ -d "$WT_PATH" ]; then
     _log "ℹ️  이미 존재: $WT_PATH"
+    if [ -n "$BASE_BRANCH" ]; then
+        git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$BASE_BRANCH" 2>/dev/null || true
+    fi
     echo "$WT_PATH"
     exit 0
 fi
@@ -92,6 +95,8 @@ else
     _log "📂 새 브랜치 $BRANCH 생성 ($BASE_BRANCH 기반) + worktree..."
     git -C "$MAIN_REPO" worktree add -b "$BRANCH" "$WT_PATH" "$BASE_BRANCH" >&2
 fi
+
+git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$BASE_BRANCH" 2>/dev/null || true
 
 _log "✓ Worktree: $WT_PATH"
 echo "$WT_PATH"

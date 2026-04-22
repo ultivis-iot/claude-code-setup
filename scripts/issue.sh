@@ -101,10 +101,44 @@ if [ -n "$task" ]; then
         '
     fi
 else
-    echo "---"
-    echo ""
-    echo "Notion Task를 찾지 못했습니다. Task의 Issue URL이 비어 있으면 다음으로 연결하세요:"
-    echo "  $SCRIPT_DIR/ult-task-link-issue.sh #$ISSUE_NUM --task <notion_task_url>"
+    story=""
+    if [ -n "$issue_url" ]; then
+        story=$(find_story_by_issue_url "$issue_url" 2>/dev/null || true)
+    fi
+
+    if [ -n "$story" ]; then
+        project_id=$(echo "$story" | jq -r '.properties["🛡️ Project "].relation[0].id // empty')
+        project=""
+        [ -n "$project_id" ] && project=$(notion_get_page "$project_id" 2>/dev/null || true)
+
+        echo "---"
+        echo ""
+        echo "### 📜 Notion Story"
+        echo ""
+        echo "$story" | jq -r '
+            "- **이름**: \(.properties.Title.title[0].plain_text // .properties.Name.title[0].plain_text // "(제목 없음)")",
+            "- **상태**: \(.properties.Status.status.name // "")",
+            "- **Tag**: \(.properties.Tag.select.name // "")",
+            "- **Priority**: \(.properties.Priority.select.name // "")",
+            "- **Issue URL**: \(.properties["Issue URL"].url // "")",
+            "- **PR URL**: \(.properties["PR URL"].url // "")",
+            "- **Work Progress**: \(.properties["Work Progress"].number // "")"
+        '
+
+        if [ -n "$project" ]; then
+            echo ""
+            echo "$project" | jq -r '
+                "#### 🛡️ Project: \(.properties.Title.title[0].plain_text // .properties.Name.title[0].plain_text // "(제목 없음)")",
+                "- **Status**: \(.properties.Status.status.name // "")",
+                "- **Work Progress**: \(.properties["Work Progress"].number // "")"
+            '
+        fi
+    else
+        echo "---"
+        echo ""
+        echo "Notion Task/Story를 찾지 못했습니다. Task의 Issue URL이 비어 있으면 다음으로 연결하세요:"
+        echo "  $SCRIPT_DIR/ult-task-link-issue.sh #$ISSUE_NUM --task <notion_task_url>"
+    fi
 fi
 
 comments=$(echo "$issue_json" | jq '.comments | length')

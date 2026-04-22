@@ -17,8 +17,13 @@ Plan을 작업 단위로 발행할 때는 다음 관계를 기준으로 움직�
 - `Story`는 여러 `Task`를 묶는 상위 단위
 - `Task 1개 = GitHub Issue 1개`
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 생성
+- 여러 Task로 나뉘는 Story는 메인 에이전트가 Story worktree를 소유하고, 각 서브에이전트가 Task worktree를 소유
+- Task branch는 Story branch에서 만들고, Task PR은 Story branch로 보낸 뒤 최종 Story PR만 `dev`로 보냄
+- Story 자체도 GitHub Issue/PR URL을 Notion Story에 기록하고, Story handoff를 Notion Story와 GitHub Story Issue에 함께 남김
 
 즉 큰 Plan은 `ult-story-create`로 `Story + Task N개 + Issue N개`로 발행하고, 기존 Story에 작업 하나를 붙일 때는 `ult-task-create`로 `Task 1개 + Issue 1개`를 만듭니다.
+
+Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니다. Story가 여러 repo를 건드릴 때도 Story에 direct Repository relation을 두기보다, 연결된 Task들의 Repository로 판단합니다. `Parent Task`는 선행관계/dependency로 사용하며, cross-repo 문서에서는 bare `#123` 대신 `repo#issue` 또는 Issue URL을 씁니다.
 
 ## 처음 시작
 

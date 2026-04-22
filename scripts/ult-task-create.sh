@@ -25,6 +25,7 @@ usage() {
   --description, -d  GitHub Issue body 및 Task 본문
   --planned-start    Planned Date 시작일
   --planned-end      Planned Date 종료일
+  --parent-task      선행 Task Notion page id/URL (반복 가능)
   --base             브랜치 생성 기준 브랜치 (기본: origin/dev가 있으면 dev, 없으면 origin HEAD)
   --here             Issue/Task만 만들고 브랜치/worktree 생성 안 함
   --no-checkout      worktree 없이 로컬 브랜치만 생성
@@ -39,6 +40,7 @@ DESCRIPTION=""
 PLANNED_START=""
 PLANNED_END=""
 BASE_BRANCH=""
+PARENT_TASK_IDS=()
 HERE=0
 NO_CHECKOUT=0
 
@@ -51,6 +53,14 @@ while [ $# -gt 0 ]; do
         --description|-d) DESCRIPTION="$2"; shift 2 ;;
         --planned-start) PLANNED_START="$2"; shift 2 ;;
         --planned-end) PLANNED_END="$2"; shift 2 ;;
+        --parent-task)
+            parent_id=$(normalize_notion_page_id "$2") || {
+                echo "Parent Task page id/URL을 해석할 수 없습니다: $2" >&2
+                exit 1
+            }
+            PARENT_TASK_IDS+=("$parent_id")
+            shift 2
+            ;;
         --base) BASE_BRANCH="$2"; shift 2 ;;
         --here) HERE=1; shift ;;
         --no-checkout) NO_CHECKOUT=1; shift ;;
@@ -249,6 +259,7 @@ if [ -z "$DESCRIPTION" ] && [ -t 0 ]; then
 fi
 
 WEEK_ID=$(current_week_id 2>/dev/null || true)
+PARENT_TASK_IDS_JSON=$(printf '%s\n' "${PARENT_TASK_IDS[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
 
 echo "▸ GitHub Issue 생성 중..."
 ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$TASK_NAME" --body "$DESCRIPTION") || {
@@ -269,6 +280,7 @@ props=$(jq -nc \
     --arg wid "$WEEK_ID" \
     --arg ps "$PLANNED_START" \
     --arg pe "$PLANNED_END" \
+    --argjson parents "$PARENT_TASK_IDS_JSON" \
     '{
         Name: {title: [{type: "text", text: {content: $name}}]},
         Topic: {select: {name: $topic}},
@@ -279,10 +291,16 @@ props=$(jq -nc \
     }
     + (if $rid != "" then {"🥨 Repository": {relation: [{id: $rid}]}} else {} end)
     + (if $wid != "" then {"❤️‍🔥 Week": {relation: [{id: $wid}]}} else {} end)
+    + (if ($parents | length) > 0 then {"Parent Task": {relation: ($parents | map({id: .}))}} else {} end)
     + (if $ps != "" then {"Planned Date": {date: ({start: $ps} + (if $pe != "" then {end: $pe} else {} end))}} else {} end)
     ')
 
 task_template_b=$(task_template_blocks)
+if ! echo "$task_template_b" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+    echo "ERROR: Task template blocks are empty" >&2
+    echo "빈 Task page 생성을 중단합니다. TASK_TEMPLATE_ID와 Notion template 접근 권한을 확인하세요." >&2
+    exit 1
+fi
 desc_blocks=$(md_to_blocks "$DESCRIPTION")
 task_blocks=$(jq -nc --argjson t "$task_template_b" --argjson d "$desc_blocks" '$t + $d')
 task_resp=$(notion_create_page "$TASK_DB" "$props" "$task_blocks")
@@ -297,6 +315,7 @@ fi
 branch_topic=$(topic_branch_component "$TOPIC")
 branch="${ISSUE_NUM}-${branch_topic}-$(make_slug "$TASK_NAME")"
 WT_PATH=""
+BASE_USED=""
 
 resolve_base_branch() {
     if [ -n "$BASE_BRANCH" ]; then
@@ -316,6 +335,7 @@ if [ "$HERE" -eq 1 ]; then
     echo "▸ --here: 브랜치/worktree 생성 생략"
 elif [ "$NO_CHECKOUT" -eq 1 ]; then
     base_branch=$(resolve_base_branch)
+    BASE_USED="$base_branch"
     base_ref="$base_branch"
     git show-ref --verify --quiet "refs/remotes/origin/$base_branch" 2>/dev/null && base_ref="origin/$base_branch"
     if git show-ref --verify --quiet "refs/heads/$branch"; then
@@ -324,9 +344,20 @@ elif [ "$NO_CHECKOUT" -eq 1 ]; then
         git branch "$branch" "$base_ref"
         echo "▸ 브랜치 생성: $branch"
     fi
+    git config "branch.$branch.gh-merge-base" "$base_branch" 2>/dev/null || true
 else
     echo "▸ Worktree 생성 중..."
-    WT_PATH=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --base "$(resolve_base_branch)")
+    BASE_USED=$(resolve_base_branch)
+    WT_PATH=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --base "$BASE_USED")
+fi
+
+if [ -n "$BASE_USED" ]; then
+    branch_note="Branch: $branch
+Base Branch: $BASE_USED"
+    [ -n "$WT_PATH" ] && branch_note="$branch_note
+Worktree: $WT_PATH"
+    notion_add_comment "$TASK_ID" "$branch_note" >/dev/null || true
+    gh issue comment "$ISSUE_NUM" --body "$branch_note" >/dev/null || true
 fi
 
 echo ""
@@ -336,6 +367,9 @@ echo "  Task: #${ISSUE_NUM} $TASK_NAME"
 echo "  Issue: $ISSUE_URL"
 echo "  Notion: $TASK_URL"
 echo "  Branch: $branch"
+if [ -n "$BASE_USED" ]; then
+    echo "  Base Branch: $BASE_USED"
+fi
 if [ -n "$WT_PATH" ]; then
     echo "  Worktree: $WT_PATH"
 fi

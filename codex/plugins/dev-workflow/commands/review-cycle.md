@@ -25,6 +25,8 @@ argument-hint: [PR번호]
 - `gh` 명령은 항상 순차적으로 단독 실행한다
 - 반영/미반영 판단을 먼저 코멘트로 남긴다
 - 범위를 넘는 리팩터는 이번 PR에서 하지 않는다
+- Story 기반 작업에서는 Task PR과 Story PR 모두 review-cycle을 수행한다
+- Task PR의 base는 Story branch이고, Story PR의 base는 `dev`다
 
 ## 수행 절차
 
@@ -46,6 +48,13 @@ argument-hint: [PR번호]
 8. 마지막 처리 리뷰 ID를 `tmp/last-review-id-{PR}.txt`에 기록한다
 9. 60초 대기 후 새 리뷰를 다시 확인한다
 10. 연속 5회 새 리뷰가 없으면 종료한다
+
+## Story Flow 규칙
+
+- Task PR은 AI 리뷰/CI가 clear될 때까지 반복한 뒤 Story branch로 merge한다.
+- Story PR은 모든 Task가 Story branch에 merge된 뒤 `dev` 대상으로 열고 다시 review-cycle을 반복한다.
+- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`, Notion Story, GitHub Story Issue에 carryover로 기록한다.
+- Task PR merge 후 dependent Task를 시작하기 전에 Story handoff를 갱신한다.
 
 ## 검증 명령 선택
 

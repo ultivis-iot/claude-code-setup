@@ -14,6 +14,8 @@
 - Story는 현재 repository의 Project에 연결된 후보만 허용
 - Task 내용으로 GitHub Issue 생성
 - Notion Task 생성과 동시에 `Issue URL` 반영
+- Task template을 사용하고 description markdown을 Notion block으로 변환
+- `--parent-task`가 있으면 `Parent Task` dependency 반영
 - `<issue_num>-<topic>-<slug>` 브랜치/worktree 생성
 
 ## Story 선택 원칙
@@ -30,6 +32,7 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 ```
 /ult:ult-task-create "다크모드 설정 추가" --name "설정 화면 토글 추가" --topic Feature
 /ult:ult-task-create --story https://www.notion.so/... --name "토큰 갱신 오류 수정" --topic Fix --description "..."
+/ult:ult-task-create --story https://www.notion.so/... --name "후속 검증" --parent-task https://www.notion.so/...
 /ult:ult-task-create --name "문구 정리" --here
 ```
 
@@ -42,5 +45,11 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 | `--topic` | `Feature`, `Fix`, `Update`, `Refactor`, `Style`, `Other` |
 | `--description` | GitHub Issue body 및 Task 본문 |
 | `--planned-start`, `--planned-end` | Planned Date |
+| `--parent-task` | 선행 Task Notion page id/URL. 반복 가능 |
+| `--base` | 브랜치 생성 기준 브랜치. Story flow에서는 Story branch 지정 |
 | `--here` | Issue/Task만 만들고 현재 브랜치 유지 |
 | `--no-checkout` | worktree 없이 로컬 브랜치만 생성 |
+
+## Story Flow 주의
+
+Story 기반 작업에서는 `Parent Task`를 선행관계로 사용한다. Task branch는 Story branch에서 만들고, Task PR은 Story branch를 target으로 한다. 같은 Story가 여러 repository를 건드리더라도 Task의 Repository relation이 repo ownership의 기준이다.

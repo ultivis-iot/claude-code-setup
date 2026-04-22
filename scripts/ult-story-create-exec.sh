@@ -12,7 +12,8 @@
 #     "priority": "High|Medium|Low",
 #     "project_id": "uuid",
 #     "assignee_notion_id": "uuid",
-#     "body_markdown": "..."
+#     "body_markdown": "...",
+#     "branch": "optional-story-branch"
 #   },
 #   "github_repo": "owner/name",
 #   "tasks": [
@@ -23,7 +24,8 @@
 #       "planned_start": "YYYY-MM-DD",
 #       "planned_end": "YYYY-MM-DD",
 #       "repository_id": "uuid",
-#       "week_id": "uuid"
+#       "week_id": "uuid",
+#       "parent_task_ids": ["uuid"]
 #     }
 #   ]
 # }
@@ -50,31 +52,30 @@ echo "$SPEC" | jq -e '.story.title and .github_repo and (.tasks | length > 0)' >
     || { echo "ERROR: spec 형식 오류 (story.title, github_repo, tasks 필수)" >&2; exit 1; }
 
 GITHUB_REPO=$(echo "$SPEC" | jq -r '.github_repo')
-
-# Markdown → Notion blocks (간단 변환: 줄 단위 paragraph)
-md_to_blocks() {
-    local md="$1"
-    echo "$md" | jq -R -s '
-        split("\n")
-        | map(select(length > 0))
-        | map({
-            object: "block",
-            type: "paragraph",
-            paragraph: {rich_text: [{type: "text", text: {content: .}}]}
-        })
-    '
-}
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "$WORKDIR"' EXIT
 
 # topic → 브랜치명 구성 요소
 topic_prefix() {
     case "$1" in
         Feature) echo "feature" ;;
+        Bug)     echo "fix" ;;
         Fix)     echo "fix" ;;
         Update)  echo "update" ;;
         Refactor) echo "refactor" ;;
         Style)   echo "style" ;;
         *)       echo "chore" ;;
     esac
+}
+
+resolve_story_base_branch() {
+    if git show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
+        echo "dev"
+        return 0
+    fi
+    local base
+    base=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    echo "${base:-main}"
 }
 
 # slug 생성
@@ -93,6 +94,7 @@ STORY_PRIORITY=$(echo "$SPEC" | jq -r '.story.priority')
 STORY_PROJECT=$(echo "$SPEC" | jq -r '.story.project_id')
 STORY_ASSIGNEE=$(echo "$SPEC" | jq -r '.story.assignee_notion_id')
 STORY_BODY=$(echo "$SPEC" | jq -r '.story.body_markdown // ""')
+STORY_BRANCH_OVERRIDE=$(echo "$SPEC" | jq -r '.story.branch // empty')
 
 story_props=$(jq -nc \
     --arg title "$STORY_TITLE" \
@@ -110,6 +112,11 @@ story_props=$(jq -nc \
 
 # 템플릿 + Plan 본문 조합
 TEMPLATE_BLOCKS=$(story_template_blocks "$STORY_TAG")
+if ! echo "$TEMPLATE_BLOCKS" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+    echo "ERROR: Story template blocks are empty for tag: $STORY_TAG" >&2
+    echo "빈 Story page 생성을 중단합니다. story_template_id 매핑과 Notion template 접근 권한을 확인하세요." >&2
+    exit 1
+fi
 PLAN_BLOCKS=$(md_to_blocks "$STORY_BODY")
 story_blocks=$(jq -nc --argjson t "$TEMPLATE_BLOCKS" --argjson p "$PLAN_BLOCKS" '$t + $p')
 
@@ -120,12 +127,41 @@ STORY_URL=$(echo "$story_resp" | jq -r .url)
 echo "  ✓ $STORY_TITLE"
 echo "    $STORY_URL"
 
+echo "▸ Story GitHub Issue 생성 중..."
+STORY_ISSUE_BODY="$WORKDIR/story-issue.md"
+{
+    echo "Notion Story: $STORY_URL"
+    echo ""
+    echo "$STORY_BODY"
+} > "$STORY_ISSUE_BODY"
+STORY_ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$STORY_TITLE" --body-file "$STORY_ISSUE_BODY") || {
+    echo "ERROR: Story GitHub Issue 생성 실패" >&2
+    exit 1
+}
+STORY_ISSUE_NUM=$(echo "$STORY_ISSUE_URL" | grep -oE '[0-9]+$')
+story_issue_props=$(jq -nc --arg u "$STORY_ISSUE_URL" '{"Issue URL": {url: $u}}')
+notion_patch_page "$STORY_ID" "$story_issue_props" >/dev/null || {
+    echo "ERROR: Story Issue URL 업데이트 실패" >&2
+    exit 1
+}
+echo "  ✓ #$STORY_ISSUE_NUM $STORY_ISSUE_URL"
+
+echo "▸ Story Worktree 생성 중..."
+if [ -n "$STORY_BRANCH_OVERRIDE" ]; then
+    STORY_BRANCH="$STORY_BRANCH_OVERRIDE"
+else
+    STORY_BRANCH="${STORY_ISSUE_NUM}-$(topic_prefix "$STORY_TAG")-$(make_slug "$STORY_TITLE")"
+fi
+STORY_BASE_BRANCH=$(resolve_story_base_branch)
+STORY_WT_PATH=$("$SCRIPT_DIR/ult-wt-add.sh" "$STORY_BRANCH" --base "$STORY_BASE_BRANCH" --quiet) || {
+    echo "ERROR: Story worktree 생성 실패" >&2
+    exit 1
+}
+echo "  ✓ $STORY_BRANCH → $STORY_WT_PATH"
+
 # ---- 2단계: Task별 Github Issue + Notion Task 생성 (병렬) ----
 echo ""
 echo "▸ Task 생성 중..."
-
-WORKDIR=$(mktemp -d)
-trap 'rm -rf "$WORKDIR"' EXIT
 
 TASK_COUNT=$(echo "$SPEC" | jq '.tasks | length')
 
@@ -134,7 +170,7 @@ process_task() {
     local idx="$1"
     local out="$WORKDIR/task-$idx.json"
 
-    local task name topic desc pstart pend repo_id week_id
+    local task name topic desc pstart pend repo_id week_id parent_task_ids
     task=$(echo "$SPEC" | jq -c ".tasks[$idx]")
     name=$(echo "$task" | jq -r .name)
     topic=$(echo "$task" | jq -r .topic)
@@ -143,10 +179,21 @@ process_task() {
     pend=$(echo "$task" | jq -r '.planned_end // empty')
     repo_id=$(echo "$task" | jq -r '.repository_id // empty')
     week_id=$(echo "$task" | jq -r '.week_id // empty')
+    parent_task_ids=$(echo "$task" | jq -c '[.parent_task_ids[]? | select(. != null and . != "")]')
 
     # Github Issue 생성
-    local issue_url issue_num
-    issue_url=$(gh issue create --repo "$GITHUB_REPO" --title "$name" --body "$desc" 2>/dev/null) || {
+    local issue_url issue_num issue_body
+    issue_body="$WORKDIR/task-$idx-issue.md"
+    {
+        echo "$desc"
+        echo ""
+        echo "---"
+        echo "Parent Story: $STORY_ISSUE_URL"
+        echo "Notion Story: $STORY_URL"
+        echo "Story Branch: $STORY_BRANCH"
+        echo "Task Base Branch: $STORY_BRANCH"
+    } > "$issue_body"
+    issue_url=$(gh issue create --repo "$GITHUB_REPO" --title "$name" --body-file "$issue_body" 2>/dev/null) || {
         echo '{"error": "gh issue create 실패"}' > "$out"; return
     }
     issue_num=$(echo "$issue_url" | grep -oE '[0-9]+$')
@@ -174,6 +221,7 @@ process_task() {
         --arg wid "$week_id" \
         --arg ps "$pstart" \
         --arg pe "$pend" \
+        --argjson parents "$parent_task_ids" \
         '{
             Name: {title: [{type: "text", text: {content: $name}}]},
             Topic: {select: {name: $topic}},
@@ -184,12 +232,17 @@ process_task() {
         }
         + (if $rid != "" then {"🥨 Repository": {relation: [{id: $rid}]}} else {} end)
         + (if $wid != "" then {"❤️‍🔥 Week": {relation: [{id: $wid}]}} else {} end)
+        + (if ($parents | length) > 0 then {"Parent Task": {relation: ($parents | map({id: .}))}} else {} end)
         + (if $ps != "" then {"Planned Date": {date: ({start: $ps} + (if $pe != "" then {end: $pe} else {} end))}} else {} end)
         ')
 
     # Task 본문: 템플릿 + 설명
     local task_template_b desc_blocks task_blocks
     task_template_b=$(task_template_blocks)
+    if ! echo "$task_template_b" | jq -e 'type == "array" and length > 0' >/dev/null 2>&1; then
+        echo '{"error": "Task template blocks are empty"}' > "$out"
+        return
+    fi
     desc_blocks=$(md_to_blocks "$desc")
     task_blocks=$(jq -nc --argjson t "$task_template_b" --argjson d "$desc_blocks" '$t + $d')
 
@@ -197,6 +250,11 @@ process_task() {
     resp=$(notion_create_page "$TASK_DB" "$props" "$task_blocks")
     local task_id
     task_id=$(echo "$resp" | jq -r .id)
+    if ! echo "$resp" | jq -e .id >/dev/null 2>&1; then
+        jq -nc --arg error "Notion Task 생성 실패" --arg response "$resp" \
+            '{error: $error, response: $response}' > "$out"
+        return
+    fi
 
     jq -nc --arg id "$task_id" --arg url "$issue_url" --arg num "$issue_num" \
            --arg name "$name" --arg topic "$topic" \
@@ -205,7 +263,7 @@ process_task() {
 
 # 병렬 실행
 export -f process_task notion_create_page notion_api _notion_token md_to_blocks task_template_blocks template_blocks_cached _cache_fresh
-export SPEC STORY_ID STORY_PROJECT STORY_ASSIGNEE GITHUB_REPO TASK_DB WORKDIR CACHE_DIR TASK_TEMPLATE_ID
+export SPEC STORY_ID STORY_URL STORY_ISSUE_URL STORY_BRANCH STORY_PROJECT STORY_ASSIGNEE GITHUB_REPO TASK_DB WORKDIR CACHE_DIR TASK_TEMPLATE_ID
 
 for i in $(seq 0 $((TASK_COUNT - 1))); do
     process_task "$i" &
@@ -231,30 +289,63 @@ echo "▸ Worktree 생성 중..."
 
 FIRST_WT_PATH=""
 FIRST_ISSUE=""
+mkdir -p tmp
+HANDOFF_PATH="tmp/story-handoff.md"
+{
+    echo "# Story Handoff"
+    echo ""
+    echo "Story: $STORY_TITLE"
+    echo "Notion Story: $STORY_URL"
+    echo "GitHub Story Issue: $STORY_ISSUE_URL"
+    echo "Story Branch: $STORY_BRANCH"
+    echo "Story Base Branch: $STORY_BASE_BRANCH"
+    echo "Story Worktree: $STORY_WT_PATH"
+    echo ""
+    echo "## Task Map"
+    echo ""
+    echo "| Task | Issue | Branch | Base Branch | Worktree | Status |"
+    echo "| --- | --- | --- | --- | --- | --- |"
+} > "$HANDOFF_PATH"
+
 while IFS= read -r task; do
     name=$(echo "$task" | jq -r .name)
     topic=$(echo "$task" | jq -r .topic)
     issue_num=$(echo "$task" | jq -r .issue_num)
+    issue_url=$(echo "$task" | jq -r .issue_url)
+    task_id=$(echo "$task" | jq -r .task_id)
     prefix=$(topic_prefix "$topic")
     slug=$(make_slug "$name")
     branch="${issue_num}-${prefix}-${slug}"
 
-    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --quiet 2>/dev/null) || {
+    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --base "$STORY_BRANCH" --quiet 2>/dev/null) || {
         echo "  ⚠ #$issue_num worktree 생성 실패"
+        echo "| $name | $issue_url | $branch | $STORY_BRANCH | (failed) | Worktree Failed |" >> "$HANDOFF_PATH"
         continue
     }
+    notion_add_comment "$task_id" "Branch: $branch
+Base Branch: $STORY_BRANCH
+Worktree: $wt_path
+Parent Story: $STORY_ISSUE_URL" >/dev/null || true
     if [ -z "$FIRST_WT_PATH" ]; then
         FIRST_WT_PATH="$wt_path"
         FIRST_ISSUE="$issue_num"
     fi
+    echo "| $name | $issue_url | $branch | $STORY_BRANCH | $wt_path | Ready |" >> "$HANDOFF_PATH"
     echo "  ✓ #$issue_num → $wt_path"
 done < <(echo "$RESULTS" | jq -c '.[]')
+
+notion_add_comment "$STORY_ID" "$(cat "$HANDOFF_PATH")" >/dev/null || true
+gh issue comment "$STORY_ISSUE_NUM" --repo "$GITHUB_REPO" --body-file "$HANDOFF_PATH" >/dev/null || true
 
 # ---- 4단계: 완료 안내 ----
 echo ""
 echo "✅ 발행 완료"
 echo "  Story: $STORY_URL"
+echo "  Story Issue: $STORY_ISSUE_URL"
+echo "  Story Branch: $STORY_BRANCH"
+echo "  Story Worktree: $STORY_WT_PATH"
 echo "  Task ${TASK_COUNT}개, Issue ${TASK_COUNT}개, Worktree ${TASK_COUNT}개"
+echo "  Handoff: $HANDOFF_PATH"
 echo ""
 echo "  첫 Task로 이동:"
 if [ -n "$FIRST_WT_PATH" ]; then

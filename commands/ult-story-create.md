@@ -43,6 +43,24 @@
 - `Task 1개 = Issue 1개`
 - 각 Task는 topic, description, planned date를 가진다
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 만든다
+- Story/Task page는 configured Notion template을 사용한다
+- description/body markdown은 heading/list/todo Notion block으로 변환되어야 한다
+- Task dependency가 있으면 `Parent Task` relation을 사용한다
+- Story GitHub Issue를 만들고 Story `Issue URL`에 기록한다
+- Story branch/worktree를 먼저 만들고 Task branch는 Story branch를 base로 만든다
+- `tmp/story-handoff.md`를 만들고 같은 내용을 Notion Story와 GitHub Story Issue에 남긴다
+
+## Agent Worktree 규칙
+
+여러 Task가 있는 Story는 Story 기반 agent worktree flow를 우선 적용한다.
+
+- 메인 에이전트는 Story context와 Story worktree를 담당한다.
+- 서브에이전트는 각 Task worktree를 담당한다.
+- Task branch는 Story branch에서 생성하는 것이 원칙이다.
+- Task PR은 Story branch를 target으로 한다.
+- Story PR만 최종적으로 `dev`를 target으로 한다.
+- cross-repo Story에서는 Task의 Repository relation이 repo ownership의 기준이다.
+- cross-repo issue 식별은 bare `#123` 대신 `repo#issue` 또는 Issue URL을 사용한다.
 
 ## 사용자 확인 항목
 

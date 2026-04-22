@@ -85,6 +85,84 @@ Plan 모드(`Shift+Tab×2`)에서 작성 → 승인하면 hook이 `tmp/current-p
 
 ---
 
+## Story 기반 Agent Worktree Flow
+
+여러 Task로 나뉘는 작업은 Story를 조율 단위로 사용합니다. Story는 목적과 통합 기준을 유지하고, Task는 실제 실행 단위로 분리합니다.
+
+핵심 규칙:
+
+- Story는 orchestration unit이고, Task는 execution unit입니다.
+- 메인 에이전트는 Notion Story, GitHub Story Issue, Story branch, Story worktree, dependency map, handoff, integration, final review를 담당합니다.
+- 각 서브에이전트는 정확히 하나의 Notion Task, GitHub Issue, Task branch, Task worktree, implementation, verification, Task PR을 담당합니다.
+- Task branch는 Story branch에서 만들고, Task PR은 Story branch를 target으로 합니다. 최종 Story PR만 `dev`를 target으로 합니다.
+- `Parent Task`는 hierarchy가 아니라 prerequisite/dependency입니다. dependency가 충족된 Task만 병렬 실행합니다.
+- Task `Repository` relation이 repo ownership의 source of truth입니다. cross-repo reference는 bare issue number가 아니라 `repo#issue` 또는 Issue URL을 씁니다.
+- `tmp/story-handoff.md`를 유지하고 같은 상태를 Notion Story와 GitHub Story Issue에 남깁니다.
+- review-cycle은 두 번 돕니다. Task PR마다 Story branch merge 전에 한 번, Story PR에서 `dev` merge 전에 한 번 돕니다.
+
+```text
+dev
+└── Story branch
+    ├── Task branch -> PR to Story branch
+    ├── Task branch -> PR to Story branch
+    └── Task branch -> PR to Story branch
+
+Story branch -> PR to dev
+```
+
+### 역할
+
+| 단위 | 담당 | 작업 공간 |
+|---|---|---|
+| Story | 메인 에이전트 | Story branch + Story worktree |
+| Task | 서브에이전트 | Task branch + Task worktree |
+
+메인 에이전트는 Story context, Task dependency, file ownership, review/merge 순서, 최종 통합 검증을 관리합니다. 서브에이전트는 자기 Task worktree만 수정하고, 완료 시 테스트 결과와 handoff를 남깁니다.
+
+### Branch / PR 규칙
+
+- Story 생성 시 Story GitHub Issue를 만들고 Notion Story의 `Issue URL`에 기록합니다.
+- Story branch는 `dev`에서 만듭니다.
+- Task branch는 같은 repository의 Story branch에서 만듭니다.
+- Task PR은 Story branch를 target으로 합니다.
+- 모든 Task가 Story branch에 merge되고 통합 검증이 끝난 뒤 Story PR을 `dev`로 보냅니다.
+- Story PR URL은 Notion Story의 `PR URL`에 기록합니다.
+- branch ancestry는 `branch.<name>.gh-merge-base`, Notion comment, Story handoff에 남깁니다.
+- 브랜치 이름에 `story/`, `task/` prefix는 필수 아닙니다. 중요한 기준은 branch base와 PR target입니다.
+
+### Dependency 규칙
+
+Notion의 `Parent Task`를 선행관계로 사용합니다.
+
+- `Parent Task`는 ownership hierarchy가 아니라 prerequisite/dependency입니다.
+- Parent Task가 없으면 시작 가능 상태입니다.
+- Parent Task가 있으면 모든 parent가 완료되거나 Story branch에 merge될 때까지 Blocked입니다.
+- 병렬 실행은 dependency가 없는 Task 또는 dependency가 충족된 Task만 대상으로 합니다.
+- 같은 파일을 수정할 가능성이 있으면 병렬화하지 않습니다.
+
+### Cross-Repo Story
+
+하나의 Story가 여러 repository를 건드릴 수 있습니다.
+
+- Story 자체에 direct Repository relation은 필요 없습니다.
+- Task의 `Repository` relation이 repository ownership의 source of truth입니다.
+- Story가 건드리는 repository는 연결된 Task들의 Repository로 판단합니다.
+- cross-repo dependency도 `Parent Task`로 표현합니다.
+- GitHub issue 번호는 repository별 namespace이므로 cross-repo 문서에서는 bare `#123` 대신 `repo#issue` 또는 Issue URL을 사용합니다.
+
+### Handoff / Review Cycle
+
+Story 기반 작업은 Story worktree의 `tmp/story-handoff.md`를 유지합니다. 같은 내용을 Notion Story comment와 GitHub Story Issue comment에도 남겨 다음 에이전트가 같은 맥락으로 이어받을 수 있게 합니다.
+
+리뷰 사이클은 두 단계입니다.
+
+- Task PR review-cycle: 각 Task PR에서 AI 리뷰/CI가 통과할 때까지 반복하고, 통과 후 Story branch로 merge합니다.
+- Story PR review-cycle: 모든 Task가 Story branch에 들어온 뒤 전체 통합 PR에서 다시 AI 리뷰/CI를 반복합니다.
+
+Task PR의 리뷰 코멘트가 Story 전체 설계나 다른 Task 범위에 해당하면, 해당 Task에서 임의로 확장하지 않고 Story handoff와 GitHub Story Issue에 기록합니다.
+
+---
+
 ## 주요 명령어
 
 ### Claude 스킬 (`/ult-*`)

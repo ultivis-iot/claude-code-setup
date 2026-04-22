@@ -334,13 +334,30 @@ normalize_notion_page_id() {
 md_to_blocks() {
     local md="$1"
     echo "$md" | jq -R -s '
+        def rt($text): [{type: "text", text: {content: $text}}];
+        def block($type; $payload): {object: "block", type: $type} + {($type): $payload};
         split("\n")
+        | map(gsub("\r$"; ""))
         | map(select(length > 0))
-        | map({
-            object: "block",
-            type: "paragraph",
-            paragraph: {rich_text: [{type: "text", text: {content: .}}]}
-        })
+        | map(
+            if test("^###\\s+") then
+                block("heading_3"; {rich_text: rt(sub("^###\\s+"; ""))})
+            elif test("^##\\s+") then
+                block("heading_2"; {rich_text: rt(sub("^##\\s+"; ""))})
+            elif test("^#\\s+") then
+                block("heading_1"; {rich_text: rt(sub("^#\\s+"; ""))})
+            elif test("^- \\[[xX]\\]\\s+") then
+                block("to_do"; {rich_text: rt(sub("^- \\[[xX]\\]\\s+"; "")), checked: true})
+            elif test("^- \\[ \\]\\s+") then
+                block("to_do"; {rich_text: rt(sub("^- \\[ \\]\\s+"; "")), checked: false})
+            elif test("^-\\s+") then
+                block("bulleted_list_item"; {rich_text: rt(sub("^-\\s+"; ""))})
+            elif test("^[0-9]+\\.\\s+") then
+                block("numbered_list_item"; {rich_text: rt(sub("^[0-9]+\\.\\s+"; ""))})
+            else
+                block("paragraph"; {rich_text: rt(.)})
+            end
+        )
     '
 }
 
@@ -387,6 +404,13 @@ find_task_by_issue_url() {
     local filter
     filter=$(jq -nc --arg u "$url" '{property: "Issue URL", url: {equals: $u}}')
     notion_query_ds "$TASK_DB" "$filter" | jq -r '.results[0] // empty'
+}
+
+find_story_by_issue_url() {
+    local url="$1"
+    local filter
+    filter=$(jq -nc --arg u "$url" '{property: "Issue URL", url: {equals: $u}}')
+    notion_query_ds "$STORY_DB" "$filter" | jq -r '.results[0] // empty'
 }
 
 find_unlinked_tasks_by_title() {
