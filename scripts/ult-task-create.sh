@@ -18,7 +18,7 @@ usage() {
   ult-task-create.sh --story <story-title-or-url> --name <task> [--planned-start YYYY-MM-DD] [--planned-end YYYY-MM-DD]
 
 옵션:
-  --story, -s        Story title, Notion page URL/id, GitHub Story/Task Issue URL, repo#issue
+  --story, -s        Story title, Notion page URL/id, GitHub Task Issue URL, repo#issue
   --project, -p      Repository의 Project relation이 비어 있을 때 사용할 Project name/page id/URL
   --name, -n         Task 이름
   --topic, -t        Feature|Fix|Update|Refactor|Style|Other (기본 Feature)
@@ -154,8 +154,6 @@ story_project_id() {
     echo "$1" | jq -r '.properties["🛡️ Project "].relation[0].id // .properties["🛡️ Project"].relation[0].id // empty'
 }
 
-CONTEXT_STORY_BRANCH=""
-CONTEXT_STORY_WT_PATH=""
 CONTEXT_HANDOFF_PATH=""
 
 story_issue_url() {
@@ -198,9 +196,6 @@ load_story_from_handoff_json() {
     local handoff="$1"
     local notion_url issue_url page_id story
     printf '%s\n' "$handoff" | jq -e '(.story | type == "object")' >/dev/null 2>&1 || return 1
-
-    CONTEXT_STORY_BRANCH=$(printf '%s\n' "$handoff" | jq -r '.story.branch // empty')
-    CONTEXT_STORY_WT_PATH=$(printf '%s\n' "$handoff" | jq -r '.story.worktree // empty')
 
     notion_url=$(printf '%s\n' "$handoff" | jq -r '.story.notion_url // empty')
     if [ -n "$notion_url" ] && page_id=$(normalize_notion_page_id "$notion_url" 2>/dev/null); then
@@ -432,10 +427,6 @@ STORY=$(load_story "$STORY_REF") || exit 1
 STORY_ID=$(echo "$STORY" | jq -r .id)
 STORY_TITLE=$(story_title "$STORY")
 STORY_URL=$(echo "$STORY" | jq -r '.url // empty')
-STORY_ISSUE_URL=$(story_issue_url "$STORY")
-STORY_ISSUE_NUM=$(issue_num_from_url "$STORY_ISSUE_URL")
-STORY_BRANCH="${CONTEXT_STORY_BRANCH:-$(branch_for_issue "$STORY_ISSUE_NUM" 2>/dev/null || true)}"
-STORY_WT_PATH="${CONTEXT_STORY_WT_PATH:-$(worktree_for_branch "$STORY_BRANCH" 2>/dev/null || true)}"
 PROJECT_ID=$(story_project_id "$STORY")
 validate_story_project_for_repo "$STORY" || exit 1
 
@@ -467,9 +458,7 @@ trap 'rm -f "$ISSUE_BODY"' EXIT
     echo "$DESCRIPTION"
     echo ""
     echo "---"
-    [ -n "$STORY_ISSUE_URL" ] && echo "Parent Story: $STORY_ISSUE_URL"
     [ -n "$STORY_URL" ] && echo "Notion Story: $STORY_URL"
-    [ -n "$STORY_BRANCH" ] && echo "Story Branch: $STORY_BRANCH"
 } > "$ISSUE_BODY"
 ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$TASK_NAME" --body-file "$ISSUE_BODY") || {
     echo "GitHub Issue 생성 실패" >&2
@@ -534,10 +523,6 @@ resolve_base_branch() {
         echo "$BASE_BRANCH"
         return 0
     fi
-    if [ -n "$STORY_BRANCH" ]; then
-        echo "$STORY_BRANCH"
-        return 0
-    fi
     if git show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
         echo "dev"
         return 0
@@ -577,11 +562,49 @@ Worktree: $WT_PATH"
 fi
 
 append_task_to_handoff() {
-    local handoff_json handoff_md task_item parent_issue_urls parent_id parent_page parent_issue parent_summary tmp_json handoff_comment story_repo
-    [ -n "$STORY_WT_PATH" ] || return 0
-    handoff_json="$STORY_WT_PATH/tmp/story-handoff.json"
-    handoff_md="$STORY_WT_PATH/tmp/story-handoff.md"
-    [ -f "$handoff_json" ] || return 0
+    local handoff_json handoff_md task_item parent_issue_urls parent_id parent_page parent_issue parent_summary tmp_json handoff_comment handoff_dir
+    if [ -n "$CONTEXT_HANDOFF_PATH" ] && [ -f "$CONTEXT_HANDOFF_PATH" ]; then
+        handoff_json="$CONTEXT_HANDOFF_PATH"
+        handoff_dir=$(dirname "$handoff_json")
+        handoff_md="$handoff_dir/story-handoff.md"
+    elif [ -n "$WT_PATH" ]; then
+        handoff_dir="$WT_PATH/tmp"
+        mkdir -p "$handoff_dir"
+        handoff_json="$handoff_dir/story-handoff.json"
+        handoff_md="$handoff_dir/story-handoff.md"
+        jq -nc \
+            --arg title "$STORY_TITLE" \
+            --arg notion_id "$STORY_ID" \
+            --arg notion_url "$STORY_URL" \
+            --arg repo "$GITHUB_REPO" \
+            --arg base "${BASE_USED:-}" \
+            '{
+                version: 1,
+                updated_at: now | todate,
+                story: {
+                    title: $title,
+                    notion_id: $notion_id,
+                    notion_url: $notion_url,
+                    github_repo: $repo,
+                    base_branch: $base
+                },
+                tasks: []
+            }' > "$handoff_json"
+        {
+            echo "# Story Handoff"
+            echo ""
+            echo "Story: $STORY_TITLE"
+            echo "Notion Story: $STORY_URL"
+            echo "Story Base Branch: ${BASE_USED:-"-"}"
+            echo ""
+            echo "## Task Map"
+            echo ""
+            echo "| Task | Repo | Issue | Branch | Base Branch | Worktree | Parents | Status |"
+            echo "| --- | --- | --- | --- | --- | --- | --- | --- |"
+        } > "$handoff_md"
+    else
+        return 0
+    fi
 
     parent_issue_urls='[]'
     for parent_id in "${PARENT_TASK_IDS[@]}"; do
@@ -631,25 +654,21 @@ append_task_to_handoff() {
             "$TASK_NAME" "$GITHUB_REPO" "$ISSUE_URL" "$branch" "${BASE_USED:-"-"}" "${WT_PATH:-"-"}" "$parent_summary" >> "$handoff_md"
     fi
 
-    story_repo=$(repo_slug_from_issue_url "$STORY_ISSUE_URL")
-    if [ -n "$STORY_ISSUE_NUM" ] && [ -n "$story_repo" ]; then
-        handoff_comment=$(mktemp)
-        {
-            echo "## Story Handoff Update"
-            echo ""
-            echo "Added Task: $TASK_NAME"
-            echo "Issue: $ISSUE_URL"
-            echo "Branch: $branch"
-            echo "Base Branch: ${BASE_USED:-"-"}"
-            [ -n "$WT_PATH" ] && echo "Worktree: $WT_PATH"
-            echo ""
-            echo "<!-- ult-story-handoff-json"
-            cat "$handoff_json"
-            echo "-->"
-        } > "$handoff_comment"
-        gh issue comment "$STORY_ISSUE_NUM" --repo "$story_repo" --body-file "$handoff_comment" >/dev/null || true
-        rm -f "$handoff_comment"
+    if [ -n "$WT_PATH" ]; then
+        mkdir -p "$WT_PATH/tmp"
+        cp "$handoff_json" "$WT_PATH/tmp/story-handoff.json"
+        [ -f "$handoff_md" ] && cp "$handoff_md" "$WT_PATH/tmp/story-handoff.md"
     fi
+
+    handoff_comment="Story Handoff Update
+
+Added Task: $TASK_NAME
+Issue: $ISSUE_URL
+Branch: $branch
+Base Branch: ${BASE_USED:-"-"}"
+    [ -n "$WT_PATH" ] && handoff_comment="$handoff_comment
+Worktree: $WT_PATH"
+    notion_add_comment "$STORY_ID" "$handoff_comment" >/dev/null || true
 }
 
 append_task_to_handoff

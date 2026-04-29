@@ -28,13 +28,12 @@ argument-hint: [directory] [-b target-branch]
    - 어떤 validator도 `FAIL`이 아님
 3. 현재 브랜치와 리모트를 확인한다
    - `-b`가 없으면 저장소 기본 브랜치를 사용한다
-   - Story 기반 Task PR이면 `-b <story-branch>`를 사용해 Story branch를 target으로 한다
+   - Story 기반 작업이어도 Task PR은 `dev` 또는 repository default branch를 target으로 한다
 4. `git push -u origin <branch>`를 수행한다
 5. `gh pr create`로 PR을 생성한다
    - `-b`가 있으면 `-B <target-branch>` 적용
 6. 생성된 PR URL을 Notion에 동기화한다
-   - Task PR이면 현재 Task의 `PR URL`
-   - Story PR이면 현재 Story의 `PR URL`
+   - 현재 Task의 `PR URL`
 
 ## PR 본문
 

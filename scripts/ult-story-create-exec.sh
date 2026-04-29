@@ -1,5 +1,5 @@
 #!/bin/bash
-# Plan 발행 실행기 — JSON 입력 받아 Story+Tasks+Issues+브랜치 일괄 생성
+# Plan 발행 실행기 — JSON 입력 받아 Notion Story + Tasks + Task Issues/branches 일괄 생성
 # Usage:
 #   ult-story-create-exec.sh <spec.json>
 #   echo '<json>' | ult-story-create-exec.sh -
@@ -86,6 +86,59 @@ make_slug() {
     echo "${s:0:50}"
 }
 
+github_slug_for_repo_path() {
+    local repo_path="$1"
+    local url
+    url=$(git -C "$repo_path" remote get-url origin 2>/dev/null || true)
+    [ -n "$url" ] || return 1
+    printf '%s\n' "$url" \
+        | sed -E 's#^git@github.com:##; s#^https://github.com/##; s#^http://github.com/##; s#\.git$##'
+}
+
+repo_path_for_slug() {
+    local slug="$1"
+    local repo_name="${slug##*/}"
+    local current_root candidate current_slug worktree_root
+    worktree_root="${WORKTREE_ROOT:-$HOME/Git}"
+
+    current_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+    if [ -n "$current_root" ]; then
+        current_slug=$(github_slug_for_repo_path "$current_root" 2>/dev/null || true)
+        if [ "$current_slug" = "$slug" ]; then
+            printf '%s\n' "$current_root"
+            return 0
+        fi
+    fi
+
+    for candidate in "$worktree_root/$repo_name" "$HOME/Git/$repo_name"; do
+        git -C "$candidate" rev-parse --show-toplevel >/dev/null 2>&1 || continue
+        current_slug=$(github_slug_for_repo_path "$candidate" 2>/dev/null || true)
+        if [ "$current_slug" = "$slug" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+resolve_task_base_branch() {
+    local repo_path="$1"
+    local base
+
+    if git -C "$repo_path" remote get-url origin >/dev/null 2>&1; then
+        git -C "$repo_path" fetch origin --prune >&2 || true
+    fi
+
+    if git -C "$repo_path" show-ref --verify --quiet "refs/remotes/origin/dev" 2>/dev/null; then
+        echo "dev"
+        return 0
+    fi
+
+    base=$(git -C "$repo_path" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    echo "${base:-main}"
+}
+
 # ---- 1단계: Story 생성 ----
 echo "▸ Story 생성 중..."
 STORY_TITLE=$(echo "$SPEC" | jq -r '.story.title')
@@ -131,37 +184,10 @@ notion_insert_blocks_after_text "$STORY_ID" "$PLAN_BLOCKS" "설명" || {
 echo "  ✓ $STORY_TITLE"
 echo "    $STORY_URL"
 
-echo "▸ Story GitHub Issue 생성 중..."
-STORY_ISSUE_BODY="$WORKDIR/story-issue.md"
-{
-    echo "Notion Story: $STORY_URL"
-    echo ""
-    echo "$STORY_BODY"
-} > "$STORY_ISSUE_BODY"
-STORY_ISSUE_URL=$(gh issue create --repo "$GITHUB_REPO" --title "$STORY_TITLE" --body-file "$STORY_ISSUE_BODY") || {
-    echo "ERROR: Story GitHub Issue 생성 실패" >&2
-    exit 1
-}
-STORY_ISSUE_NUM=$(echo "$STORY_ISSUE_URL" | grep -oE '[0-9]+$')
-story_issue_props=$(jq -nc --arg u "$STORY_ISSUE_URL" '{"Issue URL": {url: $u}}')
-notion_patch_page "$STORY_ID" "$story_issue_props" >/dev/null || {
-    echo "ERROR: Story Issue URL 업데이트 실패" >&2
-    exit 1
-}
-echo "  ✓ #$STORY_ISSUE_NUM $STORY_ISSUE_URL"
-
-echo "▸ Story Worktree 생성 중..."
-if [ -n "$STORY_BRANCH_OVERRIDE" ]; then
-    STORY_BRANCH="$STORY_BRANCH_OVERRIDE"
-else
-    STORY_BRANCH="${STORY_ISSUE_NUM}-$(topic_prefix "$STORY_TAG")-$(make_slug "$STORY_TITLE")"
-fi
 STORY_BASE_BRANCH=$(resolve_story_base_branch)
-STORY_WT_PATH=$("$SCRIPT_DIR/ult-wt-add.sh" "$STORY_BRANCH" --base "$STORY_BASE_BRANCH" --quiet) || {
-    echo "ERROR: Story worktree 생성 실패" >&2
-    exit 1
-}
-echo "  ✓ $STORY_BRANCH → $STORY_WT_PATH"
+if [ -n "$STORY_BRANCH_OVERRIDE" ]; then
+    echo "  ℹ story.branch override는 더 이상 Story용 GitHub branch를 만들지 않으므로 무시합니다: $STORY_BRANCH_OVERRIDE"
+fi
 
 # ---- 2단계: Task별 Github Issue + Notion Task 생성 (병렬) ----
 echo ""
@@ -204,10 +230,8 @@ process_task() {
         echo "$desc"
         echo ""
         echo "---"
-        echo "Parent Story: $STORY_ISSUE_URL"
         echo "Notion Story: $STORY_URL"
-        echo "Story Branch: $STORY_BRANCH"
-        echo "Task Base Branch: $STORY_BRANCH"
+        echo "Task Base Branch: $STORY_BASE_BRANCH"
     } > "$issue_body"
     issue_url=$(gh issue create --repo "$task_repo" --title "$name" --body-file "$issue_body" 2>/dev/null) || {
         echo '{"error": "gh issue create 실패"}' > "$out"; return
@@ -289,7 +313,7 @@ process_task() {
 
 # 병렬 실행
 export -f process_task notion_create_page notion_create_page_from_template notion_append_blocks notion_find_child_block_by_text notion_insert_blocks_after_text notion_wait_for_template_applied notion_api _notion_token md_to_blocks task_template_blocks template_blocks_cached _cache_fresh
-export SPEC STORY_ID STORY_URL STORY_ISSUE_URL STORY_BRANCH STORY_PROJECT STORY_ASSIGNEE GITHUB_REPO TASK_DB WORKDIR CACHE_DIR TASK_TEMPLATE_ID
+export SPEC STORY_ID STORY_URL STORY_BASE_BRANCH STORY_PROJECT STORY_ASSIGNEE GITHUB_REPO TASK_DB WORKDIR CACHE_DIR TASK_TEMPLATE_ID
 
 for i in $(seq 0 $((TASK_COUNT - 1))); do
     process_task "$i" &
@@ -315,30 +339,24 @@ echo "▸ Worktree 생성 중..."
 
 FIRST_WT_PATH=""
 FIRST_ISSUE=""
-mkdir -p "$STORY_WT_PATH/tmp"
-HANDOFF_PATH="$STORY_WT_PATH/tmp/story-handoff.md"
-HANDOFF_JSON_PATH="$STORY_WT_PATH/tmp/story-handoff.json"
+HANDOFF_PATH="$WORKDIR/story-handoff.md"
+HANDOFF_JSON_PATH="$WORKDIR/story-handoff.json"
 HANDOFF_COMMENT_PATH="$WORKDIR/story-handoff-comment.md"
 HANDOFF_JSON=$(jq -nc \
     --arg title "$STORY_TITLE" \
+    --arg notion_id "$STORY_ID" \
     --arg notion_url "$STORY_URL" \
-    --arg issue_url "$STORY_ISSUE_URL" \
     --arg repo "$GITHUB_REPO" \
-    --arg branch "$STORY_BRANCH" \
     --arg base "$STORY_BASE_BRANCH" \
-    --arg worktree "$STORY_WT_PATH" \
     '{
         version: 1,
         updated_at: now | todate,
         story: {
             title: $title,
+            notion_id: $notion_id,
             notion_url: $notion_url,
-            github_issue_url: $issue_url,
             github_repo: $repo,
-            pr_url: "",
-            branch: $branch,
-            base_branch: $base,
-            worktree: $worktree
+            base_branch: $base
         },
         tasks: []
     }')
@@ -386,13 +404,9 @@ $chunk" >/dev/null || return 1
     echo ""
     echo "Story: $STORY_TITLE"
     echo "Notion Story: $STORY_URL"
-    echo "GitHub Story Issue: $STORY_ISSUE_URL"
-    echo "Story Branch: $STORY_BRANCH"
     echo "Story Base Branch: $STORY_BASE_BRANCH"
-    echo "Story Worktree: $STORY_WT_PATH"
     echo ""
-    echo "Execution source: local/GitHub handoff. After initial publication, update the GitHub Story Issue; use Notion only for inspection/fallback."
-    echo "Machine-readable handoff: $HANDOFF_JSON_PATH"
+    echo "Execution source: Notion Story comment and local handoff files in Task worktrees."
     echo ""
     echo "## Task Map"
     echo ""
@@ -414,9 +428,10 @@ while IFS= read -r task; do
     slug=$(make_slug "$name")
     branch="${issue_num}-${prefix}-${slug}"
 
-    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --base "$STORY_BRANCH" --quiet 2>/dev/null) || {
-        echo "  ⚠ #$issue_num worktree 생성 실패"
-        echo "| $name | $task_repo | $issue_url | $branch | $STORY_BRANCH | (failed) | $parent_summary | Worktree Failed |" >> "$HANDOFF_PATH"
+    repo_path=$(repo_path_for_slug "$task_repo" 2>/dev/null || true)
+    if [ -z "$repo_path" ]; then
+        echo "  ⚠ #$issue_num repository local checkout 없음: $task_repo"
+        echo "| $name | $task_repo | $issue_url | $branch | $STORY_BASE_BRANCH | (repo not found) | $parent_summary | Worktree Failed |" >> "$HANDOFF_PATH"
         HANDOFF_JSON=$(printf '%s\n' "$HANDOFF_JSON" | jq -c \
             --arg name "$name" \
             --arg topic "$topic" \
@@ -425,7 +440,41 @@ while IFS= read -r task; do
             --arg issue "$issue_url" \
             --arg num "$issue_num" \
             --arg branch "$branch" \
-            --arg base "$STORY_BRANCH" \
+            --arg base "$STORY_BASE_BRANCH" \
+            --argjson parent_ids "$parent_task_ids" \
+            --argjson parent_urls "$parent_issue_urls" \
+            '.tasks += [{
+                name: $name,
+                topic: $topic,
+                repo: $repo,
+                notion_task_id: $id,
+                issue_url: $issue,
+                issue_num: $num,
+                pr_url: "",
+                branch: $branch,
+                base_branch: $base,
+                worktree: "",
+                parent_task_ids: $parent_ids,
+                parent_issue_urls: $parent_urls,
+                status: "Worktree Failed"
+            }]')
+        continue
+    fi
+
+    task_base=$(resolve_task_base_branch "$repo_path")
+
+    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --repo "$repo_path" --base "$task_base" --quiet 2>/dev/null) || {
+        echo "  ⚠ #$issue_num worktree 생성 실패"
+        echo "| $name | $task_repo | $issue_url | $branch | $task_base | (failed) | $parent_summary | Worktree Failed |" >> "$HANDOFF_PATH"
+        HANDOFF_JSON=$(printf '%s\n' "$HANDOFF_JSON" | jq -c \
+            --arg name "$name" \
+            --arg topic "$topic" \
+            --arg repo "$task_repo" \
+            --arg id "$task_id" \
+            --arg issue "$issue_url" \
+            --arg num "$issue_num" \
+            --arg branch "$branch" \
+            --arg base "$task_base" \
             --argjson parent_ids "$parent_task_ids" \
             --argjson parent_urls "$parent_issue_urls" \
             '.tasks += [{
@@ -446,14 +495,14 @@ while IFS= read -r task; do
         continue
     }
     notion_add_comment "$task_id" "Branch: $branch
-Base Branch: $STORY_BRANCH
+Base Branch: $task_base
 Worktree: $wt_path
-Parent Story: $STORY_ISSUE_URL" >/dev/null || true
+Notion Story: $STORY_URL" >/dev/null || true
     if [ -z "$FIRST_WT_PATH" ]; then
         FIRST_WT_PATH="$wt_path"
         FIRST_ISSUE="$issue_num"
     fi
-    echo "| $name | $task_repo | $issue_url | $branch | $STORY_BRANCH | $wt_path | $parent_summary | Ready |" >> "$HANDOFF_PATH"
+    echo "| $name | $task_repo | $issue_url | $branch | $task_base | $wt_path | $parent_summary | Ready |" >> "$HANDOFF_PATH"
     HANDOFF_JSON=$(printf '%s\n' "$HANDOFF_JSON" | jq -c \
         --arg name "$name" \
         --arg topic "$topic" \
@@ -462,7 +511,7 @@ Parent Story: $STORY_ISSUE_URL" >/dev/null || true
         --arg issue "$issue_url" \
         --arg num "$issue_num" \
         --arg branch "$branch" \
-        --arg base "$STORY_BRANCH" \
+        --arg base "$task_base" \
         --arg wt "$wt_path" \
         --argjson parent_ids "$parent_task_ids" \
         --argjson parent_urls "$parent_issue_urls" \
@@ -494,18 +543,20 @@ printf '%s\n' "$HANDOFF_JSON" | jq . > "$HANDOFF_JSON_PATH"
 } > "$HANDOFF_COMMENT_PATH"
 
 notion_add_long_comment "$STORY_ID" "$(cat "$HANDOFF_COMMENT_PATH")" >/dev/null || true
-gh issue comment "$STORY_ISSUE_NUM" --repo "$GITHUB_REPO" --body-file "$HANDOFF_COMMENT_PATH" >/dev/null || true
+while IFS= read -r task_wt_path; do
+    [ -n "$task_wt_path" ] || continue
+    mkdir -p "$task_wt_path/tmp"
+    cp "$HANDOFF_PATH" "$task_wt_path/tmp/story-handoff.md"
+    cp "$HANDOFF_JSON_PATH" "$task_wt_path/tmp/story-handoff.json"
+done < <(printf '%s\n' "$HANDOFF_JSON" | jq -r '.tasks[]?.worktree | select(. != "")')
 
 # ---- 4단계: 완료 안내 ----
 echo ""
 echo "✅ 발행 완료"
 echo "  Story: $STORY_URL"
-echo "  Story Issue: $STORY_ISSUE_URL"
-echo "  Story Branch: $STORY_BRANCH"
-echo "  Story Worktree: $STORY_WT_PATH"
 echo "  Task ${TASK_COUNT}개, Issue ${TASK_COUNT}개, Worktree ${TASK_COUNT}개"
-echo "  Handoff: $HANDOFF_PATH"
-echo "  Handoff JSON: $HANDOFF_JSON_PATH"
+echo "  Handoff: 각 Task worktree의 tmp/story-handoff.md"
+echo "  Handoff JSON: 각 Task worktree의 tmp/story-handoff.json"
 echo ""
 echo "  첫 Task로 이동:"
 if [ -n "$FIRST_WT_PATH" ]; then

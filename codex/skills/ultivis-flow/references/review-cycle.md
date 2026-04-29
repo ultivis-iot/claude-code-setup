@@ -26,9 +26,9 @@ Inspect the latest AI PR feedback, classify each finding, make the required chan
 
 ## Story-based PRs
 
-- For Task PRs, the base branch is the Story branch. Continue review-cycle until AI review and CI are clear, then merge into the Story branch.
-- For Story PRs, the base branch is `dev`. Continue review-cycle until integrated behavior is clear.
-- If Task PR feedback is Story-wide or belongs to another Task, do not expand the Task PR. Record it in `tmp/story-handoff.md` and the GitHub Story Issue.
+- For Task PRs, the base branch is `dev` or the repository default branch. Continue review-cycle until AI review and CI are clear, then merge into the target base branch.
+- Do not create Story PRs. After all Task PRs are merged, run Story-level integration validation.
+- If Task PR feedback is Story-wide or belongs to another Task, do not expand the Task PR. Record it in `tmp/story-handoff.md` and the Notion Story.
 - After each Task PR merge, update the Story handoff before starting dependent Tasks.
 
 ## Boundaries

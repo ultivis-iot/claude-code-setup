@@ -5,7 +5,7 @@ GitHub Issue는 있지만 Notion Task의 `Issue URL`이 비어 있어 `/issue`, 
 ## 실행
 
 ```bash
-~/.codex/scripts/ult-task-link-issue.sh [issue_num|issue_url] [--task <notion_task_url>]
+${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-link-issue.sh [issue_num|issue_url] [--task <notion_task_url>]
 ```
 
 스크립트가 처리하는 것:

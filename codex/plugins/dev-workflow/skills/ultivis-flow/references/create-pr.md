@@ -16,13 +16,11 @@ Use this procedure when the user wants the Codex equivalent of `/create-pr`.
 3. Push the branch.
 4. Create the PR with a concise title and body.
 
-For Story-based work, do not assume every PR targets `dev`:
+For Story-based work, GitHub PRs still belong to Tasks:
 
-- Task PRs target the Story branch.
-- Story PRs target `dev`.
-- If the current branch is a Task branch under an active Story, confirm or infer the Story branch from the task context before creating the PR.
+- Task PRs target `dev` or the repository default branch.
+- Do not create Story PRs.
 - After creating a Task PR, store the PR URL on the Notion Task when available.
-- After creating a Story PR, store the PR URL on the Notion Story `PR URL`.
 
 ## PR body structure
 

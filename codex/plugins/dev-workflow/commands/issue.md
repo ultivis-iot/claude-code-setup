@@ -12,7 +12,7 @@
 ## 실행
 
 ```bash
-~/.codex/scripts/issue.sh
+${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/issue.sh
 ```
 
 스크립트가 처리하는 것:

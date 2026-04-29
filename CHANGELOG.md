@@ -1,17 +1,22 @@
 # Changelog
 
 ## Unreleased
+
+## v0.6.4 (2026-04-29)
+- Story는 Notion 조율 단위로 유지하고 GitHub Issue/PR은 Task 단위에만 만들도록 Story 생성, Task 추가, Story runner, PR/review 문서를 정리.
+- workflow 스크립트와 Notion cache를 전역 설치 경로(`~/.codex`/`~/.claude`) 기준으로 해석하도록 강화해 작업 repo-local `scripts/` 탐색을 피하도록 수정.
+- 브랜치/worktree 생성 전에 항상 `git fetch origin --prune`로 원격 refs를 최신화하고, 새 브랜치를 최신 원격 base 기준으로 만들도록 `ult-wt-add.sh`와 workflow 문서를 강화.
 - Notion Story/Task 생성 시 template block 복사 대신 Notion template API를 사용하고, markdown body를 `설명` block 뒤에 삽입하도록 수정.
 - Task 실행 중 사용자 승인 없이 후속 Task/Issue/branch/worktree를 생성하지 않고 carryover로 기록하도록 Story runner prompt와 workflow 문서를 강화.
 - Story 기반 agent/worktree flow, cross-repo Story, `Parent Task` dependency 규칙을 workflow 문서와 Codex skill/plugin reference에 반영.
 - Plan 작성/발행 전에 blocking question을 먼저 묻고, 사용자가 스스로 판단할 수 있도록 decision tradeoff를 제시하는 규칙을 추가.
-- Story DB에 `Issue URL`/`PR URL` 프로퍼티를 추가하고, Story 생성 시 GitHub Story Issue와 Story branch/worktree, `tmp/story-handoff.md`를 함께 생성하도록 확장.
+- Story 생성 시 GitHub Story Issue와 Story branch/worktree를 만들지 않고, Task별 Issue/branch/worktree와 Task worktree handoff만 생성하도록 수정.
 - `ult-story-run.sh` / `/ult-story-run`을 추가해 Story의 Ready/Blocked Task를 분석하고 subagent 실행 프롬프트를 생성하도록 지원.
-- Story 생성 시 `tmp/story-handoff.json`을 함께 만들고, `ult-story-run.sh`이 로컬/GitHub Story Issue handoff를 먼저 사용한 뒤 Notion은 fallback으로만 조회하도록 개선.
-- `ult-task-create.sh`가 기존 Story를 GitHub Issue URL, current branch, local handoff에서 더 안정적으로 찾고 Story branch를 기본 base로 사용하도록 개선.
+- Story 생성 시 Task worktree별 `tmp/story-handoff.json`을 함께 만들고, `ult-story-run.sh`이 로컬 handoff를 먼저 사용한 뒤 Notion은 fallback으로 조회하도록 개선.
+- `ult-task-create.sh`가 기존 Story를 GitHub Task Issue URL, current branch, local handoff에서 더 안정적으로 찾고 최신 원격 base를 기본 base로 사용하도록 개선.
 - `ult-cache-refresh.sh`를 추가하고 `setup.sh`, `setup-codex.sh`, `setup.ps1` 설치 시 사용자별 `~/.claude/notion-cache` / `~/.codex/notion-cache`를 자동 준비하도록 개선.
 - `verify-workflow.sh`가 Claude Code 설치본과 Codex 설치본을 구분해 검증하도록 수정.
-- branch ancestry를 `gh-merge-base`, Notion/GitHub comments, Story handoff에 기록하고 review-cycle을 Task PR/Story PR 양쪽에서 수행하도록 문서화.
+- branch ancestry를 `gh-merge-base`, Notion Story comment, Task worktree handoff에 기록하고 review-cycle은 Task PR 기준으로 수행하도록 문서화.
 - Notion Story/Task 생성 시 template 적용 실패를 감지하고, markdown body를 heading/list/todo Notion block으로 변환하도록 개선.
 - `ult-task-create.sh`가 `--parent-task` 옵션으로 선행 Task relation을 설정할 수 있도록 확장.
 - Codex skill display name/path renamed from `dev-workflow` to `ultivis-flow`.

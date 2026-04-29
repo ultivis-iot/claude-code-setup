@@ -12,13 +12,13 @@ Notion Week 기간 기준으로 작업을 집계하고, LLM이 마크다운 주�
 
 ## 책임 분리
 
-- 데이터 수집: `scripts/ult-weekly-collect.sh`
+- 데이터 수집: `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-weekly-collect.sh`
 - 요약 작성: 이 명령
-- 발행: `scripts/ult-weekly-publish.sh`
+- 발행: `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-weekly-publish.sh`
 
 ## 수행 절차
 
-1. `scripts/ult-weekly-collect.sh`로 주간 데이터를 JSON으로 수집한다
+1. `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-weekly-collect.sh`로 주간 데이터를 JSON으로 수집한다
    - 수집 실패 시 발행 단계로 가지 않고 즉시 중단한다
 2. JSON을 읽고 아래 내용을 중심으로 요약한다
    - 완료/진행 현황

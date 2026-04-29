@@ -2,6 +2,7 @@
 
 ## 기본 원칙
 - 코드 변경 전 반드시 기존 패턴 확인
+- 브랜치 생성, 체크아웃, worktree 생성 전에는 먼저 `git fetch origin --prune`로 원격 refs를 최신화하고, 새 브랜치는 최신 원격 base에서 시작
 
 ## Plan 모드 가이드
 Plan 모드 사용 시 반드시 의도 섹션이 포함되어 **사용자의 의도를 명확하게 명문화**해야 합니다.
@@ -26,7 +27,7 @@ Plan이 크거나 애매하면 바로 Story/Task를 만들지 말고, 먼저 사
 작업 수행 중 새 Notion Task, GitHub Issue, 하위 Task를 임의로 만들지 않는다.
 
 - `ult-task-create`는 사용자가 명시적으로 “Task를 추가/생성하라”고 승인한 경우에만 실행한다.
-- 현재 Task 범위를 벗어난 후속 작업은 새 Task를 만들지 말고 Story handoff와 GitHub Story Issue에 carryover로 기록한다.
+- 현재 Task 범위를 벗어난 후속 작업은 새 Task를 만들지 말고 Story handoff와 Notion Story comment에 carryover로 기록한다.
 - 리뷰나 구현 중 발견한 추가 범위도 동일하다. 사용자가 승인하기 전까지 Task/Issue/branch/worktree를 새로 만들지 않는다.
 
 ### Plan 저장 시점

@@ -4,7 +4,7 @@
 
 입력:
 
-- `scripts/ult-weekly-collect.sh`가 JSON 출력
+- 전역 `ult-weekly-collect.sh`가 JSON 출력
 - 기본: 이번 주, 본인
 - 옵션: `--week <YYYY-MM-DD>`, `--team`
 
@@ -33,6 +33,6 @@ LLM 출력 목표:
 
 후속 액션:
 
-- `s`: `scripts/ult-weekly-publish.sh`로 발행
+- `s`: 전역 `ult-weekly-publish.sh`로 발행
 - `c`: 클립보드 복사
 - Enter: 종료

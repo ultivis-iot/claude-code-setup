@@ -1,7 +1,7 @@
 #!/bin/bash
 # Story 실행 오케스트레이션 준비
 # Usage:
-#   ult-story-run.sh [story-issue|story-issue-url|handoff-json|notion-story-url] [--publish] [--json]
+#   ult-story-run.sh [task-issue|handoff-json|notion-story-url] [--publish] [--json]
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,15 +15,15 @@ STORY_REF=""
 usage() {
     cat >&2 <<'EOF'
 사용법:
-  ult-story-run.sh [story-issue|story-issue-url|handoff-json|notion-story-url] [--publish] [--json]
+  ult-story-run.sh [task-issue|handoff-json|notion-story-url] [--publish] [--json]
 
 역할:
-  로컬/GitHub Story handoff를 먼저 읽어 Task dependency를 평가하고,
+  로컬 Story handoff를 먼저 읽어 Task dependency를 평가하고,
   Ready Task별 subagent 프롬프트와 실행 요약을 생성합니다.
   handoff가 없을 때만 Notion Story/Task 조회로 fallback합니다.
 
 옵션:
-  --publish   생성한 실행 요약을 GitHub Story Issue에 코멘트로 남김
+  --publish   생성한 실행 요약을 Notion Story에 코멘트로 남김
   --json      사람이 읽는 요약 대신 JSON summary 출력
 EOF
 }
@@ -299,12 +299,16 @@ parent_ready_from_handoff() {
 
 run_handoff_story() {
     local handoff="$1"
-    local source story_title story_url story_issue_url story_pr_url story_repo story_issue_num
+    local source story_title story_url story_issue_url story_pr_url story_repo story_issue_num story_id
     local story_branch story_base story_worktree output_root run_key output_dir summary_md summary_json ready_json
 
     source=$(printf '%s\n' "$handoff" | jq -r '._source // "handoff"')
     story_title=$(printf '%s\n' "$handoff" | jq -r '.story.title // "(제목 없음)"')
     story_url=$(printf '%s\n' "$handoff" | jq -r '.story.notion_url // ""')
+    story_id=$(printf '%s\n' "$handoff" | jq -r '.story.notion_id // empty')
+    if [ -z "$story_id" ] && [ -n "$story_url" ]; then
+        story_id=$(normalize_notion_page_id "$story_url" 2>/dev/null || true)
+    fi
     story_issue_url=$(printf '%s\n' "$handoff" | jq -r '.story.github_issue_url // ""')
     story_pr_url=$(printf '%s\n' "$handoff" | jq -r '.story.pr_url // ""')
     story_repo=$(printf '%s\n' "$handoff" | jq -r '.story.github_repo // empty')
@@ -332,11 +336,7 @@ run_handoff_story() {
         echo "- Source: $source"
         echo "- Story: $story_title"
         echo "- Notion Story: $story_url"
-        echo "- GitHub Story Issue: $story_issue_url"
-        echo "- Story PR: $story_pr_url"
-        echo "- Story Branch: ${story_branch:-"(not found)"}"
         echo "- Story Base: ${story_base:-"(unknown)"}"
-        echo "- Story Worktree: ${story_worktree:-"(not found)"}"
         echo ""
         echo "## Tasks"
         echo ""
@@ -426,8 +426,6 @@ You are a Task owner subagent. You are not alone in the codebase; do not revert 
 Story:
 - Title: $story_title
 - Notion Story: $story_url
-- GitHub Story Issue: $story_issue_url
-- Story branch: ${story_branch:-"(not found)"}
 
 Task:
 - Name: $task_name
@@ -444,12 +442,12 @@ Rules:
 - Preserve Story context and Task scope.
 - Do not edit another Task owner's worktree.
 - Do not create additional Notion Tasks, GitHub Issues, branches, or worktrees unless the user explicitly approves that new Task creation.
-- If you find out-of-scope follow-up work, record it as carryover in the Story handoff/GitHub Story Issue instead of creating a subtask.
+- If you find out-of-scope follow-up work, record it as carryover in the Story handoff/Notion Story instead of creating a subtask.
 - Verify locally using the repository's existing commands.
 - Commit and push the Task branch.
-- Create the Task PR targeting the Story branch: ${story_branch:-"(story branch required)"}.
+- Create the Task PR targeting the base branch: ${task_base:-"(base branch required)"}.
 - Run or request review-cycle for the Task PR until AI review and CI are clear.
-- Update the GitHub Story Issue handoff with results, PR URL, tests, and carryover.
+- Update the Story handoff with results, PR URL, tests, and carryover.
 
 Deliverable:
 - Implementation summary
@@ -477,21 +475,17 @@ EOF
         --arg source "$source" \
         --arg story "$story_title" \
         --arg story_url "$story_url" \
-        --arg story_issue_url "$story_issue_url" \
-        --arg story_pr_url "$story_pr_url" \
-        --arg story_branch "$story_branch" \
         --arg story_base "$story_base" \
-        --arg story_worktree "$story_worktree" \
         --arg output_dir "$output_dir" \
         --argjson tasks "$all_items" \
         --argjson ready "$ready_items" \
-        '{source:$source, story:$story, story_url:$story_url, story_issue_url:$story_issue_url, story_pr_url:$story_pr_url, story_branch:$story_branch, story_base:$story_base, story_worktree:$story_worktree, output_dir:$output_dir, tasks:$tasks, ready_tasks:$ready}' \
+        '{source:$source, story:$story, story_url:$story_url, story_base:$story_base, output_dir:$output_dir, tasks:$tasks, ready_tasks:$ready}' \
         > "$summary_json"
 
     printf '%s\n' "$ready_items" > "$ready_json"
 
-    if [ "$PUBLISH" -eq 1 ] && [ -n "$story_issue_num" ] && [ -n "$story_repo" ]; then
-        gh issue comment "$story_issue_num" --repo "$story_repo" --body-file "$summary_md" >/dev/null || true
+    if [ "$PUBLISH" -eq 1 ] && [ -n "$story_id" ]; then
+        notion_add_comment "$story_id" "$(cat "$summary_md")" >/dev/null || true
     fi
 
     if [ "$JSON_OUTPUT" -eq 1 ]; then
@@ -567,28 +561,23 @@ if handoff=$(load_handoff 2>/dev/null); then
 fi
 
 story=$(resolve_story "$STORY_REF") || {
-    echo "Story를 찾을 수 없습니다. Story Notion URL, Story GitHub Issue, 또는 Story/Task branch에서 실행하세요." >&2
+    echo "Story를 찾을 수 없습니다. Story Notion URL, Task Issue, 또는 Task worktree에서 실행하세요." >&2
     exit 1
 }
 
 story_id=$(printf '%s\n' "$story" | jq -r .id)
 story_title=$(printf '%s\n' "$story" | title_of_page)
 story_url=$(printf '%s\n' "$story" | jq -r '.url // ""')
-story_issue_url=$(printf '%s\n' "$story" | jq -r '.properties["Issue URL"].url // ""')
-story_pr_url=$(printf '%s\n' "$story" | jq -r '.properties["PR URL"].url // ""')
-story_issue_num=$(issue_num_from_url "$story_issue_url")
-story_repo=$(repo_slug_from_issue_url "$story_issue_url")
-story_branch=$(branch_for_issue "$story_issue_num" 2>/dev/null || true)
-story_base=$(branch_base "$story_branch")
-story_worktree=$(worktree_for_branch "$story_branch" 2>/dev/null || true)
+story_base=$(branch_base "")
+story_repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)
 
 filter=$(jq -nc --arg sid "$story_id" '{property: "📜 Story", relation: {contains: $sid}}')
 sorts='[{"property":"Created","direction":"ascending"}]'
 tasks_resp=$(notion_query_ds "$TASK_DB" "$filter" "$sorts")
 task_count=$(printf '%s\n' "$tasks_resp" | jq '.results | length')
 
-output_root="${story_worktree:-$(pwd)}/tmp/story-run"
-run_key="${story_issue_num:-$story_id}"
+output_root="$(pwd)/tmp/story-run"
+run_key="$story_id"
 output_dir="$output_root/$run_key"
 mkdir -p "$output_dir/prompts"
 
@@ -601,11 +590,7 @@ ready_json="$output_dir/ready-tasks.json"
     echo ""
     echo "- Story: $story_title"
     echo "- Notion Story: $story_url"
-    echo "- GitHub Story Issue: $story_issue_url"
-    echo "- Story PR: $story_pr_url"
-    echo "- Story Branch: ${story_branch:-"(not found)"}"
     echo "- Story Base: $story_base"
-    echo "- Story Worktree: ${story_worktree:-"(not found)"}"
     echo ""
     echo "## Tasks"
     echo ""
@@ -692,8 +677,6 @@ You are a Task owner subagent. You are not alone in the codebase; do not revert 
 Story:
 - Title: $story_title
 - Notion Story: $story_url
-- GitHub Story Issue: $story_issue_url
-- Story branch: ${story_branch:-"(not found)"}
 
 Task:
 - Name: $task_name
@@ -710,10 +693,10 @@ Rules:
 - Preserve Story context and Task scope.
 - Do not edit another Task owner's worktree.
 - Do not create additional Notion Tasks, GitHub Issues, branches, or worktrees unless the user explicitly approves that new Task creation.
-- If you find out-of-scope follow-up work, record it as carryover in the Story handoff/GitHub Story Issue instead of creating a subtask.
+- If you find out-of-scope follow-up work, record it as carryover in the Story handoff/Notion Story instead of creating a subtask.
 - Verify locally using the repository's existing commands.
 - Commit and push the Task branch.
-- Create the Task PR targeting the Story branch: ${story_branch:-"(story branch required)"}.
+- Create the Task PR targeting the base branch: ${task_base:-"(base branch required)"}.
 - Run or request review-cycle for the Task PR until AI review and CI are clear.
 - Update the Story handoff with results, PR URL, tests, and carryover.
 
@@ -743,23 +726,17 @@ jq -nc \
     --arg story_id "$story_id" \
     --arg story "$story_title" \
     --arg story_url "$story_url" \
-    --arg story_issue_url "$story_issue_url" \
-    --arg story_pr_url "$story_pr_url" \
-    --arg story_branch "$story_branch" \
     --arg story_base "$story_base" \
-    --arg story_worktree "$story_worktree" \
     --arg output_dir "$output_dir" \
     --argjson tasks "$all_items" \
     --argjson ready "$ready_items" \
-    '{story_id:$story_id, story:$story, story_url:$story_url, story_issue_url:$story_issue_url, story_pr_url:$story_pr_url, story_branch:$story_branch, story_base:$story_base, story_worktree:$story_worktree, output_dir:$output_dir, tasks:$tasks, ready_tasks:$ready}' \
+    '{story_id:$story_id, story:$story, story_url:$story_url, story_base:$story_base, output_dir:$output_dir, tasks:$tasks, ready_tasks:$ready}' \
     > "$summary_json"
 
 printf '%s\n' "$ready_items" > "$ready_json"
 
 if [ "$PUBLISH" -eq 1 ]; then
-    if [ -n "$story_issue_num" ] && [ -n "$story_repo" ]; then
-        gh issue comment "$story_issue_num" --repo "$story_repo" --body-file "$summary_md" >/dev/null || true
-    fi
+    notion_add_comment "$story_id" "$(cat "$summary_md")" >/dev/null || true
 fi
 
 if [ "$JSON_OUTPUT" -eq 1 ]; then

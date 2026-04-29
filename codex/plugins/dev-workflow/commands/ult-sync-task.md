@@ -11,7 +11,7 @@ argument-hint: [note-or-action]
 ## 실행
 
 ```bash
-~/.codex/scripts/ult-sync-task.sh [note-or-action]
+${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-sync-task.sh [note-or-action]
 ```
 
 동작:

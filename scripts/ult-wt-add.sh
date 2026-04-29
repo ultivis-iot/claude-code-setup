@@ -69,11 +69,26 @@ WT_PATH="$WORKTREE_ROOT/$WT_NAME"
 
 _log() { $QUIET || echo "$@" >&2; }
 
+normalize_base_branch_name() {
+    case "$1" in
+        origin/*) echo "${1#origin/}" ;;
+        *)        echo "$1" ;;
+    esac
+}
+
+if git -C "$MAIN_REPO" remote get-url origin >/dev/null 2>&1; then
+    _log "🔄 origin 최신 상태 가져오는 중..."
+    git -C "$MAIN_REPO" fetch origin --prune >&2 || {
+        echo "ERROR: origin fetch 실패" >&2
+        exit 1
+    }
+fi
+
 # 이미 존재하면 경로만 반환 (idempotent)
 if [ -d "$WT_PATH" ]; then
     _log "ℹ️  이미 존재: $WT_PATH"
     if [ -n "$BASE_BRANCH" ]; then
-        git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$BASE_BRANCH" 2>/dev/null || true
+        git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$(normalize_base_branch_name "$BASE_BRANCH")" 2>/dev/null || true
     fi
     echo "$WT_PATH"
     exit 0
@@ -84,6 +99,11 @@ if [ -z "$BASE_BRANCH" ]; then
     BASE_BRANCH=$(git -C "$MAIN_REPO" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
     [ -z "$BASE_BRANCH" ] && BASE_BRANCH="main"
 fi
+BASE_BRANCH=$(normalize_base_branch_name "$BASE_BRANCH")
+BASE_REF="$BASE_BRANCH"
+if git -C "$MAIN_REPO" show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH" 2>/dev/null; then
+    BASE_REF="origin/$BASE_BRANCH"
+fi
 
 # Worktree 생성
 if git -C "$MAIN_REPO" show-ref --verify --quiet "refs/remotes/origin/$BRANCH" 2>/dev/null; then
@@ -93,7 +113,7 @@ if git -C "$MAIN_REPO" show-ref --verify --quiet "refs/remotes/origin/$BRANCH" 2
     git -C "$WT_PATH" checkout -B "$BRANCH" "origin/$BRANCH" >/dev/null 2>&1 || true
 else
     _log "📂 새 브랜치 $BRANCH 생성 ($BASE_BRANCH 기반) + worktree..."
-    git -C "$MAIN_REPO" worktree add -b "$BRANCH" "$WT_PATH" "$BASE_BRANCH" >&2
+    git -C "$MAIN_REPO" worktree add -b "$BRANCH" "$WT_PATH" "$BASE_REF" >&2
 fi
 
 git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$BASE_BRANCH" 2>/dev/null || true

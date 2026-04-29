@@ -2,24 +2,24 @@
 
 기존 Story에 Task 1개, GitHub Issue 1개, Issue URL 연결, 브랜치/worktree 생성을 한 번에 처리합니다.
 
-이 명령은 새 Task/Issue/branch/worktree를 만드는 발행 명령입니다. 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행하고, 현재 Task 수행 중 발견한 후속 작업은 임의로 생성하지 말고 Story handoff와 GitHub Story Issue에 carryover로 기록합니다.
+이 명령은 새 Task/Issue/branch/worktree를 만드는 발행 명령입니다. 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행하고, 현재 Task 수행 중 발견한 후속 작업은 임의로 생성하지 말고 Story handoff와 Notion Story comment에 carryover로 기록합니다.
 
 ## 실행
 
 ```bash
-~/.codex/scripts/ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
+${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
 ```
 
 스크립트가 처리하는 것:
 - 현재 GitHub 계정, repository, repository에 연결된 Project, Week 조회
-- Story 선택 또는 Notion URL/id, GitHub Story Issue, GitHub Task Issue, local handoff로 Story 조회
+- Story 선택 또는 Notion URL/id, GitHub Task Issue, local handoff로 Story 조회
 - Story는 현재 repository의 Project에 연결된 후보만 허용
 - Task 내용으로 GitHub Issue 생성
 - Notion Task 생성과 동시에 `Issue URL` 반영
 - Task template을 사용하고 description markdown을 Notion block으로 변환
 - `--parent-task`가 있으면 `Parent Task` dependency 반영
-- Story branch를 base로 `<issue_num>-<topic>-<slug>` 브랜치/worktree 생성
-- Story worktree에 `tmp/story-handoff.json`이 있으면 새 Task를 append하고 GitHub Story Issue에 handoff update comment를 남김
+- 최신 원격 base 기준으로 `<issue_num>-<topic>-<slug>` 브랜치/worktree 생성
+- local `tmp/story-handoff.json`이 있으면 새 Task를 append하고 Notion Story comment에 handoff update를 남김
 
 ## Story 선택 원칙
 
@@ -43,18 +43,18 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 
 | 인자 | 동작 |
 |---|---|
-| `<story title or url>` | 해당 Story에 추가. Notion URL/id, GitHub Issue URL, `repo#issue`, title 지원 |
+| `<story title or url>` | 해당 Story에 추가. Notion URL/id, GitHub Task Issue URL, `repo#issue`, title 지원 |
 | `--name` | Task 이름 |
 | `--topic` | `Feature`, `Fix`, `Update`, `Refactor`, `Style`, `Other` |
 | `--description` | GitHub Issue body 및 Task 본문 |
 | `--planned-start`, `--planned-end` | Planned Date |
 | `--parent-task` | 선행 Task Notion page id/URL. 반복 가능 |
-| `--base` | 브랜치 생성 기준 브랜치. Story flow에서는 Story branch 지정 |
+| `--base` | 브랜치 생성 기준 브랜치. 기본은 최신 `origin/dev` 또는 repository default branch |
 | `--here` | Issue/Task만 만들고 현재 브랜치 유지 |
 | `--no-checkout` | worktree 없이 로컬 브랜치만 생성 |
 
 ## Story Flow 주의
 
-Story 기반 작업에서는 `Parent Task`를 선행관계로 사용한다. Task branch는 Story branch에서 만들고, Task PR은 Story branch를 target으로 한다. 같은 Story가 여러 repository를 건드리더라도 Task의 Repository relation이 repo ownership의 기준이다.
+Story 기반 작업에서는 `Parent Task`를 선행관계로 사용한다. Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch를 target으로 한다. Story GitHub Issue/PR은 만들지 않는다. 같은 Story가 여러 repository를 건드리더라도 Task의 Repository relation이 repo ownership의 기준이다.
 
-Story를 명시하지 않으면 현재 worktree의 `tmp/story-handoff.json`, 현재 branch의 `gh-merge-base`, 현재 GitHub Issue 순서로 Story를 추론한다. 추론이 애매하면 Notion 후보 선택으로 fallback한다.
+Story를 명시하지 않으면 현재 worktree의 `tmp/story-handoff.json`, 현재 branch의 `gh-merge-base`, 현재 GitHub Task Issue 순서로 Story를 추론한다. 추론이 애매하면 Notion 후보 선택으로 fallback한다.

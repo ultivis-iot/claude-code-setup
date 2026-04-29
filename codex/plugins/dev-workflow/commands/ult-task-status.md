@@ -19,7 +19,7 @@ n8n이 자동 처리하지 못하는 비정형 상태 전이를 수동으로 적
 ## 실행
 
 ```bash
-~/.codex/scripts/ult-task-status.sh [<issue_num>] [<action>]
+${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-status.sh [<issue_num>] [<action>]
 ```
 
 ### 사용 예

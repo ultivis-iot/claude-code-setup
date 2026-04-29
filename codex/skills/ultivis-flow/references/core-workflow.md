@@ -34,5 +34,6 @@ Use conventional commit types such as `feat`, `fix`, `docs`, `refactor`, `test`,
 
 Branch creation rule:
 
-- For standalone tasks, create branches from `dev` when `origin/dev` exists. Use another base only when the user explicitly asks for it or the repository has no `dev` branch.
-- For Story-based tasks, create Task branches from the Story branch. The Story branch itself should come from `dev` when available.
+- Before creating or checking out a branch/worktree, refresh remote refs with `git fetch origin --prune`.
+- For standalone tasks, create branches from the latest `origin/dev` when it exists. Use another base only when the user explicitly asks for it or the repository has no `dev` branch.
+- For Story-based tasks, do not create Story branches. Create Task branches from the latest `origin/dev` when it exists, or the repository default branch otherwise.

@@ -10,7 +10,22 @@ WORKFLOW_ENV_LOADED=1
 WORKFLOW_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKFLOW_HOME_DEFAULT="$(cd "$WORKFLOW_SCRIPT_DIR/.." && pwd)"
 
-export WORKFLOW_HOME="${WORKFLOW_HOME:-${APP_HOME:-$WORKFLOW_HOME_DEFAULT}}"
+if [ -z "${WORKFLOW_HOME:-}" ]; then
+    if [ -n "${APP_HOME:-}" ]; then
+        WORKFLOW_HOME="$APP_HOME"
+    elif [ "$WORKFLOW_HOME_DEFAULT" = "${CODEX_HOME:-$HOME/.codex}" ] || [ "$WORKFLOW_HOME_DEFAULT" = "$HOME/.claude" ]; then
+        WORKFLOW_HOME="$WORKFLOW_HOME_DEFAULT"
+    elif [ -n "${CODEX_HOME:-}" ]; then
+        WORKFLOW_HOME="$CODEX_HOME"
+    elif [ -d "$HOME/.codex/scripts" ]; then
+        WORKFLOW_HOME="$HOME/.codex"
+    elif [ -d "$HOME/.claude/scripts" ]; then
+        WORKFLOW_HOME="$HOME/.claude"
+    else
+        WORKFLOW_HOME="$WORKFLOW_HOME_DEFAULT"
+    fi
+fi
+export WORKFLOW_HOME
 export WORKFLOW_SCRIPTS_DIR="${WORKFLOW_SCRIPTS_DIR:-$WORKFLOW_HOME/scripts}"
 export WORKFLOW_DEV_TOOLS_DIR="${WORKFLOW_DEV_TOOLS_DIR:-$WORKFLOW_HOME/dev-tools}"
 export WORKFLOW_HOOKS_DIR="${WORKFLOW_HOOKS_DIR:-$WORKFLOW_HOME/hooks}"

@@ -20,7 +20,7 @@ argument-hint: [story-or-task-context]
 ## 선택 규칙
 
 1. 인자가 없고 현재 작업을 고르려는 상황이면:
-   - `scripts/ult-my-tasks.sh`를 사용해 본인 Task 목록을 보여주고 선택을 진행한다.
+   - `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-my-tasks.sh`를 사용해 본인 Task 목록을 보여주고 선택을 진행한다.
 
 2. 승인된 Plan이 있고, 새 Story + Task 여러 개 + Issue/브랜치 발행이 필요한 작업이면:
    - `/ult-story-create`의 절차를 따른다.

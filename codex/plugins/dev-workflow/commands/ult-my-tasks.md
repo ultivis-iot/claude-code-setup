@@ -5,7 +5,7 @@
 ## 실행
 
 ```bash
-~/.codex/scripts/ult-my-tasks.sh [--week | --all]
+${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-my-tasks.sh [--week | --all]
 ```
 
 스크립트가 처리하는 것:
