@@ -4,7 +4,7 @@ Use this procedure when the user wants the Codex equivalent of `/review-cycle`.
 
 ## Goal
 
-Inspect the latest AI PR feedback, classify each finding, make the required changes, and continue until there are no new actionable findings.
+Inspect the latest AI PR feedback, classify each finding, and process one follow-up round. Use an external loop, such as Ralph Loop, to rerun the command until there are no new actionable findings.
 
 ## Classification
 
@@ -22,11 +22,13 @@ Inspect the latest AI PR feedback, classify each finding, make the required chan
 4. Apply fixes only for actionable items inside scope.
 5. Run the project's relevant verification commands.
 6. Commit and push the follow-up changes.
-7. Continue checking for new feedback until the review stream is exhausted or the user stops the loop.
+7. Record the last processed review ID.
+8. End the round without printing `REVIEW COMPLETE` if code changes, comments, commits, or pushes were made.
+9. Print `REVIEW COMPLETE` only when there are no new actionable findings and checks are clear.
 
 ## Story-based PRs
 
-- For Task PRs, the base branch is `dev` or the repository default branch. Continue review-cycle until AI review and CI are clear, then merge into the target base branch.
+- For Task PRs, the base branch is `dev` or the repository default branch. Rerun review-cycle until AI review and CI are clear, then merge into the target base branch.
 - Do not create Story PRs. After all Task PRs are merged, run Story-level integration validation.
 - If Task PR feedback is Story-wide or belongs to another Task, do not expand the Task PR. Record it in `tmp/story-handoff.md` and the Notion Story.
 - After each Task PR merge, update the Story handoff before starting dependent Tasks.

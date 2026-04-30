@@ -17,13 +17,13 @@ Plan을 작업 단위로 발행할 때는 다음 관계를 기준으로 움직�
 - `Story`는 여러 `Task`를 묶는 상위 단위
 - `Task 1개 = GitHub Issue 1개`
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 생성
-- 여러 Task로 나뉘는 Story는 메인 에이전트가 Story worktree를 소유하고, 각 서브에이전트가 Task worktree를 소유
-- Task branch는 Story branch에서 만들고, Task PR은 Story branch로 보낸 뒤 최종 Story PR만 `dev`로 보냄
-- Story 자체도 GitHub Issue/PR URL을 Notion Story에 기록하고, 초기 Story handoff는 Notion Story와 GitHub Story Issue에 함께 남긴 뒤 이후 변경은 GitHub Story Issue에 반영
+- 여러 Task로 나뉘는 Story는 메인 에이전트가 Notion Story와 handoff를 소유하고, 각 서브에이전트가 Task worktree를 소유
+- Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch로 보냄
+- Story 자체에는 GitHub Issue/PR을 만들지 않고, 초기 Story handoff는 Notion Story comment와 각 Task worktree에 남김
 
 즉 큰 Plan은 `ult-story-create`로 `Story + Task N개 + Issue N개`로 발행하고, 기존 Story에 작업 하나를 붙일 때는 `ult-task-create`로 `Task 1개 + Issue 1개`를 만듭니다.
 
-Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니다. Story가 여러 repo를 건드릴 때도 Story에 direct Repository relation을 두기보다, 연결된 Task들의 Repository로 판단합니다. `Parent Task`는 선행관계/dependency로 사용하며, cross-repo 문서에서는 bare `#123` 대신 `repo#issue` 또는 Issue URL을 씁니다.
+Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니다. Story가 여러 repo를 건드릴 때도 Story에 direct Repository relation을 두기보다, 연결된 Task들의 Repository로 판단합니다. `Parent Task`는 선행관계/dependency로 사용하며, cross-repo 문서에서는 bare `#123` 대신 `repo#issue` 또는 Issue URL을 씁니다. 기존 Story/Task를 재사용할 때는 현재 repository의 Project, active 상태, current handoff/current issue가 모두 맞는지 확인하고, 과거 완료/미완료 Story나 다른 repo Task는 임의로 선택하지 않습니다.
 
 ## 처음 시작
 
@@ -304,6 +304,8 @@ Plan에 따라 코드를 구현합니다.
 # 자동 반복 — 새 리뷰가 올 때마다 자동 반영 (Ralph Loop 연동)
 /ralph-loop /review-cycle 23 --completion-promise "REVIEW COMPLETE" --max-iterations 15
 ```
+
+`/review-cycle`은 한 라운드만 처리하고, 수정/코멘트/푸시가 발생한 라운드에서는 `REVIEW COMPLETE`를 출력하지 않습니다. 새 actionable 리뷰가 없고 checks가 clear일 때만 `REVIEW COMPLETE`를 출력해 Ralph Loop가 종료됩니다.
 
 AI 코드 리뷰어의 지적을 자동으로 분석하고:
 - **실제 버그/보안 문제** → 코드 수정 + 커밋 + push

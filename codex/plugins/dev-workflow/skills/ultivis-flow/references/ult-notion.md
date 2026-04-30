@@ -46,6 +46,8 @@ Before selecting or creating a Story:
 
 Never pick a Story from an unrelated Project just because the title, topic, or broad category seems close. If Project mapping is unavailable or ambiguous, pause and ask the user rather than guessing.
 
+Do not attach new work to old closed context by inference. Completed, canceled, or failed Story/Task records are not valid candidates unless the user explicitly reopens that record first. Current local handoff and current GitHub issue are stronger evidence than title similarity. Stale branch base config, old worktree names, and old PR targets are not valid Story/Task selection evidence.
+
 ## Story-Based Agent Worktree Flow
 
 Use this model for multi-task Story work. These rules are the operating checklist:
@@ -93,7 +95,7 @@ After creation, the local handoff files and Notion Story comments are the mutabl
 
 Use the global `ult-story-run.sh` to generate a current run summary and Ready Task prompts. It reads local handoff first and falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
 
-When adding a Task to an existing Story, prefer passing the Notion Story URL or running from a Task worktree with local handoff. The global `ult-task-create.sh` resolves Story context from local handoff, GitHub Task Issue, current branch issue, and then Notion title search. New Task branches should base on the latest remote base, and new Tasks should be appended to Story handoff when available.
+When adding a Task to an existing Story, prefer passing the Notion Story URL or running from a Task worktree with local handoff. The global `ult-task-create.sh` resolves Story context from local handoff, the current GitHub Task Issue, and then active Notion title search. It must not resolve Story context from stale branch base config or old worktrees. New Task branches should base on the latest remote base, and new Tasks should be appended to Story handoff when available.
 
 ## Task Dependency Rules
 

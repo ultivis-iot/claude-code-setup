@@ -1,16 +1,16 @@
 ---
 allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
-description: PR의 AI 리뷰를 확인하고 반영 가능한 항목을 반복 처리
+description: PR의 AI 리뷰를 확인하고 반영 가능한 항목을 한 라운드 처리
 argument-hint: [PR번호]
 ---
 
 # Review Cycle
 
-본문만으로 기본 루프는 수행 가능하고, 아래 문서는 판단이 애매할 때만 연다:
+본문만으로 기본 라운드는 수행 가능하고, 아래 문서는 판단이 애매할 때만 연다:
 
 - `docs/references/review-cycle-playbook.md`
   - 리뷰 분류 기준을 다시 보고 싶을 때
-  - 종료 조건이나 중복 방지 규칙이 헷갈릴 때
+  - 완료 판단이나 중복 방지 규칙이 헷갈릴 때
 
 ## 입력
 
@@ -25,8 +25,10 @@ argument-hint: [PR번호]
 - `gh` 명령은 항상 순차적으로 단독 실행한다
 - 반영/미반영 판단을 먼저 코멘트로 남긴다
 - 범위를 넘는 리팩터는 이번 PR에서 하지 않는다
-- Story 기반 작업에서는 Task PR과 Story PR 모두 review-cycle을 수행한다
-- Task PR의 base는 Story branch이고, Story PR의 base는 `dev`다
+- 이 명령은 한 라운드만 처리한다. 자동 반복은 `/ralph-loop /review-cycle ... --completion-promise "REVIEW COMPLETE"`가 담당한다
+- 수정/코멘트/푸시를 수행한 라운드에서는 `REVIEW COMPLETE`를 출력하지 않는다
+- Story 기반 작업에서도 review-cycle은 Task PR마다 수행한다
+- Task PR의 base는 `dev` 또는 repository default branch다
 
 ## 수행 절차
 
@@ -46,14 +48,13 @@ argument-hint: [PR번호]
 6. 프로젝트에 맞는 검증 명령을 실행한다
 7. commit + push 한다
 8. 마지막 처리 리뷰 ID를 `tmp/last-review-id-{PR}.txt`에 기록한다
-9. 60초 대기 후 새 리뷰를 다시 확인한다
-10. 연속 5회 새 리뷰가 없으면 종료한다
+9. 라운드 결과를 출력하고 종료한다
 
 ## Story Flow 규칙
 
-- Task PR은 AI 리뷰/CI가 clear될 때까지 반복한 뒤 Story branch로 merge한다.
-- Story PR은 모든 Task가 Story branch에 merge된 뒤 `dev` 대상으로 열고 다시 review-cycle을 반복한다.
-- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`와 GitHub Story Issue에 carryover로 기록한다.
+- Task PR은 AI 리뷰/CI가 clear될 때까지 반복한 뒤 `dev` 또는 repository default branch로 merge한다.
+- 모든 Task PR이 merge된 뒤 Story 단위 통합 검증을 수행한다. 별도 Story PR은 만들지 않는다.
+- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`와 Notion Story comment에 carryover로 기록한다.
 - Task PR merge 후 dependent Task를 시작하기 전에 Story handoff를 갱신한다.
 
 ## 검증 명령 선택
@@ -67,18 +68,25 @@ argument-hint: [PR번호]
 
 push 실패 시 한 번은 rebase 후 재시도하고, 다시 실패하면 중단한다.
 
-## 종료
+## 라운드 종료
 
-- 신규 리뷰 없음 5회 연속
-- 또는 반복 지적/설명 완료 항목만 남음
+- 신규 actionable 리뷰가 없고 CI/checks가 clear면 완료로 본다
+- 반복 지적/설명 완료 항목만 남아도 완료로 본다
+- 수정, 코멘트, commit, push를 수행했다면 다음 리뷰가 필요하므로 완료로 보지 않는다
 
-종료 메시지:
+완료 메시지:
 
 ```text
-REVIEW COMPLETE — N건 리뷰 처리, M회 대기 후 종료
+REVIEW COMPLETE — 신규 actionable 리뷰 없음
+```
+
+다음 라운드가 필요한 경우:
+
+```text
+REVIEW ROUND COMPLETE — N건 처리, 새 리뷰 확인 필요
 ```
 
 reference를 안 열어도 되는 경우:
 
-- 최신 AI 리뷰를 읽고 반영 가능한 항목을 처리하는 일반 루프
-- 종료 기준이 단순한 케이스
+- 최신 AI 리뷰를 읽고 반영 가능한 항목을 처리하는 일반 라운드
+- 완료 기준이 단순한 케이스

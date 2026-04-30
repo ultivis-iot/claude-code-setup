@@ -251,10 +251,17 @@ if [ -z "$issue_num" ]; then
     echo "✓ GitHub Issue 생성 및 Task 연결: ${issue_url}"
 fi
 
-# 기존 브랜치 검색 (Issue 번호 포함)
+# 기존 브랜치 검색. 이슈 번호가 단순 포함된 과거 브랜치를 잡지 않도록 prefix만 허용한다.
 existing_branch=""
 if [ -n "$issue_num" ]; then
-    existing_branch=$(git branch --list "*${issue_num}*" --format='%(refname:short)' | head -1)
+    current_branch=$(git branch --show-current 2>/dev/null || true)
+    if printf '%s\n' "$current_branch" | grep -Eq "^${issue_num}($|[-_/])"; then
+        existing_branch="$current_branch"
+    else
+        existing_branch=$(git branch --format='%(refname:short)' 2>/dev/null \
+            | grep -E "^${issue_num}($|[-_/])" \
+            | head -1)
+    fi
 fi
 
 # 브랜치 이름 결정

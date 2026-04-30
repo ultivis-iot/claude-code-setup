@@ -155,7 +155,7 @@ valid_handoff_json() {
 }
 
 load_local_handoff() {
-    local candidate current base base_wt
+    local candidate
 
     if [ -n "$STORY_REF" ] && [ -f "$STORY_REF" ] && valid_handoff_json < "$STORY_REF"; then
         jq -c --arg source "local:$STORY_REF" '. + {_source: $source}' "$STORY_REF"
@@ -170,19 +170,6 @@ load_local_handoff() {
             return 0
         fi
     done
-
-    current=$(git branch --show-current 2>/dev/null || true)
-    if [ -n "$current" ]; then
-        base=$(git config "branch.$current.gh-merge-base" 2>/dev/null || true)
-        if [ -n "$base" ]; then
-            base_wt=$(worktree_for_branch "$base" 2>/dev/null || true)
-            candidate="$base_wt/tmp/story-handoff.json"
-            if [ -n "$base_wt" ] && [ -f "$candidate" ] && valid_handoff_json < "$candidate"; then
-                jq -c --arg source "local:$candidate" '. + {_source: $source}' "$candidate"
-                return 0
-            fi
-        fi
-    fi
 
     return 1
 }

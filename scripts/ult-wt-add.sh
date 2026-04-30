@@ -87,6 +87,15 @@ fi
 # 이미 존재하면 경로만 반환 (idempotent)
 if [ -d "$WT_PATH" ]; then
     _log "ℹ️  이미 존재: $WT_PATH"
+    existing_branch=$(git -C "$WT_PATH" branch --show-current 2>/dev/null || true)
+    if [ "$existing_branch" != "$BRANCH" ]; then
+        echo "ERROR: worktree path already exists for a different branch." >&2
+        echo "  Path: $WT_PATH" >&2
+        echo "  Expected branch: $BRANCH" >&2
+        echo "  Actual branch: ${existing_branch:-unknown}" >&2
+        echo "기존 과거 작업 브랜치를 재사용하지 않도록 중단합니다. worktree를 정리하거나 다른 branch 이름을 사용하세요." >&2
+        exit 1
+    fi
     if [ -n "$BASE_BRANCH" ]; then
         git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$(normalize_base_branch_name "$BASE_BRANCH")" 2>/dev/null || true
     fi

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## v0.6.5 (2026-04-30)
+- `/review-cycle`을 한 라운드 처리 명령으로 정리하고, 자동 반복은 Ralph Loop가 `REVIEW COMPLETE` 완료 신호를 기준으로 담당하도록 문서와 설치본 프롬프트를 통일.
+- Story/Task 선택 시 완료/미완료/취소된 과거 Story를 재사용하지 않도록 필터와 검증을 강화하고, 오래된 branch base나 과거 worktree 기반 Story 추론을 제거.
+- PR 생성 target을 `origin/dev` 또는 repository default branch로 고정하고, local handoff/branch config/과거 PR에서 작업 브랜치를 target으로 추론하지 않도록 명시.
+- `ult-my-tasks.sh`와 `ult-wt-add.sh`가 이슈 번호 포함 브랜치나 기존 worktree 경로를 잘못 재사용하지 않도록 방어 로직 추가.
+
 ## v0.6.4 (2026-04-29)
 - Story는 Notion 조율 단위로 유지하고 GitHub Issue/PR은 Task 단위에만 만들도록 Story 생성, Task 추가, Story runner, PR/review 문서를 정리.
 - workflow 스크립트와 Notion cache를 전역 설치 경로(`~/.codex`/`~/.claude`) 기준으로 해석하도록 강화해 작업 repo-local `scripts/` 탐색을 피하도록 수정.

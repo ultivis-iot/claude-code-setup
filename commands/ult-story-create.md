@@ -54,20 +54,20 @@
 - Story/Task page는 configured Notion template을 사용한다
 - description/body markdown은 heading/list/todo Notion block으로 변환되어야 한다
 - Task dependency가 있으면 `Parent Task` relation을 사용한다
-- Story GitHub Issue를 만들고 Story `Issue URL`에 기록한다
-- Story branch/worktree를 먼저 만들고 Task branch는 Story branch를 base로 만든다
-- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 만들고 초기 handoff를 Notion Story와 GitHub Story Issue에 동일하게 남긴다
-- 생성 이후 handoff 변경사항은 GitHub Story Issue에 반영한다
+- Story GitHub Issue/PR은 만들지 않는다
+- Task branch/worktree는 Task Issue 기준으로 만들고 최신 원격 base를 사용한다
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 각 Task worktree에 만들고 초기 handoff를 Notion Story comment에도 남긴다
+- 생성 이후 handoff 변경사항은 Task worktree handoff와 Notion Story comment에 반영한다
 
 ## Agent Worktree 규칙
 
 여러 Task가 있는 Story는 Story 기반 agent worktree flow를 우선 적용한다.
 
-- 메인 에이전트는 Story context와 Story worktree를 담당한다.
+- 메인 에이전트는 Notion Story context와 handoff를 담당한다.
 - 서브에이전트는 각 Task worktree를 담당한다.
-- Task branch는 Story branch에서 생성하는 것이 원칙이다.
-- Task PR은 Story branch를 target으로 한다.
-- Story PR만 최종적으로 `dev`를 target으로 한다.
+- Task branch는 최신 원격 base에서 생성하는 것이 원칙이다.
+- Task PR은 `dev` 또는 repository default branch를 target으로 한다.
+- Story PR은 만들지 않는다.
 - cross-repo Story에서는 Task의 Repository relation이 repo ownership의 기준이다.
 - cross-repo issue 식별은 bare `#123` 대신 `repo#issue` 또는 Issue URL을 사용한다.
 

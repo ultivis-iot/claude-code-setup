@@ -16,6 +16,12 @@ Use this procedure when the user wants the Codex equivalent of `/create-pr`.
 3. Push the branch.
 4. Create the PR with a concise title and body.
 
+Target branch rules:
+
+- Prefer `dev` when `origin/dev` exists; otherwise use the repository default branch.
+- Do not infer a PR target from local handoff, stale branch config, old PRs, or old work branches.
+- If the target is the current branch or a non-default work branch, stop and ask for explicit confirmation.
+
 For Story-based work, GitHub PRs still belong to Tasks:
 
 - Task PRs target `dev` or the repository default branch.

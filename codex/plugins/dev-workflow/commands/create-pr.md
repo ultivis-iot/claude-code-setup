@@ -27,8 +27,10 @@ argument-hint: [directory] [-b target-branch]
    - `results.intent-validator == PASS`
    - 어떤 validator도 `FAIL`이 아님
 3. 현재 브랜치와 리모트를 확인한다
-   - `-b`가 없으면 저장소 기본 브랜치를 사용한다
+   - `-b`가 없으면 `origin/dev`가 있을 때 `dev`, 없으면 repository default branch를 사용한다
    - Story 기반 작업이어도 Task PR은 `dev` 또는 repository default branch를 target으로 한다
+   - local handoff, branch config, 과거 PR, 오래된 작업 branch에서 target branch를 추론하지 않는다
+   - target이 현재 branch이거나 `dev`/repository default branch가 아닌 작업 branch로 보이면 중단하고 사용자 확인을 받는다
 4. `git push -u origin <branch>`를 수행한다
 5. `gh pr create`로 PR을 생성한다
    - `-b`가 있으면 `-B <target-branch>` 적용

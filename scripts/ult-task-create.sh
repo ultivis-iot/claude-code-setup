@@ -154,6 +154,21 @@ story_project_id() {
     echo "$1" | jq -r '.properties["🛡️ Project "].relation[0].id // .properties["🛡️ Project"].relation[0].id // empty'
 }
 
+story_status() {
+    echo "$1" | jq -r '.properties.Status.status.name // empty'
+}
+
+story_is_terminal_status() {
+    case "$1" in
+        "완료"|"개발 완료"|"미완료"|"취소"|"Canceled"|"Cancelled"|"Done"|"Closed")
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 CONTEXT_HANDOFF_PATH=""
 
 story_issue_url() {
@@ -311,18 +326,9 @@ load_story_from_handoff_file() {
 }
 
 load_story_from_local_context() {
-    local current base base_wt issue_num issue_url
+    local issue_num issue_url
 
     load_story_from_handoff_file "tmp/story-handoff.json" && return 0
-
-    current=$(git branch --show-current 2>/dev/null || true)
-    if [ -n "$current" ]; then
-        base=$(git config "branch.$current.gh-merge-base" 2>/dev/null || true)
-        if [ -n "$base" ]; then
-            base_wt=$(worktree_for_branch "$base" 2>/dev/null || true)
-            [ -n "$base_wt" ] && load_story_from_handoff_file "$base_wt/tmp/story-handoff.json" && return 0
-        fi
-    fi
 
     issue_num=$(issue_num_from_branch 2>/dev/null || true)
     if [ -n "$issue_num" ]; then
@@ -348,16 +354,36 @@ filter_stories_for_repo_project() {
     '
 }
 
+filter_active_stories() {
+    local rows="$1"
+    echo "$rows" | jq -c '
+        map(
+            . as $story
+            | ($story.properties.Status.status.name // "") as $status
+            | select(["완료", "개발 완료", "미완료", "취소", "Canceled", "Cancelled", "Done", "Closed"] | index($status) | not)
+        )
+    '
+}
+
 validate_story_project_for_repo() {
     local story="$1"
-    local project_id title
+    local project_id title status
     project_id=$(story_project_id "$story")
     title=$(story_title "$story")
+    status=$(story_status "$story")
 
     [ -n "$project_id" ] || {
         echo "Story에서 Project relation을 찾을 수 없습니다: $title" >&2
         return 1
     }
+
+    if story_is_terminal_status "$status"; then
+        echo "선택된 Story가 종료 상태입니다. 과거 Story에 새 Task를 붙이지 않도록 중단합니다." >&2
+        echo "  Story: $title" >&2
+        echo "  Status: ${status:-unknown}" >&2
+        echo "활성 Story를 지정하거나, 정말 재개가 필요하면 Notion에서 Story 상태를 먼저 되돌리세요." >&2
+        return 1
+    fi
 
     if ! echo "$REPO_PROJECT_IDS_JSON" | jq -e --arg pid "$project_id" 'index($pid)' >/dev/null; then
         echo "Story의 Project가 현재 repository의 Project와 일치하지 않습니다." >&2
@@ -406,6 +432,7 @@ load_story() {
         filter=$(jq -nc --arg q "$ref" '{property: "Title", title: {contains: $q}}')
         rows=$(notion_query_ds "$STORY_DB" "$filter" | jq -c '.results')
         rows=$(filter_stories_for_repo_project "$rows")
+        rows=$(filter_active_stories "$rows")
         select_story_from_json "$rows"
         return
     fi
@@ -413,13 +440,17 @@ load_story() {
     load_story_from_local_context && return 0
 
     filter=$(jq -nc --arg uid "$ASSIGNEE_ID" '{
-        or: [
-            {property: "Status", status: {equals: "진행 중"}},
-            {property: "Assignee", people: {contains: $uid}}
+        and: [
+            {property: "Assignee", people: {contains: $uid}},
+            {or: [
+                {property: "Status", status: {equals: "시작 전"}},
+                {property: "Status", status: {equals: "진행 중"}}
+            ]}
         ]
     }')
     rows=$(notion_query_ds "$STORY_DB" "$filter" | jq -c '.results')
     rows=$(filter_stories_for_repo_project "$rows")
+    rows=$(filter_active_stories "$rows")
     select_story_from_json "$rows"
 }
 

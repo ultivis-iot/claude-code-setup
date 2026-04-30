@@ -27,6 +27,8 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 
 - Story 선택 전에 현재 repository의 Notion Project를 먼저 확인합니다.
 - 후보 Story는 해당 Project에 연결된 것만 유효합니다.
+- 완료/미완료/취소 등 과거 종료 상태 Story는 후보에서 제외하고, 명시 URL/id로 지정해도 상태를 먼저 되돌리기 전에는 새 Task를 붙이지 않습니다.
+- title 검색 결과가 여러 개면 최신 active Story인지, 현재 handoff/current issue와 연결되는지 확인하기 전에는 자동 선택하지 않습니다.
 - 후보가 애매하면 Story를 고르거나 만들기 전에 사용자 확인을 받습니다.
 - Project가 불명확하면 아무 Story나 고르지 말고 중단합니다.
 
@@ -57,4 +59,4 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 
 Story 기반 작업에서는 `Parent Task`를 선행관계로 사용한다. Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch를 target으로 한다. Story GitHub Issue/PR은 만들지 않는다. 같은 Story가 여러 repository를 건드리더라도 Task의 Repository relation이 repo ownership의 기준이다.
 
-Story를 명시하지 않으면 현재 worktree의 `tmp/story-handoff.json`, 현재 branch의 `gh-merge-base`, 현재 GitHub Task Issue 순서로 Story를 추론한다. 추론이 애매하면 Notion 후보 선택으로 fallback한다.
+Story를 명시하지 않으면 현재 worktree의 `tmp/story-handoff.json`, 현재 GitHub Task Issue 순서로 Story를 추론한다. 오래된 branch base나 과거 worktree만으로 Story를 추론하지 않는다. 추론이 애매하면 active Story 후보를 보여주고 사용자 선택으로 fallback한다.
