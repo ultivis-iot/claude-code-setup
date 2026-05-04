@@ -4,7 +4,7 @@ Use this procedure when the user wants the Codex equivalent of `/review-cycle`.
 
 ## Goal
 
-Inspect the latest AI PR feedback, classify each finding, and process one follow-up round. Use an external loop, such as Ralph Loop, to rerun the command until there are no new actionable findings.
+Inspect the latest AI PR feedback, classify each finding, and keep processing follow-up rounds through Ralph Loop until there are no new actionable findings. A direct `/review-cycle` invocation should bootstrap Ralph Loop automatically; only `/review-cycle ... --once` performs one concrete round.
 
 ## Classification
 
@@ -16,15 +16,16 @@ Inspect the latest AI PR feedback, classify each finding, and process one follow
 
 ## Required behavior
 
-1. Read the latest PR comments, reviews, and unresolved review threads.
-2. Ignore human comments when the task is specifically about AI review follow-up.
-3. Record what will be addressed before editing code.
-4. Apply fixes only for actionable items inside scope.
-5. Run the project's relevant verification commands.
-6. Commit and push the follow-up changes.
-7. Record the last processed review ID.
-8. End the round without printing `REVIEW COMPLETE` if code changes, comments, commits, or pushes were made.
-9. Print `REVIEW COMPLETE` only when there are no new actionable findings and checks are clear.
+1. If invoked without `--once`, start Ralph Loop with `/review-cycle ... --once` as the repeated prompt and do not process reviews in the bootstrap call.
+2. In a `--once` round, read the latest PR comments, reviews, and unresolved review threads.
+3. Ignore human comments when the task is specifically about AI review follow-up.
+4. Record what will be addressed before editing code.
+5. Apply fixes only for actionable items inside scope.
+6. Run the project's relevant verification commands.
+7. Commit and push the follow-up changes.
+8. Record the last processed review ID.
+9. End the round without printing `<promise>REVIEW COMPLETE</promise>` if code changes, comments, commits, or pushes were made.
+10. Print `<promise>REVIEW COMPLETE</promise>` only when there are no new actionable findings and checks are clear.
 
 ## Story-based PRs
 

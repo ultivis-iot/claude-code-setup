@@ -1,12 +1,12 @@
 ---
-allowed-tools: Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
-description: PR의 AI 리뷰를 확인하고 반영 가능한 항목을 한 라운드 처리
-argument-hint: [PR번호]
+allowed-tools: Bash(${HOME}/.claude/scripts/review-cycle-ralph-loop.sh:*), Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
+description: PR의 AI 리뷰를 Ralph Loop로 반복 확인하고 반영
+argument-hint: [PR번호] [--once]
 ---
 
 # Review Cycle
 
-본문만으로 기본 라운드는 수행 가능하고, 아래 문서는 판단이 애매할 때만 연다:
+본문만으로 기본 흐름은 수행 가능하고, 아래 문서는 판단이 애매할 때만 연다:
 
 - `docs/references/review-cycle-playbook.md`
   - 리뷰 분류 기준을 다시 보고 싶을 때
@@ -16,17 +16,32 @@ argument-hint: [PR번호]
 
 입력: `$ARGUMENTS`
 
-- `/review-cycle 23` → PR #23
-- `/review-cycle` → 현재 브랜치 PR 자동 감지
+- `/review-cycle 23` → Ralph Loop로 PR #23 review-cycle 자동 반복
+- `/review-cycle` → Ralph Loop로 현재 브랜치 PR 자동 감지 후 자동 반복
+- `/review-cycle 23 --once` → Ralph Loop 내부에서 실행되는 단일 라운드
 - PR 번호는 양의 정수만 허용
+
+## 자동 루프 부트스트랩
+
+`$ARGUMENTS`에 `--once`가 없으면 이 명령은 직접 리뷰를 처리하지 않는다. 먼저 아래 bootstrap을 실행해 Ralph Loop를 시작하고, 반복 prompt는 `/review-cycle ... --once`로 설정한다.
+
+```!
+"${HOME}/.claude/scripts/review-cycle-ralph-loop.sh" $ARGUMENTS
+```
+
+- bootstrap이 실행된 호출에서는 리뷰 처리, 코드 수정, commit, push를 직접 수행하지 않는다
+- 이후 Ralph Loop가 `/review-cycle ... --once`를 반복 입력하면 그때 아래 단일 라운드를 수행한다
+- 반복 횟수 기본값은 15회이며, 필요하면 `REVIEW_CYCLE_MAX_ITERATIONS` 환경 변수로 조정한다
+- Ralph Loop 완료 신호는 반드시 `<promise>REVIEW COMPLETE</promise>` 형식으로 출력한다
 
 ## 핵심 규칙
 
 - `gh` 명령은 항상 순차적으로 단독 실행한다
 - 반영/미반영 판단을 먼저 코멘트로 남긴다
 - 범위를 넘는 리팩터는 이번 PR에서 하지 않는다
-- 이 명령은 한 라운드만 처리한다. 자동 반복은 `/ralph-loop /review-cycle ... --completion-promise "REVIEW COMPLETE"`가 담당한다
-- 수정/코멘트/푸시를 수행한 라운드에서는 `REVIEW COMPLETE`를 출력하지 않는다
+- `--once` 라운드만 실제 리뷰 처리를 수행한다
+- 사용자가 `/review-cycle`을 직접 실행하면 Ralph Loop가 자동으로 `/review-cycle ... --once`를 반복 실행해야 한다
+- 수정/코멘트/푸시를 수행한 라운드에서는 `<promise>REVIEW COMPLETE</promise>`를 출력하지 않는다
 - Story 기반 작업에서도 review-cycle은 Task PR마다 수행한다
 - Task PR의 base는 `dev` 또는 repository default branch다
 
@@ -74,10 +89,10 @@ push 실패 시 한 번은 rebase 후 재시도하고, 다시 실패하면 중�
 - 반복 지적/설명 완료 항목만 남아도 완료로 본다
 - 수정, 코멘트, commit, push를 수행했다면 다음 리뷰가 필요하므로 완료로 보지 않는다
 
-완료 메시지:
+완료 메시지는 아래 한 줄만 출력한다:
 
 ```text
-REVIEW COMPLETE — 신규 actionable 리뷰 없음
+<promise>REVIEW COMPLETE</promise>
 ```
 
 다음 라운드가 필요한 경우:

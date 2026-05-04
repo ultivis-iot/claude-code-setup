@@ -28,9 +28,11 @@
 
 자동 반복:
 
-- `/review-cycle`은 한 라운드만 처리
-- 새 리뷰 대기와 재실행은 `/ralph-loop /review-cycle ... --completion-promise "REVIEW COMPLETE"`가 담당
-- 수정/코멘트/푸시를 수행한 라운드에서는 `REVIEW COMPLETE`를 출력하지 않음
+- 사용자는 `/review-cycle [PR번호]`만 실행한다
+- `/review-cycle` 기본 호출은 Ralph Loop를 자동으로 시작하고, 반복 prompt를 `/review-cycle [PR번호] --once`로 설정한다
+- `/review-cycle --once`만 한 라운드를 처리한다
+- 수정/코멘트/푸시를 수행한 라운드에서는 `<promise>REVIEW COMPLETE</promise>`를 출력하지 않음
+- 신규 actionable 리뷰가 없고 CI/checks가 clear일 때만 `<promise>REVIEW COMPLETE</promise>`를 출력해 Ralph Loop를 종료한다
 
 완료 조건:
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## v0.6.6 (2026-05-04)
+
+- `/review-cycle` 기본 실행이 Ralph Loop를 자동으로 시작하고, 내부 반복 라운드는 `/review-cycle ... --once`로 수행하도록 명령 프롬프트와 문서를 수정.
+- Ralph Loop 완료 감지에 맞춰 review-cycle 완료 신호를 `<promise>REVIEW COMPLETE</promise>` 형식으로 정리.
+
 ## v0.6.5 (2026-04-30)
 - `/review-cycle`을 한 라운드 처리 명령으로 정리하고, 자동 반복은 Ralph Loop가 `REVIEW COMPLETE` 완료 신호를 기준으로 담당하도록 문서와 설치본 프롬프트를 통일.
 - Story/Task 선택 시 완료/미완료/취소된 과거 Story를 재사용하지 않도록 필터와 검증을 강화하고, 오래된 branch base나 과거 worktree 기반 Story 추론을 제거.

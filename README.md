@@ -298,14 +298,14 @@ Plan에 따라 코드를 구현합니다.
 ### 6. PR 리뷰 반영
 
 ```bash
-# 1회 실행 — 최신 AI 리뷰 확인 후 반영/코멘트
+# 기본 실행 — Ralph Loop가 자동으로 켜지고 반복 처리
 /review-cycle 23
 
-# 자동 반복 — 새 리뷰가 올 때마다 자동 반영 (Ralph Loop 연동)
-/ralph-loop /review-cycle 23 --completion-promise "REVIEW COMPLETE" --max-iterations 15
+# 내부 단일 라운드 — Ralph Loop가 반복 실행할 때만 사용
+/review-cycle 23 --once
 ```
 
-`/review-cycle`은 한 라운드만 처리하고, 수정/코멘트/푸시가 발생한 라운드에서는 `REVIEW COMPLETE`를 출력하지 않습니다. 새 actionable 리뷰가 없고 checks가 clear일 때만 `REVIEW COMPLETE`를 출력해 Ralph Loop가 종료됩니다.
+사용자는 `/review-cycle`만 실행하면 됩니다. 이 명령이 Ralph Loop를 자동으로 시작하고, Ralph Loop는 내부적으로 `/review-cycle ... --once`를 반복 실행합니다. 수정/코멘트/푸시가 발생한 라운드에서는 완료 promise를 출력하지 않고, 새 actionable 리뷰가 없고 checks가 clear일 때만 `<promise>REVIEW COMPLETE</promise>`를 출력해 Ralph Loop가 종료됩니다.
 
 AI 코드 리뷰어의 지적을 자동으로 분석하고:
 - **실제 버그/보안 문제** → 코드 수정 + 커밋 + push
