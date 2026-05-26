@@ -223,6 +223,7 @@ REPOSITORY_DB="23a729af-8b39-4fe9-accb-c0eb44538ce0"
 WEEK_DB="2caff747-77ab-8055-b249-000bec1e846b"
 MEMBER_DB="11bab65b-33f6-417a-aaf2-ccdb7f574b71"
 DAILY_REPORT_DB="f365bbd5-d7e3-49c9-bf0d-89c757de27df"
+WEEKLY_REVIEW_DB="301ff747-77ab-803b-905a-000b9fc65ad9"
 
 # ---- 캐시 ----
 CACHE_DIR="$WORKFLOW_CACHE_DIR"
@@ -367,6 +368,14 @@ story_template_id() {
     esac
 }
 TASK_TEMPLATE_ID="1f5ff747-77ab-80b1-975a-d04aeb3adf56"
+WEEKLY_REVIEW_MARKETING_TEMPLATE_ID="30fff747-77ab-8068-b92c-c06ec0167789"
+
+weekly_review_template_id() {
+    case "$1" in
+        ""|마케팅|marketing|Marketing) echo "$WEEKLY_REVIEW_MARKETING_TEMPLATE_ID" ;;
+        *) echo "$1" ;;
+    esac
+}
 
 # 템플릿 페이지의 children blocks를 fetch + 정제 + 캐시
 template_blocks_cached() {

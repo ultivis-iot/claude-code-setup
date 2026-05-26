@@ -32,6 +32,23 @@ Global scripts:
 
 If Notion integration is required, verify credentials and the available MCP/tooling in the current environment before promising automation.
 
+## Weekly Review Rules
+
+Use these rules when the user asks for `weekly-review` or asks to review the weekly work.
+
+- `weekly-review` means review/draft only. Do not publish to Notion unless the user explicitly says `publish` or asks to create the Notion page.
+- The default target is the previous Week DB row. Resolve the current Week from Week DB first, then choose the immediately preceding Week by `DateFrom`.
+- Use `ult-weekly-collect.sh --week <previous-week-DateFrom>` to collect all tasks assigned to the current user for that Week. Do not filter to one Project unless the user explicitly asks for a Project-specific review.
+- Format the review to match the Weekly Review `마케팅` template, with these sections: `새로 추가된 기능`, `기타 업데이트 내용`, and `Task 보기`. If multiple Projects appear, group or label the content by Project only when it improves readability.
+- `새로 추가된 기능` should contain only feature/new-capability items that are meaningful to users.
+- `기타 업데이트 내용` should contain user-facing fixes, updates, refactors, UX improvements, and operational changes. Do not fill this section with raw stats.
+- Use totals, status split, commit count, and topic counts only as internal context for judging scope unless the user explicitly asks for metrics.
+- Keep the review concise and short-phrase oriented. Weekly Review bullets should read like brief Notion bullets, not explanatory sentences. Include only important follow-up/overdue items when they affect completion or next-week action.
+- `Task 보기` is the template's linked database/view area. Do not manually duplicate the full task list in the written review unless the user asks for it.
+- For Project-specific Weekly Review titles, use `<ProjectShort>-YY-MM-WW`, where `ProjectShort` comes from the selected Project and `WW` is the week-of-month from the Week DB `DateFrom` date. Example: Project `Ultivis CRM` and Week `2026-05-18 ~ 2026-05-24` becomes `CRM-26-05-03`. For all-task reviews spanning multiple Projects, use `Weekly-YY-MM-WW` unless the user asks for a different naming rule.
+- If publishing is explicitly requested, use `ult-weekly-publish.sh`. The default template is `마케팅`; allow `--project <Project name|Notion page id|URL>` when the Project should differ from the template default.
+- The `Task 보기` linked database filter belongs to the Notion template/view. Current Notion API tooling can create the page and set `❤️‍🔥 Week`/`🛡️ Project` relations, but should not claim it can patch the linked view filter unless verified in the current environment.
+
 ## Story and Project Rules
 
 Story is not a loose label. A Story belongs under a specific Notion Project, and that Project relation is the primary boundary for selecting or creating the Story.
