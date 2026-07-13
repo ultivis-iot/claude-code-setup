@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## v0.6.7 (2026-07-13)
+
+- Codex skill에만 있던 Weekly Review 규칙(직전 Week 기본 대상, `마케팅` 템플릿 3섹션, 제목 규칙, 명시적 발행 요청 시에만 publish)을 `/ult-weekly-report` 명령과 Codex plugin 명령, `weekly-report-format.md`에 백포트.
+- `ult-weekly-collect.sh`에서 Story/Project 캐시 파일이 없을 때 `jq` glob 확장 실패로 매핑이 깨지던 문제 수정.
+- Codex 설치/문서를 현재 plugin/skill 구조에 맞춰 정리하고, 기본 사용법을 `/ult:...` slash command 대신 `ultivis-flow` skill과 자연어 요청 중심으로 수정.
+- Codex plugin 설치 위치를 `~/.codex/plugins/ult`로 정리하고 marketplace entry가 해당 plugin을 가리키도록 수정.
 
 ## v0.6.6 (2026-05-04)
 

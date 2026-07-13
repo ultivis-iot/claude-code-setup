@@ -49,7 +49,7 @@ argument-hint: [directory] [-b target-branch]
 ## 실패 규칙
 
 - validation 미통과 시 즉시 중단
-- `/commit-and-verify` 재실행 안내
+- `/ult:commit-and-verify` 재실행 안내
 - push 또는 `gh pr create` 실패 시 원인만 요약해 안내하고 중단
 
 reference를 안 열어도 되는 경우:

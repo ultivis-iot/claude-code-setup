@@ -1,6 +1,6 @@
 # Task에 GitHub Issue 연결
 
-GitHub Issue는 있지만 Notion Task의 `Issue URL`이 비어 있어 `/issue`, `/ult-task-note`, `/ult-task-status`가 Task를 찾지 못할 때 사용합니다.
+GitHub Issue는 있지만 Notion Task의 `Issue URL`이 비어 있어 `/ult:issue`, `/ult:ult-task-note`, `/ult:ult-task-status`가 Task를 찾지 못할 때 사용합니다.
 
 ## 실행
 
@@ -18,9 +18,9 @@ ${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-link-issue
 ## 사용 예
 
 ```
-/ult-task-link-issue #234 --task https://www.notion.so/...
-/ult-task-link-issue https://github.com/org/repo/issues/234 --task https://www.notion.so/...
-/ult-task-link-issue #234 --name "Token refresh 처리"
+/ult:ult-task-link-issue #234 --task https://www.notion.so/...
+/ult:ult-task-link-issue https://github.com/org/repo/issues/234 --task https://www.notion.so/...
+/ult:ult-task-link-issue #234 --name "Token refresh 처리"
 ```
 
 ## 주의

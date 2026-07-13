@@ -25,11 +25,11 @@ ${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-status.sh 
 ### 사용 예
 
 ```
-/ult-task-status                 # 현재 브랜치 Task, 대화형
-/ult-task-status #234 cancel     # Task #234 미완료 처리
-/ult-task-status #234 reopen     # 시작 전으로 되돌림
-/ult-task-status #234 in-progress
-/ult-task-status #234 done
+/ult:ult-task-status                 # 현재 브랜치 Task, 대화형
+/ult:ult-task-status #234 cancel     # Task #234 미완료 처리
+/ult:ult-task-status #234 reopen     # 시작 전으로 되돌림
+/ult:ult-task-status #234 in-progress
+/ult:ult-task-status #234 done
 ```
 
 ### action 매핑

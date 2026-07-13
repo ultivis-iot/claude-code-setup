@@ -58,7 +58,7 @@ cd claude-code-setup
 ./setup-codex.sh
 ```
 
-Codex에서는 `skill + plugin commands + minimal rules` 형태로 같은 워크플로우를 적용합니다. 현재 Codex 명령 진입점은 짧은 `/ult:...` 네임스페이스를 사용합니다.
+Codex에서는 `skill + plugin marketplace + minimal rules` 형태로 같은 워크플로우를 적용합니다. 기본 진입점은 `ultivis-flow` skill과 자연어 요청이며, plugin은 이 skill을 설치/공유하기 위한 패키지입니다.
 
 ### Linux / macOS
 
@@ -172,15 +172,11 @@ Codex 설치 시:
 ~/.codex/notion-cache/
 └── ...                         # Notion token 사용 가능 시 설치 중 자동 준비
 
-~/plugins/
+~/.codex/plugins/
 └── ult/
     ├── .codex-plugin/
     │   └── plugin.json
-    ├── commands/
-    │   ├── commit-and-verify.md
-    │   ├── create-pr.md
-    │   ├── review-cycle.md
-    │   └── ...
+    ├── commands/                 # legacy compatibility only
     └── skills/
         └── ultivis-flow/
 
@@ -194,17 +190,16 @@ Codex 설치 시:
 
 `setup-codex.sh` 실행 후 새 Codex 세션에서 다음처럼 요청하면 됩니다:
 
-- `/ult:commit-and-verify feat: 새로운 기능 추가`
-- `/ult:create-pr`
-- `/ult:review-cycle 23`
-- `/ult:ult-my-tasks`
-- `/ult:ult-story-run`
+- `$ultivis-flow commit and verify 해줘`
+- `$ultivis-flow validation 통과했으면 PR 만들어줘`
+- `$ultivis-flow PR 23 review cycle 돌려줘`
+- `$ultivis-flow 내 Ultivis Task 확인하고 시작하게 도와줘`
 - "이 작업 plan 먼저 잡고 intent 명시해줘"
 - "commit and verify 해줘"
 - "validation 통과했으면 PR 만들어줘"
 - "PR 23 review cycle 돌려줘"
 
-Codex에서는 로컬 문서/예제 기준으로 루트 slash command 등록 경로를 확인하지 못해, `~/plugins/ult`와 `~/.agents/plugins/marketplace.json`를 통해 `/ult:...` 형식의 짧은 slash command를 등록합니다. `ultivis-flow` skill은 같은 워크플로우를 자연어 요청에도 적용하고, `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다.
+Codex에서는 `~/.codex/skills/ultivis-flow`를 직접 설치하고, 같은 skill을 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
 
 설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `bash`가 있으면 같은 refresh 스크립트로 warm-up을 시도합니다.
 

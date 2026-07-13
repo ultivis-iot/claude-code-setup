@@ -13,7 +13,7 @@ RULE_NAME="dev-workflow.rules"
 PLUGIN_SOURCE_DIR="dev-workflow"
 PLUGIN_NAME="ult"
 LEGACY_PLUGIN_NAME="dev-workflow"
-PLUGIN_ROOT="$HOME/plugins"
+PLUGIN_ROOT="$CODEX_DIR/plugins"
 PLUGIN_DEST="$PLUGIN_ROOT/$PLUGIN_NAME"
 MARKETPLACE_PATH="$HOME/.agents/plugins/marketplace.json"
 
@@ -56,7 +56,7 @@ rm -rf "$PLUGIN_ROOT/$LEGACY_PLUGIN_NAME"
 rm -rf "$PLUGIN_DEST"
 cp -R "$SCRIPT_DIR/codex/plugins/$PLUGIN_SOURCE_DIR" "$PLUGIN_DEST"
 mkdir -p "$(dirname "$MARKETPLACE_PATH")"
-python3 - "$MARKETPLACE_PATH" "$PLUGIN_NAME" "$LEGACY_PLUGIN_NAME" <<'PY'
+python3 - "$MARKETPLACE_PATH" "$PLUGIN_NAME" "$LEGACY_PLUGIN_NAME" "$PLUGIN_DEST" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -64,11 +64,18 @@ from pathlib import Path
 marketplace_path = Path(sys.argv[1]).expanduser()
 plugin_name = sys.argv[2]
 legacy_plugin_name = sys.argv[3]
+plugin_dest = Path(sys.argv[4]).expanduser()
+home = Path.home()
+try:
+    rel_plugin_path = plugin_dest.relative_to(home)
+    source_path = f"./{rel_plugin_path.as_posix()}"
+except ValueError:
+    source_path = str(plugin_dest)
 entry = {
     "name": plugin_name,
     "source": {
         "source": "local",
-        "path": f"./plugins/{plugin_name}",
+        "path": source_path,
     },
     "policy": {
         "installation": "INSTALLED_BY_DEFAULT",
@@ -105,9 +112,9 @@ with marketplace_path.open("w") as handle:
     json.dump(payload, handle, indent=2)
     handle.write("\n")
 PY
-echo -e "${GREEN}   ✓ ~/plugins/$PLUGIN_NAME${NC}"
+echo -e "${GREEN}   ✓ ~/.codex/plugins/$PLUGIN_NAME${NC}"
 echo -e "${GREEN}   ✓ ~/.agents/plugins/marketplace.json${NC}"
-echo -e "${YELLOW}     Codex에서 /ult:commit-and-verify 같은 짧은 namespaced slash command를 기본 노출합니다.${NC}"
+echo -e "${YELLOW}     Codex에서는 plugin이 ultivis-flow skill을 제공하며, /plugins에서 설치 상태를 확인할 수 있습니다.${NC}"
 
 echo "5. Scripts 설치..."
 SCRIPTS_DEST="$CODEX_DIR/scripts"
@@ -194,8 +201,9 @@ echo "설치된 파일:"
 echo "  ~/.codex/rules/$RULE_NAME"
 echo "  ~/.codex/skills/$SKILL_NAME/SKILL.md"
 echo "  ~/.codex/skills/$SKILL_NAME/references/*.md"
-echo "  ~/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
-echo "  ~/plugins/$PLUGIN_NAME/commands/*.md"
+echo "  ~/.codex/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
+echo "  ~/.codex/plugins/$PLUGIN_NAME/commands/*.md (legacy compatibility)"
+echo "  ~/.codex/plugins/$PLUGIN_NAME/skills/$SKILL_NAME/SKILL.md"
 echo "  ~/.agents/plugins/marketplace.json"
 echo "  ~/.codex/scripts/*.sh"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
@@ -204,7 +212,7 @@ echo "  ~/.codex/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
 echo ""
 echo "사용 방법:"
 echo "  1. 새 Codex 세션 시작"
-echo "  2. Plan 작성 시 Intent를 명확히 문서화"
-echo "  3. /ult:commit-and-verify, /ult:create-pr 같은 slash command 사용"
-echo "  4. PR 리뷰 자동 반영: /ult:review-cycle [PR번호]  (Ralph Loop 자동 시작)"
-echo "  5. 자연어 요청과 ~/.codex/skills/$SKILL_NAME 기반 workflow도 함께 사용 가능"
+echo "  2. 필요하면 /plugins에서 Ult plugin 설치/활성 상태 확인"
+echo "  3. 자연어 요청 또는 \$ultivis-flow skill mention으로 workflow 사용"
+echo "  4. Plan 작성 시 Intent를 명확히 문서화"
+echo "  5. PR 리뷰 자동 반영은 'PR <번호> review cycle 돌려줘'처럼 요청"

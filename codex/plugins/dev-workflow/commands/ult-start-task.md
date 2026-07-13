@@ -23,16 +23,16 @@ argument-hint: [story-or-task-context]
    - `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-my-tasks.sh`를 사용해 본인 Task 목록을 보여주고 선택을 진행한다.
 
 2. 승인된 Plan이 있고, 새 Story + Task 여러 개 + Issue/브랜치 발행이 필요한 작업이면:
-   - `/ult-story-create`의 절차를 따른다.
+   - `/ult:ult-story-create`의 절차를 따른다.
 
 3. 기존 Story에 Task 하나만 추가하는 상황이면:
-   - `/ult-task-create`의 절차를 따른다.
+   - `/ult:ult-task-create`의 절차를 따른다.
 
 4. 기존 Story의 Ready Task를 실행하거나 병렬 서브에이전트 작업을 준비하는 상황이면:
-   - `/ult-story-run`의 절차를 따른다.
+   - `/ult:ult-story-run`의 절차를 따른다.
 
 5. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
-   - `/ult-task-note`의 절차를 따른다.
+   - `/ult:ult-task-note`의 절차를 따른다.
 
 ## 출력
 

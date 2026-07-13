@@ -257,6 +257,7 @@ dw ub-234                          # 프로젝트별 .isaac/dw.sh 실행
 
 ### Codex 전역 (`~/.codex/`)
 - `skills/ultivis-flow/` — Codex workflow skill
+- `plugins/ult/` — `/plugins`에서 확인 가능한 개인 workflow plugin
 - `scripts/*.sh` — workflow 실행 스크립트
 - `dev-tools/.env` — `WORKTREE_ROOT`, 선택적 `NOTION_TOKEN`
 - `notion-cache/` — Members/Projects/Repositories/Schemas/Templates 캐시

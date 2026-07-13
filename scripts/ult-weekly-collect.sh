@@ -70,8 +70,8 @@ for id in $project_ids; do fetch_to "$id" project & done
 wait
 
 # id → name 매핑 빌드
-STORY_MAP=$(jq -s 'map({(.id): .title}) | add // {}' "$TMPDIR"/story-* 2>/dev/null || echo '{}')
-PROJECT_MAP=$(jq -s 'map({(.id): .title}) | add // {}' "$TMPDIR"/project-* 2>/dev/null || echo '{}')
+STORY_MAP=$(cat "$TMPDIR"/story-* 2>/dev/null | jq -s 'map({(.id): .title}) | add // {}')
+PROJECT_MAP=$(cat "$TMPDIR"/project-* 2>/dev/null | jq -s 'map({(.id): .title}) | add // {}')
 
 # 5. Task 정리 (필요 필드만 추출)
 TASKS_JSON=$(echo "$TASKS_RESP" | jq -c \

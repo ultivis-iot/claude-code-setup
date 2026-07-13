@@ -19,7 +19,7 @@ argument-hint: [directory] [commit-message]
 - subagent는 다른 command를 호출하지 않는다
 - subagent는 파일을 쓰지 않고 JSON 텍스트만 반환한다
 - 메인 명령만 `<directory>/tmp/validation-status.json`을 생성한다
-- 이 명령은 검증까지만 수행한다. PR 생성은 `/create-pr`로 분리한다
+- 이 명령은 검증까지만 수행한다. PR 생성은 `/ult:create-pr`로 분리한다
 
 ## 입력 파싱
 

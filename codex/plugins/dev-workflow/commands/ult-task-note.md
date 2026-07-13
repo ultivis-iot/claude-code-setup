@@ -18,8 +18,8 @@ ${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-note.sh "<
 ## 사용 예
 
 ```
-/ult-task-note "Token refresh 흐름 백엔드 확인 대기 (김OO)"
-/ult-task-note "vite.config에 ESM 호환 옵션 추가로 해결"
+/ult:ult-task-note "Token refresh 흐름 백엔드 확인 대기 (김OO)"
+/ult:ult-task-note "vite.config에 ESM 호환 옵션 추가로 해결"
 ```
 
 ## 실패 케이스

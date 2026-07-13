@@ -90,8 +90,8 @@ Story/Task/Issue 생성은 Plan 승인과 발행 미리보기 확인 이후에�
 
 ## 관련 명령
 
-- 기존 Story에 Task 1개 추가: `/ult-task-create`
-- 현재 Task 메모 추가: `/ult-task-note`
+- 기존 Story에 Task 1개 추가: `/ult:ult-task-create`
+- 현재 Task 메모 추가: `/ult:ult-task-note`
 
 reference를 안 열어도 되는 경우:
 

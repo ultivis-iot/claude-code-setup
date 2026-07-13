@@ -11,10 +11,10 @@ argument-hint: [directory] [commit-message]
 ## 선택 규칙
 
 1. `<directory>/tmp/validation-status.json`이 없거나 오래되었으면:
-   - `/commit-and-verify`와 동일한 절차를 먼저 수행한다.
+   - `/ult:commit-and-verify`와 동일한 절차를 먼저 수행한다.
 
 2. 검증 결과가 PR 가능 상태면:
-   - `/create-pr`와 동일한 절차로 push 및 PR 생성을 진행한다.
+   - `/ult:create-pr`와 동일한 절차로 push 및 PR 생성을 진행한다.
 
 3. 검증 실패 항목이 있으면:
    - PR 생성은 중단하고 실패 원인과 다음 수정 지점을 안내한다.
