@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODEX_DIR="${CODEX_HOME:-$HOME/.codex}"
-SKILL_NAME="ultivis-flow"
+SKILLS_SOURCE="$SCRIPT_DIR/codex/skills"
 LEGACY_SKILL_NAME="dev-workflow"
 RULE_NAME="dev-workflow.rules"
 PLUGIN_SOURCE_DIR="dev-workflow"
@@ -46,9 +46,14 @@ echo -e "${YELLOW}     실제 워크플로우 동작은 skill이 담당하고, r
 
 echo "3. Skill 설치..."
 rm -rf "$CODEX_DIR/skills/$LEGACY_SKILL_NAME"
-rm -rf "$CODEX_DIR/skills/$SKILL_NAME"
-cp -R "$SCRIPT_DIR/codex/skills/$SKILL_NAME" "$CODEX_DIR/skills/$SKILL_NAME"
-echo -e "${GREEN}   ✓ ~/.codex/skills/$SKILL_NAME${NC}"
+for skill_dir in "$SKILLS_SOURCE"/*/; do
+    if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
+        skill_name=$(basename "$skill_dir")
+        rm -rf "$CODEX_DIR/skills/$skill_name"
+        cp -R "$skill_dir" "$CODEX_DIR/skills/$skill_name"
+        echo -e "${GREEN}   ✓ ~/.codex/skills/$skill_name${NC}"
+    fi
+done
 
 echo "4. Plugin 설치..."
 mkdir -p "$PLUGIN_ROOT"
@@ -199,11 +204,10 @@ echo "==================================="
 echo ""
 echo "설치된 파일:"
 echo "  ~/.codex/rules/$RULE_NAME"
-echo "  ~/.codex/skills/$SKILL_NAME/SKILL.md"
-echo "  ~/.codex/skills/$SKILL_NAME/references/*.md"
+echo "  ~/.codex/skills/*/SKILL.md"
 echo "  ~/.codex/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
 echo "  ~/.codex/plugins/$PLUGIN_NAME/commands/*.md (legacy compatibility)"
-echo "  ~/.codex/plugins/$PLUGIN_NAME/skills/$SKILL_NAME/SKILL.md"
+echo "  ~/.codex/plugins/$PLUGIN_NAME/skills/*/SKILL.md"
 echo "  ~/.agents/plugins/marketplace.json"
 echo "  ~/.codex/scripts/*.sh"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
@@ -213,6 +217,6 @@ echo ""
 echo "사용 방법:"
 echo "  1. 새 Codex 세션 시작"
 echo "  2. 필요하면 /plugins에서 Ult plugin 설치/활성 상태 확인"
-echo "  3. 자연어 요청 또는 \$ultivis-flow skill mention으로 workflow 사용"
+echo "  3. 자연어 요청은 \$ultivis-flow가 라우팅하고, 필요하면 개별 skill을 명시 호출"
 echo "  4. Plan 작성 시 Intent를 명확히 문서화"
 echo "  5. PR 리뷰 자동 반영은 'PR <번호> review cycle 돌려줘'처럼 요청"

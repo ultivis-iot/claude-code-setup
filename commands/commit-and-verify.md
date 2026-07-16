@@ -34,11 +34,12 @@ argument-hint: [directory] [commit-message]
 2. 필요하면 Plan 파일을 선택해 `<directory>/tmp/current-plan.md`로 복사한다
 3. 커밋 메시지가 있으면 conventional commit 형식인지 확인하고 커밋한다
    - 메시지가 없으면 사용자에게 커밋 메시지를 확인받거나, staged 변경이 없으면 중단한다
-4. intent-validator를 먼저 실행한다
+4. intent-validator를 **Spec Review**로 먼저 실행한다
+   - 승인된 Plan/Issue/Task 대비 누락, 잘못된 동작, 범위 확장, 검증 증거를 확인한다
 5. intent 결과가 `PASS`일 때만 아래 validator를 병렬 실행한다
    - doc-validator
    - security-validator
-   - code-simplifier
+   - code-simplifier (**Standards Review**: 저장소 규칙 우선 + 코드 스멜 기준)
    - test-validator
    - cli-validator (`.cli-sync.json`이 활성화된 경우만)
 6. 프론트엔드 변경이 있으면 Visual QA 수행 여부를 사용자에게 묻고 `visual-qa`를 `PENDING` 또는 `SKIP`으로 기록한다
@@ -65,6 +66,7 @@ Plan 없이 진행할 수는 있지만, intent 검증 품질은 떨어질 수 �
 - intent-validator가 `FAIL`이면 즉시 중단하고 나머지는 `SKIP`
 - 품질 validator 중 하나라도 `FAIL`이면 결과를 파일에 기록하고 수정 지점을 안내한다
 - Visual QA는 선택적이며 `PENDING` 또는 `SKIP` 가능
+- Spec Review와 Standards Review가 모두 통과해야 리뷰가 완료된 것으로 본다
 
 ## 출력
 

@@ -2,17 +2,19 @@
 
 Apply this sequence by default:
 
-1. Plan
-2. Build
-3. Commit
-4. Validation stage 1: intent validation
-5. Validation stage 2: quality validation
-6. Optional Visual QA for frontend changes
-7. PR creation
+1. Route the request and announce the selected overlay when one is useful
+2. Plan
+3. Build
+4. Commit
+5. Validation stage 1: intent validation
+6. Validation stage 2: quality validation
+7. Optional Visual QA for frontend changes
+8. PR creation
 
 Key expectations:
 
 - The plan must include the user's intent, expected outcome, and meaningful constraints.
+- An explicit skill invocation wins. For an ambiguous route, ask one question with 2–3 choices and put the recommendation first.
 - Before writing or publishing a plan, ask blocking clarification questions when scope, success criteria, target repo/project/story, dependencies, or verification expectations are unclear.
 - Ask questions that help the user think and decide. Present the decision point and tradeoff briefly instead of filling gaps with hidden assumptions.
 - Ask only the next 1-3 important questions at a time. Record answers as plan decisions, and record non-blocking assumptions explicitly.

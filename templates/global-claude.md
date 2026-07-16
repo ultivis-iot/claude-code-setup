@@ -4,6 +4,35 @@
 - 코드 변경 전 반드시 기존 패턴 확인
 - 브랜치 생성, 체크아웃, worktree 생성 전에는 먼저 `git fetch origin --prune`로 원격 refs를 최신화하고, 새 브랜치는 최신 원격 base에서 시작
 
+## 기본 라우터
+
+`ultivis-flow`를 모든 개발 작업의 상시 기반으로 사용한다. 이 흐름이 Plan, GitHub/Notion Story·Task, branch/worktree, commit-and-verify, PR과 review-cycle을 소유한다. 설치된 다른 스킬은 특정 작업 방식을 제공하는 일시적 오버레이이며 이 게이트를 대체하지 않는다.
+
+사용자의 자연어 질의와 저장소 상태를 보고 다음처럼 라우팅한다.
+
+1. 사용자가 `/tdd`, `/research`처럼 스킬을 명시하면 그 선택을 우선한다.
+2. 하나의 스킬이 명확하면 자동 선택하고 한 문장으로 알린 뒤 진행한다.
+3. 둘 이상의 접근이 결과를 실질적으로 바꾸면 질문 하나에 선택지 2~3개를 제시한다. 추천안을 먼저 두고 각 선택지의 tradeoff를 짧게 설명한다.
+4. primary overlay는 한 번에 하나만 사용하고, 완료 기준에 도달한 뒤에만 후속 스킬로 전환한다.
+5. 적합한 오버레이가 없으면 `ultivis-flow`만으로 진행한다.
+
+기본 매핑:
+
+- 중요한 모호성/의사결정: `grilling`
+- test-first 구현: `tdd`
+- 원인 불명의 버그/회귀/성능 저하: `diagnosing-bugs`
+- 외부 문서/API/표준 확인: `research`
+- 도메인 용어와 불변식: `domain-modeling`
+- module/interface/seam 설계: `codebase-design`
+- 코드베이스 구조 개선 후보 탐색: `improve-codebase-architecture`
+- 여러 세션이 필요한 foggy work: `wayfinder`
+- merge/rebase conflict: `resolving-merge-conflicts`
+- 세션 인수인계: `handoff`
+- 전용 학습 workspace: `teach`
+- skill 작성/수정: `writing-great-skills`
+
+`grill-me`는 사용자가 명시적으로 `grilling`을 시작하는 단축 진입점이다.
+
 ## Plan 모드 가이드
 Plan 모드 사용 시 반드시 의도 섹션이 포함되어 **사용자의 의도를 명확하게 명문화**해야 합니다.
 

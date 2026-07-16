@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ultivis Flow"
+  short_description: "Route work through the Ultivis development flow"
+  default_prompt: "Use $ultivis-flow to route this request and apply the required workflow gates."

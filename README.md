@@ -6,18 +6,20 @@
 
 이 설정은 다음과 같은 개발 플로우를 자동화합니다:
 
-``` 
+```
 Plan → 빌드 → Commit → 검증 1단계 → 검증 2단계 (병렬) → Push & PR
                            ↓
                       (실패 시 빌드로 복귀)
 ```
+
+`ultivis-flow`가 전체 개발 흐름을 담당하고, 요청에 따라 Matt Pocock의 스킬을 작업 방식으로 함께 사용합니다.
 
 Plan을 작업 단위로 발행할 때는 다음 관계를 기준으로 움직입니다:
 
 - `Story`는 여러 `Task`를 묶는 상위 단위
 - `Task 1개 = GitHub Issue 1개`
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 생성
-- 여러 Task로 나뉘는 Story는 메인 에이전트가 Notion Story와 handoff를 소유하고, 각 서브에이전트가 Task worktree를 소유
+- 여러 Task로 나뉘는 Story는 메인 에이전트가 Notion Story와 handoff를 소유하고, 사용자가 병렬 작업을 승인한 경우 각 서브에이전트가 Task worktree를 소유
 - Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch로 보냄
 - Story 자체에는 GitHub Issue/PR을 만들지 않고, 초기 Story handoff는 Notion Story comment와 각 Task worktree에 남김
 
@@ -40,6 +42,7 @@ Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니�
 | 기능 | 설명 |
 |-----|------|
 | **Plan 모드 가이드** | 사용자 의도를 명확하게 문서화 |
+| **질의 기반 스킬 라우터** | `ultivis-flow`를 기반으로 요청에 맞는 독립 overlay를 자동 선택 |
 | **Plan 자동 저장** | Plan 승인 시 `tmp/current-plan.md`로 자동 복사 |
 | **자동 검증** | 커밋 후 의도 검증 + 품질 검증 자동 실행 |
 | **작업 중심 진입점** | `ult-start-task`, `ult-finish-task`, `ult-sync-task` 명령으로 세부 명령 추상화 |
@@ -47,6 +50,17 @@ Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니�
 | **보안 검사** | 실시간 보안 취약점 경고 + 커밋 후 보안 리뷰 |
 | **Visual QA** | 프론트엔드 변경 시 브라우저 자동화 UI 검증 |
 | **PR 생성** | 검증 통과 확인 후 자동 PR 생성 |
+
+## Matt Pocock 스킬
+
+[mattpocock/skills](https://github.com/mattpocock/skills)의 다음 스킬을 추가했습니다.
+
+- Engineering: `tdd`, `diagnosing-bugs`, `research`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `wayfinder`, `resolving-merge-conflicts`
+- Productivity: `grilling`, `grill-me`, `handoff`, `teach`, `writing-great-skills`
+
+`ultivis-flow`가 기존 GitHub/Notion 개발 흐름을 계속 담당하고, 사용자의 자연어 요청에 맞는 스킬을 자동으로 선택합니다. 필요하면 Codex의 `$tdd`나 Claude Code의 `/tdd`처럼 스킬을 직접 호출할 수도 있습니다. 선택이 필요한 경우에는 추천안을 포함한 2~3개 선택지를 제시합니다.
+
+`ask-matt`는 별도로 설치하지 않고 이 라우팅을 `ultivis-flow`에 포함했습니다. `code-review`의 핵심은 `commit-and-verify`의 Spec Review와 Standards Review에 반영했습니다. 자세한 원본 버전과 조정 내용은 [Matt Pocock Skills 도입 기준](docs/references/matt-pocock-skills.md)을 참고하세요.
 
 ## 설치
 
@@ -133,6 +147,11 @@ git pull
 │   ├── test-validator.md       # 검증 2단계: 테스트 검증
 │   ├── cli-validator.md        # 검증 2단계: CLI 동기화 + Help 품질
 │   └── visual-qa-analyzer.md   # Visual QA 결과 분석
+├── skills/
+│   ├── ultivis-flow/            # 상시 baseline + 자연어 router
+│   ├── tdd/                     # test-first vertical slice
+│   ├── diagnosing-bugs/         # tight repro loop
+│   └── ...                      # research/design/wayfinder/productivity overlays
 ├── schemas/
 │   └── validation-status.schema.json  # 검증 결과 표준 스키마
 ├── hooks/
@@ -156,14 +175,18 @@ Codex 설치 시:
 ├── rules/
 │   └── dev-workflow.rules      # 안전한 최소 rules 파일 (Starlark 파싱용)
 ├── skills/
-│   └── ultivis-flow/
-│       ├── SKILL.md
-│       └── references/
-│           ├── core-workflow.md
-│           ├── commit-and-verify.md
-│           ├── create-pr.md
-│           ├── review-cycle.md
-│           └── ult-notion.md
+│   ├── ultivis-flow/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       ├── core-workflow.md
+│   │       ├── overlay-routing.md
+│   │       ├── commit-and-verify.md
+│   │       ├── create-pr.md
+│   │       ├── review-cycle.md
+│   │       └── ult-notion.md
+│   ├── tdd/
+│   ├── diagnosing-bugs/
+│   └── ...                       # focused overlays
 └── dev-tools/
     ├── dev-commands.sh
     ├── .env.example
@@ -178,7 +201,8 @@ Codex 설치 시:
     │   └── plugin.json
     ├── commands/                 # legacy compatibility only
     └── skills/
-        └── ultivis-flow/
+        ├── ultivis-flow/
+        └── ...                   # 같은 overlay 세트
 
 ~/.agents/plugins/
 └── marketplace.json
@@ -199,7 +223,7 @@ Codex 설치 시:
 - "validation 통과했으면 PR 만들어줘"
 - "PR 23 review cycle 돌려줘"
 
-Codex에서는 `~/.codex/skills/ultivis-flow`를 직접 설치하고, 같은 skill을 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
+Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고, 같은 세트를 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
 
 설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `bash`가 있으면 같은 refresh 스크립트로 warm-up을 시도합니다.
 

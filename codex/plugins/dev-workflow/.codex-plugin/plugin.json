@@ -1,7 +1,7 @@
 {
   "name": "ult",
-  "version": "0.6.1",
-  "description": "Ultivis development workflow plugin for Codex with reusable skill guidance.",
+  "version": "0.7.0",
+  "description": "Ultivis workflow baseline with natural-language routing and focused engineering skills.",
   "author": {
     "name": "Ultivis",
     "url": "https://github.com/ultivis-iot/claude-code-setup"
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Ult",
-    "shortDescription": "Ultivis development workflow skill",
-    "longDescription": "Adds the ultivis-flow skill for commit-and-verify style validation, PR creation, review-cycle handling, Visual QA, and Ultivis task workflows in Codex.",
+    "shortDescription": "Ultivis workflow and engineering skill router",
+    "longDescription": "Keeps ultivis-flow as the lifecycle baseline and routes natural-language work to focused skills for TDD, diagnosis, research, design, architecture, wayfinding, conflict resolution, and productivity.",
     "developerName": "Ultivis",
     "category": "Coding",
     "capabilities": [
@@ -34,6 +34,7 @@
     "termsOfServiceURL": "https://github.com/ultivis-iot/claude-code-setup",
     "defaultPrompt": [
       "Use the ultivis-flow skill to validate and commit this change.",
+      "Use ultivis-flow to choose the best overlay for this request.",
       "Create a PR after validation passes.",
       "Check my Ultivis tasks and start work."
     ],

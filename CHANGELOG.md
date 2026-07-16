@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.7.0 (2026-07-16)
+
+- `ultivis-flow`를 상시 기반으로 유지하면서 자연어 질의를 13개 독립 오버레이 스킬로 자동 라우팅하는 기본 라우터 추가.
+- 경로가 명확하면 자동 선택하고, 결과를 바꾸는 복수 경로에서는 추천안을 먼저 둔 2~3개 선택지로 사용자 결정을 받도록 정리.
+- Matt Pocock의 `tdd`, `diagnosing-bugs`, `research`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `wayfinder`, `resolving-merge-conflicts`와 productivity 스킬을 고정 커밋 기준으로 도입.
+- `wayfinder`를 Notion Story → Notion Task + GitHub Issue 구조와 `Parent Task` dependency에 맞게 조정.
+- `code-review`의 Spec Review/Standards Review를 `commit-and-verify`의 intent-validator/code-simplifier에 흡수.
+- Claude/Codex 설치 스크립트와 Codex plugin이 전체 스킬 세트를 설치하도록 확장.
+
 ## v0.6.7 (2026-07-13)
 
 - Codex skill에만 있던 Weekly Review 규칙(직전 Week 기본 대상, `마케팅` 템플릿 3섹션, 제목 규칙, 명시적 발행 요청 시에만 publish)을 `/ult-weekly-report` 명령과 Codex plugin 명령, `weekly-report-format.md`에 백포트.

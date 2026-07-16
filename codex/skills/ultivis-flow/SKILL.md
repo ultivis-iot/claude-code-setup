@@ -1,11 +1,11 @@
 ---
 name: ultivis-flow
-description: Use when working in repositories that follow this setup's development workflow and the user wants the same flow in Codex. Covers plan intent capture, commit-and-verify style validation, PR creation, AI review-cycle handling, visual QA prompting, issue lookup, and Ultivis Story/Task flow.
+description: Baseline workflow and query router for repositories using this setup. Use for planning, implementation, GitHub/Notion Story and Task work, validation, commits, PRs, reviews, or whenever a focused engineering overlay should be selected from the user's natural-language request.
 ---
 
 # Development Workflow
 
-Use this skill when the repository follows the workflow from this setup project and the user wants Codex to apply the same operating model.
+This is the always-on baseline for repositories using this setup. It owns lifecycle and tracking; focused skills are temporary overlays and never replace this workflow.
 
 ## Default behavior
 
@@ -13,10 +13,12 @@ Use this skill when the repository follows the workflow from this setup project 
 2. Keep the user's intent visible and validate against it after code changes.
 3. Treat commit, validation, PR creation, and review follow-up as separate gates.
 4. Prefer the repository's existing scripts, docs, and temp artifacts over inventing a new process.
+5. Route the request to at most one primary overlay before doing specialized work.
 
 ## Which reference to read
 
 - For the overall flow, read [references/core-workflow.md](references/core-workflow.md).
+- For natural-language overlay selection, read [references/overlay-routing.md](references/overlay-routing.md).
 - For commit and validation behavior, read [references/commit-and-verify.md](references/commit-and-verify.md).
 - For PR creation, read [references/create-pr.md](references/create-pr.md).
 - For AI review handling, read [references/review-cycle.md](references/review-cycle.md).

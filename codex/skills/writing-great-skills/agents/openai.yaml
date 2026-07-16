@@ -1,0 +1,4 @@
+interface:
+  display_name: "Writing Great Skills"
+  short_description: "Principles for predictable skills"
+  default_prompt: "Use $writing-great-skills to make this skill concise and predictable."

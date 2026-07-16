@@ -14,11 +14,11 @@ Use this procedure when the user wants the Codex equivalent of `/commit-and-veri
 2. Inspect git status, current branch, staged diff, and branch diff against the base branch.
 3. Ensure the approved plan is available as `tmp/current-plan.md` when the project uses that workflow.
 4. Create a conventional commit.
-5. Run intent validation first.
+5. Run intent validation first as the **Spec Review**. Check the approved Plan and linked Task/Issue for missing behavior, wrong behavior, scope creep, and concrete verification evidence.
 6. If intent validation passes, run quality validation for:
    - documentation
    - security
-   - code simplicity
+   - code simplicity as the **Standards Review**, applying repository standards first and code-smell checks second
    - tests
    - CLI sync when the project has `.cli-sync.json`
 7. If frontend files changed, ask whether to perform Visual QA or mark it pending/skipped.
@@ -31,3 +31,5 @@ Use this procedure when the user wants the Codex equivalent of `/commit-and-veri
 - `FAIL`: stop and fix before proceeding
 
 Do not create a PR inside this procedure. PR creation is a separate gate.
+
+The Spec Review and Standards Review are the two review axes adapted from Matt Pocock's `code-review` skill. Keep them separate so a standards-clean change cannot hide a spec failure, and a spec-complete change cannot hide maintainability problems.

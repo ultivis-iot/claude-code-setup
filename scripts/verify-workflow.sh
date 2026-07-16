@@ -29,33 +29,42 @@ if [ "$MODE" = "repo" ]; then
     check_script "$WORKFLOW_ROOT/setup.sh"
     check_script "$WORKFLOW_ROOT/setup-codex.sh"
     check_file "$WORKFLOW_ROOT/setup.ps1"
-    check_file "$WORKFLOW_ROOT/codex/skills/ultivis-flow/SKILL.md"
-    check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/ultivis-flow/SKILL.md"
-
     for command_file in "$WORKFLOW_ROOT"/commands/*.md; do
         command_name="$(basename "$command_file")"
-        check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/commands/$command_name"
+        plugin_command="$WORKFLOW_ROOT/codex/plugins/dev-workflow/commands/$command_name"
+        check_file "$plugin_command"
     done
 
+    while IFS= read -r skill_dir; do
+        skill_name="$(basename "$skill_dir")"
+        check_file "$skill_dir/SKILL.md"
+        check_file "$skill_dir/agents/openai.yaml"
+        check_file "$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/$skill_name/SKILL.md"
+    done < <(find "$WORKFLOW_ROOT/codex/skills" -mindepth 1 -maxdepth 1 -type d | sort)
+
     while IFS= read -r skill_file; do
-        rel="${skill_file#"$WORKFLOW_ROOT/codex/skills/ultivis-flow/"}"
-        plugin_file="$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/ultivis-flow/$rel"
+        rel="${skill_file#"$WORKFLOW_ROOT/codex/skills/"}"
+        plugin_file="$WORKFLOW_ROOT/codex/plugins/dev-workflow/skills/$rel"
         check_file "$plugin_file"
         cmp -s "$skill_file" "$plugin_file" || {
             echo "ERROR: plugin skill copy differs: $rel" >&2
             exit 1
         }
-    done < <(find "$WORKFLOW_ROOT/codex/skills/ultivis-flow" -type f | sort)
+    done < <(find "$WORKFLOW_ROOT/codex/skills" -type f | sort)
 elif [ "$MODE" = "installed-codex" ]; then
     check_file "$WORKFLOW_ROOT/skills/ultivis-flow/SKILL.md"
-    check_file "$HOME/plugins/ult/.codex-plugin/plugin.json"
-    check_file "$HOME/plugins/ult/skills/ultivis-flow/SKILL.md"
+    check_file "$WORKFLOW_ROOT/skills/tdd/SKILL.md"
+    check_file "$WORKFLOW_ROOT/skills/wayfinder/SKILL.md"
+    check_file "$WORKFLOW_ROOT/plugins/ult/.codex-plugin/plugin.json"
+    check_file "$WORKFLOW_ROOT/plugins/ult/skills/ultivis-flow/SKILL.md"
 elif [ "$MODE" = "installed-claude" ]; then
     check_file "$WORKFLOW_ROOT/CLAUDE.md"
     check_file "$WORKFLOW_ROOT/commands/commit-and-verify.md"
     check_file "$WORKFLOW_ROOT/commands/ult-story-run.md"
     check_file "$WORKFLOW_ROOT/agents/intent-validator.md"
     check_file "$WORKFLOW_ROOT/schemas/validation-status.schema.json"
+    check_file "$WORKFLOW_ROOT/skills/ultivis-flow/SKILL.md"
+    check_file "$WORKFLOW_ROOT/skills/tdd/SKILL.md"
 else
     echo "ERROR: unknown workflow install mode: $WORKFLOW_ROOT" >&2
     exit 1

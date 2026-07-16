@@ -29,12 +29,13 @@ Write-Host ""
 Write-Host "1. 디렉토리 생성..."
 New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "commands") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "agents") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "skills") | Out-Null
 
 # CLAUDE.md 설치
 Write-Host "2. CLAUDE.md 설치..."
 $ClaudeMdPath = Join-Path $ClaudeDir "CLAUDE.md"
 $Marker = "# === Claude Code 개발 플로우 설정 ==="
-$SourceClaudeMd = Join-Path $ScriptDir "CLAUDE.md"
+$SourceClaudeMd = Join-Path $ScriptDir "templates\global-claude.md"
 
 if (Test-Path $ClaudeMdPath) {
     $Content = Get-Content $ClaudeMdPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
@@ -81,6 +82,23 @@ $AgentsDest = Join-Path $ClaudeDir "agents"
 if (Test-Path $AgentsSource) {
     Get-ChildItem -Path $AgentsSource -Filter "*.md" | ForEach-Object {
         Copy-Item $_.FullName -Destination $AgentsDest -Force
+        Write-Host "   $($_.Name)" -ForegroundColor Green
+    }
+}
+
+# Skills 설치
+Write-Host "4-1. Skills 설치..."
+$SkillsSource = Join-Path $ScriptDir "codex\skills"
+$SkillsDest = Join-Path $ClaudeDir "skills"
+if (Test-Path $SkillsSource) {
+    Get-ChildItem -Path $SkillsSource -Directory | Where-Object {
+        Test-Path (Join-Path $_.FullName "SKILL.md")
+    } | ForEach-Object {
+        $DestSkillPath = Join-Path $SkillsDest $_.Name
+        if (Test-Path $DestSkillPath) {
+            Remove-Item $DestSkillPath -Recurse -Force
+        }
+        Copy-Item $_.FullName -Destination $DestSkillPath -Recurse -Force
         Write-Host "   $($_.Name)" -ForegroundColor Green
     }
 }
@@ -212,6 +230,7 @@ Write-Host "  ~/.claude/agents/intent-validator.md"
 Write-Host "  ~/.claude/agents/doc-validator.md"
 Write-Host "  ~/.claude/agents/security-validator.md"
 Write-Host "  ~/.claude/agents/code-simplifier.md"
+Write-Host "  ~/.claude/skills/*/SKILL.md"
 Write-Host "  ~/.claude/schemas/validation-status.schema.json"
 Write-Host "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
 Write-Host "  ~/.claude/scripts/*.sh (workflow 실행 스크립트)"

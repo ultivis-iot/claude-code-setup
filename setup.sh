@@ -81,6 +81,7 @@ echo ""
 echo "1. 디렉토리 생성..."
 mkdir -p "$CLAUDE_DIR/commands"
 mkdir -p "$CLAUDE_DIR/agents"
+mkdir -p "$CLAUDE_DIR/skills"
 
 # CLAUDE.md 설치 (기존 파일에 추가)
 echo "2. CLAUDE.md 설치..."
@@ -143,6 +144,17 @@ for file in "$SCRIPT_DIR/agents"/*.md; do
         filename=$(basename "$file")
         cp "$file" "$CLAUDE_DIR/agents/$filename"
         echo -e "${GREEN}   ✓ $filename${NC}"
+    fi
+done
+
+# Skills 설치
+echo "4-1. Skills 설치..."
+for skill_dir in "$SCRIPT_DIR/codex/skills"/*/; do
+    if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
+        skill_name=$(basename "$skill_dir")
+        rm -rf "$CLAUDE_DIR/skills/$skill_name"
+        cp -R "$skill_dir" "$CLAUDE_DIR/skills/$skill_name"
+        echo -e "${GREEN}   ✓ $skill_name${NC}"
     fi
 done
 
@@ -388,6 +400,7 @@ echo "  ~/.claude/agents/intent-validator.md"
 echo "  ~/.claude/agents/doc-validator.md"
 echo "  ~/.claude/agents/security-validator.md"
 echo "  ~/.claude/agents/code-simplifier.md"
+echo "  ~/.claude/skills/*/SKILL.md"
 echo "  ~/.claude/agents/cli-validator.md (CLI 동기화 검증 Agent)"
 echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
