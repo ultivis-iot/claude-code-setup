@@ -127,6 +127,38 @@ if (Test-Path $ScriptsSource) {
     }
 }
 
+# 구버전 파일 정리
+# 이 목록에는 과거에 이 저장소가 설치했다가 rename/제거된 파일만 넣는다.
+# (~/.claude에 사용자가 직접 만든 로컬 전용 파일은 건드리지 않는다)
+Write-Host "6-1. 구버전 파일 정리..."
+$StaleFiles = @(
+    "commands\isaac-my-tasks.md",
+    "commands\isaac-story-create.md",
+    "commands\isaac-task-create.md",
+    "commands\isaac-task-note.md",
+    "commands\isaac-task-status.md",
+    "commands\isaac-weekly-report.md",
+    "scripts\isaac-my-tasks.sh",
+    "scripts\isaac-story-create-exec.sh",
+    "scripts\isaac-task-note.sh",
+    "scripts\isaac-task-status.sh",
+    "scripts\isaac-weekly-collect.sh",
+    "scripts\isaac-weekly-publish.sh",
+    "scripts\isaac-wt-add.sh"
+)
+$StaleRemoved = 0
+foreach ($RelPath in $StaleFiles) {
+    $StaleTarget = Join-Path $ClaudeDir $RelPath
+    if (Test-Path $StaleTarget) {
+        Remove-Item $StaleTarget -Force
+        Write-Host "   제거: $RelPath" -ForegroundColor Green
+        $StaleRemoved++
+    }
+}
+if ($StaleRemoved -eq 0) {
+    Write-Host "   정리할 구버전 파일 없음" -ForegroundColor Green
+}
+
 # Plugins 설치
 Write-Host "7. Plugins 설치..."
 $PluginsSource = Join-Path $ScriptDir "plugins"

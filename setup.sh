@@ -137,6 +137,38 @@ if [ -d "$SCRIPT_DIR/scripts" ]; then
     done
 fi
 
+# 구버전 파일 정리
+# 이 목록에는 과거에 이 저장소가 설치했다가 rename/제거된 파일만 넣는다.
+# (~/.claude에 사용자가 직접 만든 로컬 전용 파일은 건드리지 않는다)
+echo "3-1. 구버전 파일 정리..."
+STALE_FILES=(
+    "commands/isaac-my-tasks.md"
+    "commands/isaac-story-create.md"
+    "commands/isaac-task-create.md"
+    "commands/isaac-task-note.md"
+    "commands/isaac-task-status.md"
+    "commands/isaac-weekly-report.md"
+    "scripts/isaac-my-tasks.sh"
+    "scripts/isaac-story-create-exec.sh"
+    "scripts/isaac-task-note.sh"
+    "scripts/isaac-task-status.sh"
+    "scripts/isaac-weekly-collect.sh"
+    "scripts/isaac-weekly-publish.sh"
+    "scripts/isaac-wt-add.sh"
+)
+STALE_REMOVED=0
+for rel_path in "${STALE_FILES[@]}"; do
+    stale_target="$CLAUDE_DIR/$rel_path"
+    if [ -f "$stale_target" ]; then
+        rm "$stale_target"
+        echo -e "${GREEN}   ✓ 제거: $rel_path${NC}"
+        STALE_REMOVED=$((STALE_REMOVED + 1))
+    fi
+done
+if [ "$STALE_REMOVED" -eq 0 ]; then
+    echo -e "${GREEN}   ✓ 정리할 구버전 파일 없음${NC}"
+fi
+
 # Agents 설치
 echo "4. Agents 설치..."
 for file in "$SCRIPT_DIR/agents"/*.md; do

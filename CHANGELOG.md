@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.2 (2026-07-19)
+
+- `setup.sh`/`setup.ps1`에 구버전 파일 정리 단계 추가: 과거 이 저장소가 설치했다가 isaac → ult rename으로 사라진 commands 6개, scripts 7개를 설치/업데이트 시 `~/.claude`에서 제거. 명시적 목록 기반이라 사용자가 직접 만든 로컬 전용 파일은 건드리지 않음.
+
 ## v0.7.1 (2026-07-19)
 
 - 설치본(`~/.claude`)에서만 수정되어 있던 `wayfinder` 티켓 모델 변경을 repo로 백포트: decision ticket을 해소 즉시 닫는 대신, 티켓 하나가 조사 → 확정 스펙 → 구현 전 과정을 담고 확정된 작업은 같은 티켓의 issue-keyed branch로 구현에 핸드오프 ("One ticket, plan through build"). `codex/skills/`와 `codex/plugins/dev-workflow/skills/` 두 사본 모두 갱신.
