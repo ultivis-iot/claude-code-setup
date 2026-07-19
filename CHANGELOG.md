@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.7.1 (2026-07-19)
+
+- 설치본(`~/.claude`)에서만 수정되어 있던 `wayfinder` 티켓 모델 변경을 repo로 백포트: decision ticket을 해소 즉시 닫는 대신, 티켓 하나가 조사 → 확정 스펙 → 구현 전 과정을 담고 확정된 작업은 같은 티켓의 issue-keyed branch로 구현에 핸드오프 ("One ticket, plan through build"). `codex/skills/`와 `codex/plugins/dev-workflow/skills/` 두 사본 모두 갱신.
+- `/ult-start-task`에 기존 Task/Issue가 지목된 경우의 분기 백포트: 새 Task/Issue/Story를 만들지 않고 해당 이슈 기준 브랜치(`ult-wt-add.sh`)에서 바로 구현하며, 이슈 코멘트의 확정 스펙을 Plan으로 사용.
+
 ## v0.7.0 (2026-07-16)
 
 - `ultivis-flow`를 상시 기반으로 유지하면서 자연어 질의를 13개 독립 오버레이 스킬로 자동 라우팅하는 기본 라우터 추가.

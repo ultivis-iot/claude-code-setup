@@ -22,16 +22,20 @@ argument-hint: [story-or-task-context]
 1. 인자가 없고 현재 작업을 고르려는 상황이면:
    - `scripts/ult-my-tasks.sh`를 사용해 본인 Task 목록을 보여주고 선택을 진행한다.
 
-2. 승인된 Plan이 있고, 새 Story + Task 여러 개 + Issue/브랜치 발행이 필요한 작업이면:
+2. 기존 Task/Issue(번호·URL·제목)가 지목되었거나 그 구현을 시작하는 상황이면:
+   - **새 Task/Issue/Story를 만들지 않는다.** 해당 Issue 기준 브랜치를 만들고(`scripts/ult-wt-add.sh`, 브랜치명은 이슈 번호 기반) 그 브랜치/worktree에서 바로 구현한다.
+   - wayfinder 티켓처럼 확정 스펙이 이슈 코멘트에 있으면 그 스펙이 곧 Plan이다 — 재발행 없이 코멘트를 읽고 구현하며, PR은 이 이슈를 참조하고 머지 시 이슈를 닫는다.
+
+3. 승인된 Plan이 있고, 새 Story + Task 여러 개 + Issue/브랜치 발행이 필요한 작업이면:
    - `/ult-story-create`의 절차를 따른다.
 
-3. 기존 Story에 Task 하나만 추가하는 상황이면:
+4. 기존 Story에 Task 하나만 추가하는 상황이면:
    - `/ult-task-create`의 절차를 따른다.
 
-4. 기존 Story의 Ready Task를 실행하거나 병렬 서브에이전트 작업을 준비하는 상황이면:
+5. 기존 Story의 Ready Task를 실행하거나 병렬 서브에이전트 작업을 준비하는 상황이면:
    - `/ult-story-run`의 절차를 따른다.
 
-5. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
+6. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
    - `/ult-task-note`의 절차를 따른다.
 
 ## 출력
