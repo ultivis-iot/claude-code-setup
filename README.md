@@ -49,6 +49,7 @@ Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니�
 | **CLI 동기화 검증** | 서버 API 변경 시 CLI 커맨드 동기화 + Help 품질 자동 검증 |
 | **보안 검사** | 실시간 보안 취약점 경고 + 커밋 후 보안 리뷰 |
 | **Visual QA** | 프론트엔드 변경 시 브라우저 자동화 UI 검증 |
+| **UX Review** | 승인된 사용자 시나리오를 Playwright로 반복 촬영·평가하고 최종 교육 영상을 제작 |
 | **PR 생성** | 검증 통과 확인 후 자동 PR 생성 |
 
 ## Matt Pocock 스킬
@@ -186,6 +187,7 @@ Codex 설치 시:
 │   │       └── ult-notion.md
 │   ├── tdd/
 │   ├── diagnosing-bugs/
+│   ├── ux-review/               # scenario approval → UX review loop → approved guide
 │   └── ...                       # focused overlays
 └── dev-tools/
     ├── dev-commands.sh
@@ -222,6 +224,7 @@ Codex 설치 시:
 - "commit and verify 해줘"
 - "validation 통과했으면 PR 만들어줘"
 - "PR 23 review cycle 돌려줘"
+- "사용자 시나리오를 확정하고 UX 리뷰 영상과 교육 영상을 만들어줘"
 
 Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고, 같은 세트를 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
 

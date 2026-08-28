@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "id": "operator-request-to-approval",
+  "title": "새 요청을 등록하고 승인 상태 확인하기",
+  "product": "제품 이름",
+  "audience": {
+    "role": "운영 담당자",
+    "experience": "beginner",
+    "permissions": ["요청 조회", "요청 생성"]
+  },
+  "job": {
+    "trigger": "처리해야 할 새 업무 요청을 전달받았다",
+    "outcome": "요청이 등록되어 승인 대기 상태임을 확인한다",
+    "successCriteria": [
+      "등록한 요청을 목록에서 찾을 수 있다",
+      "요청 상세에서 승인 대기 상태를 확인할 수 있다"
+    ]
+  },
+  "prerequisites": ["제품에 로그인할 수 있다"],
+  "dataSetup": ["요청을 분류할 기준정보가 준비되어 있다"],
+  "environment": {
+    "baseUrlEnvironmentVariable": "UX_REVIEW_BASE_URL",
+    "locale": "ko",
+    "viewport": { "width": 1440, "height": 1000 }
+  },
+  "recordingPolicy": "disposable-write",
+  "steps": [
+    {
+      "step": 1,
+      "stage": "orientation",
+      "goal": "오늘 처리할 요청을 파악한다",
+      "startingState": "업무 홈에 진입했다",
+      "action": "대기 중인 요청과 주요 상태를 확인한다",
+      "expected": "새 요청을 시작할 위치와 현재 대기량이 보인다",
+      "caption": "먼저 처리할 요청과 현재 상태를 확인합니다.",
+      "narration": "업무 홈에서는 현재 대기 중인 요청과 처리 상태를 한눈에 확인할 수 있습니다.",
+      "evidenceSlug": "work-overview"
+    },
+    {
+      "step": 2,
+      "stage": "action",
+      "goal": "새 요청을 등록한다",
+      "startingState": "새 요청 등록 버튼이 보인다",
+      "action": "필수 정보를 입력하고 요청을 저장한다",
+      "expected": "저장 성공 피드백과 생성된 요청 정보가 보인다",
+      "caption": "필수 정보를 입력하고 요청을 저장합니다.",
+      "narration": "필수 항목을 입력한 뒤 저장하면 새 요청이 생성됩니다.",
+      "evidenceSlug": "create-request"
+    },
+    {
+      "step": 3,
+      "stage": "verification",
+      "goal": "등록 결과를 확인한다",
+      "startingState": "요청 저장이 완료되었다",
+      "action": "목록에서 요청을 찾고 상세를 연다",
+      "expected": "등록 내용과 승인 대기 상태가 일치한다",
+      "caption": "목록과 상세에서 등록 결과와 상태를 확인합니다.",
+      "narration": "마지막으로 목록과 상세 화면에서 입력 내용과 승인 대기 상태를 확인합니다.",
+      "evidenceSlug": "verify-request"
+    }
+  ],
+  "recoveryPaths": [
+    {
+      "id": "required-field-validation",
+      "trigger": "필수 항목을 입력하지 않고 저장한다",
+      "expected": "누락된 항목이 명확히 표시되고 입력값은 유지된다",
+      "stepIds": [2]
+    }
+  ],
+  "exclusions": ["승인 담당자의 후속 승인 처리"]
+}

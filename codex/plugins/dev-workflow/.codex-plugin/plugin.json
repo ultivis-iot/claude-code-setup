@@ -1,7 +1,7 @@
 {
   "name": "ult",
-  "version": "0.7.0",
-  "description": "Ultivis workflow baseline with natural-language routing and focused engineering skills.",
+  "version": "0.8.0",
+  "description": "Ultivis workflow baseline with natural-language routing, focused engineering skills, and scenario-driven UX review.",
   "author": {
     "name": "Ultivis",
     "url": "https://github.com/ultivis-iot/claude-code-setup"
@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Ult",
     "shortDescription": "Ultivis workflow and engineering skill router",
-    "longDescription": "Keeps ultivis-flow as the lifecycle baseline and routes natural-language work to focused skills for TDD, diagnosis, research, design, architecture, wayfinding, conflict resolution, and productivity.",
+    "longDescription": "Keeps ultivis-flow as the lifecycle baseline and routes natural-language work to focused skills for TDD, diagnosis, research, design, architecture, wayfinding, UX review, conflict resolution, and productivity.",
     "developerName": "Ultivis",
     "category": "Coding",
     "capabilities": [

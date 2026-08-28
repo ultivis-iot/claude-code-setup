@@ -26,6 +26,7 @@
 | Merge or rebase conflicts | `resolving-merge-conflicts` |
 | Transfer of unfinished context to another session | `handoff` |
 | A dedicated, stateful learning workspace | `teach` |
+| Role-based user journey, UI/UX audit, Playwright WebM evidence, captions, or training guide | `ux-review` |
 | Authoring or revising a reusable skill | `writing-great-skills` |
 
 `grill-me` is the explicit shortcut for starting `grilling`; the router normally selects `grilling` directly.

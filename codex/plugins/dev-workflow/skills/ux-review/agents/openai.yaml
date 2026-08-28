@@ -1,0 +1,4 @@
+interface:
+  display_name: "UX Review"
+  short_description: "Iterate UX reviews and record approved guides"
+  default_prompt: "Use $ux-review to approve a real user scenario, iteratively capture captioned Playwright WebM evidence, evaluate the observed UI/UX, and record a user-approved guide."

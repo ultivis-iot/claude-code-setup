@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.8.0 (2026-08-28)
+
+- `ux-review` 스킬 추가: 사용자 업무 시나리오 승인 → Playwright WebM·스크린샷·SRT 증거 수집 → ISO 9241/WCAG 2.2/ARIA APG/Nielsen 기준의 LLM UI/UX 평가 → 개선 반복 → 사용자 승인 교육 영상 제작 흐름을 제공.
+- 시나리오 승인과 가이드 제작 승인을 SHA-256 기반의 별도 계약으로 분리하고, 반복 리뷰 증거와 최종 문서용 스크린샷을 같은 시나리오 단계에 연결.
+- Codex 직접 설치, Codex `ult` 플러그인, Claude Code 스킬 설치 경로에 동일한 `ux-review` 번들을 배포하고 `ultivis-flow` 자연어 라우터에 UX 리뷰 신호를 추가.
+
 ## v0.7.2 (2026-07-19)
 
 - `setup.sh`/`setup.ps1`에 구버전 파일 정리 단계 추가: 과거 이 저장소가 설치했다가 isaac → ult rename으로 사라진 commands 6개, scripts 7개를 설치/업데이트 시 `~/.claude`에서 제거. 명시적 목록 기반이라 사용자가 직접 만든 로컬 전용 파일은 건드리지 않음.
