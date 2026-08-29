@@ -3,7 +3,7 @@
 ## Review bundle
 
 ```text
-tmp/ux-journeys/<date>-<scenario-id>/review-01/
+tmp/ux-journry/<YYYY-MM-DD>/<NN>.<scenario-id>/review-01/
 ├── <id>-scenario.json
 ├── <id>-scenario-approval.json
 ├── <id>-review.webm
@@ -19,7 +19,7 @@ The scenario and matching user approval exist before Playwright code. Later pass
 ## Approved guide bundle
 
 ```text
-tmp/ux-journeys/<date>-<scenario-id>/guide/
+tmp/ux-journry/<YYYY-MM-DD>/<NN>.<scenario-id>/guide-01/
 ├── <id>-scenario.json
 ├── <id>-scenario-approval.json
 ├── <id>-guide-approval.json
@@ -71,3 +71,5 @@ Keep authorization headers, request bodies, tokens, credentials, and personal da
 ## Storage
 
 Use ignored `tmp/` storage by default because videos and screenshots can contain development data. Publish or commit them only after an explicit request and data review.
+
+Create one numbered scenario directory per new scenario. Within each date directory, `NN` starts at `01` and increases from the greatest existing valid two-digit prefix. Repeated review or guide captures for the same approved scenario remain inside that scenario directory and increment only their pass directories (`review-01`, `review-02`, `guide-01`, `guide-02`). Do not create a second delivery-only copy elsewhere under `tmp/`.

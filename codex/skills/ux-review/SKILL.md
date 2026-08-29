@@ -26,7 +26,20 @@ Make these explicit:
 - data setup and mutation policy;
 - review scope and exclusions.
 
-Default output to `tmp/ux-journeys/<YYYY-MM-DD>-<scenario-id>`. Store credentials only in environment variables or ignored Playwright storage state.
+Default output to `tmp/ux-journry/<YYYY-MM-DD>/<NN>.<scenario-id>/`, where `NN` is a date-local two-digit scenario sequence. Start at `01`; before creating a new scenario directory, inspect sibling directories for that date and increment the greatest valid two-digit prefix by one (`01`, `02`, `03`, ...). Do not reuse a sequence even when an earlier scenario is abandoned. Keep all review and guide passes for the same approved scenario under that one numbered directory. Store credentials only in environment variables or ignored Playwright storage state.
+
+Example:
+
+```text
+tmp/ux-journry/2026-08-30/
+├── 01.field-worker-record-production/
+│   ├── review-01/
+│   ├── review-02/
+│   └── guide-01/
+└── 02.manager-order-to-production/
+    ├── review-01/
+    └── guide-01/
+```
 
 Completion criterion: audience, job outcome, environment, write policy, and scope are explicit.
 
@@ -125,6 +138,8 @@ Use the same recorder with `phase: 'guide'`, `scenarioApproval`, and `guideAppro
 
 Use clean deterministic data and the approved critical path. Remove review-only pauses and debugging UI. Keep captions instructional and use each step's optional `narration` as the future voice-over source. Produce guide WebM, SRT, chapters, caption-free screenshots, observations, execution metadata, scenario, and both approval files. Treat the screenshots as reusable documentation sources; preserve stable step and evidence slugs so `ultivis-docs` can map a guide section to the exact frame.
 
+Store guide passes in `guide-01`, `guide-02`, and so on inside the numbered scenario directory. The validated guide directory is also the delivery location; do not duplicate final videos into a separate `tmp/guides` tree.
+
 Do not silently repair the scenario while filming. Stop and return to review when the product no longer matches an expected result.
 
 Completion criterion: the guide follows every approved step in order and its execution hash equals the approval hash.
@@ -139,6 +154,8 @@ node ~/.codex/skills/ux-review/scripts/validate-artifacts.mjs <output-directory>
 ```
 
 Open each final WebM by absolute path and inspect duration, dimensions, and first/middle/last frames. Verify caption readability and that captions do not cover active controls. Return clickable absolute WebM links for VS Code. If preview reports missing `libx264`, `preset`, or MP4 support, repair the local preview ffmpeg; keep the source artifact as WebM.
+
+In the final response, link the role-specific WebM files from their numbered scenario directories and identify each role clearly. Do not expose a broader shared working root when a direct guide file link is available.
 
 For UX findings, use P0 for blocked/unsafe work, P1 for major workflow friction or inaccessible primary actions, and P2 for consistency and polish. Cite journey, step or timestamp, route, screenshot, impact, and smallest coherent improvement.
 
