@@ -35,14 +35,15 @@ async function showCaption(page, text, placement) {
         transform: 'translateX(-50%)',
         padding: '10px 16px',
         borderRadius: '10px',
-        background: 'rgba(15, 23, 42, 0.9)',
-        color: '#fff',
+        border: '1px solid rgba(15, 23, 42, 0.18)',
+        background: 'rgba(255, 255, 255, 0.96)',
+        color: '#111827',
         fontFamily: 'sans-serif',
         fontSize: '18px',
         fontWeight: '600',
         lineHeight: '1.45',
         textAlign: 'center',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.28)',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.34)',
         pointerEvents: 'none',
       });
       document.body.append(element);
@@ -127,7 +128,7 @@ export function createJourneyRecorder({
   const cues = [];
   const observations = [];
   let sequence = 0;
-  const resolvedCaptionPlacement = captionPlacement || (phase === 'guide' ? 'top' : 'bottom');
+  const resolvedCaptionPlacement = captionPlacement || 'bottom';
   const pacing = {
     beforeActionMs: 900,
     afterActionMs: 1_500,

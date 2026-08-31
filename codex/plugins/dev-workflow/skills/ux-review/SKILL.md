@@ -140,6 +140,8 @@ Use clean deterministic data and the approved critical path. Remove review-only 
 
 Record guide actions at a pace a first-time user can follow. Before each action, leave the current state visible long enough to locate the target; slow clicks, selections, and field entry instead of executing them at automation speed; after navigation or submission, hold the resulting screen before moving on. Keep each caption visible for at least 4 seconds and allow up to 8 seconds for longer Korean captions. Use Playwright `slowMo` or equivalent action-level pacing in addition to caption dwell time. Inspect the finished video at normal playback speed; if a reviewer cannot identify what changed without pausing, create the next guide pass with slower pacing.
 
+Place guide captions in the lower third by default and use a theme-independent high-contrast surface; do not use a dark translucent caption on a dark product screen. If the lower-third caption covers the control or result being explained, adjust that step's scroll position or caption placement instead of moving every caption to the top.
+
 Store guide passes in `guide-01`, `guide-02`, and so on inside the numbered scenario directory. The validated guide directory is also the delivery location; do not duplicate final videos into a separate `tmp/guides` tree.
 
 Do not silently repair the scenario while filming. Stop and return to review when the product no longer matches an expected result.
