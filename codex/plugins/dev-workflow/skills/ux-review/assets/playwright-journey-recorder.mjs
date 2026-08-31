@@ -20,8 +20,8 @@ function renderSrt(cues) {
     .join('\n');
 }
 
-async function showCaption(page, text) {
-  await page.evaluate((caption) => {
+async function showCaption(page, text, placement) {
+  await page.evaluate(({ caption, captionPlacement }) => {
     let element = document.querySelector('[data-testid="ux-journey-caption"]');
     if (!element) {
       element = document.createElement('div');
@@ -47,8 +47,10 @@ async function showCaption(page, text) {
       });
       document.body.append(element);
     }
+    element.style.top = captionPlacement === 'top' ? '72px' : 'auto';
+    element.style.bottom = captionPlacement === 'top' ? 'auto' : '28px';
     element.textContent = caption;
-  }, text);
+  }, { caption: text, captionPlacement: placement });
 }
 
 async function hideCaption(page) {
@@ -93,6 +95,8 @@ export function createJourneyRecorder({
   guideApproval = null,
   outputDirectory,
   getRuntimeEvidence = () => ({}),
+  guidePacing = {},
+  captionPlacement = null,
 }) {
   const failures = validateScenario(scenario);
   if (failures.length > 0) throw new Error(failures.join('\n'));
@@ -123,6 +127,15 @@ export function createJourneyRecorder({
   const cues = [];
   const observations = [];
   let sequence = 0;
+  const resolvedCaptionPlacement = captionPlacement || (phase === 'guide' ? 'top' : 'bottom');
+  const pacing = {
+    beforeActionMs: 900,
+    afterActionMs: 1_500,
+    minCaptionMs: 4_000,
+    maxCaptionMs: 8_000,
+    captionMsPerCharacter: 120,
+    ...guidePacing,
+  };
 
   return {
     async step(stepNumber, action, dwell) {
@@ -135,7 +148,13 @@ export function createJourneyRecorder({
       if (typeof action !== 'function') throw new Error(`Step ${stepNumber} requires an action.`);
 
       await hideCaption(page);
+      if (phase === 'guide' && sequence > 0) {
+        await page.waitForTimeout(pacing.beforeActionMs);
+      }
       await action(expectedStep);
+      if (phase === 'guide') {
+        await page.waitForTimeout(pacing.afterActionMs);
+      }
       sequence += 1;
       const start = Date.now() - startedAt;
       await mkdir(outputDirectory, { recursive: true });
@@ -153,8 +172,11 @@ export function createJourneyRecorder({
         ),
         fullPage: true,
       });
-      await showCaption(page, expectedStep.caption);
-      const readingTime = Math.min(5_000, Math.max(1_800, expectedStep.caption.length * 80));
+      await showCaption(page, expectedStep.caption, resolvedCaptionPlacement);
+      const readingTime = Math.min(
+        pacing.maxCaptionMs,
+        Math.max(pacing.minCaptionMs, expectedStep.caption.length * pacing.captionMsPerCharacter)
+      );
       await page.waitForTimeout(dwell ?? (phase === 'guide' ? readingTime : 1_200));
       cues.push({
         step: expectedStep.step,

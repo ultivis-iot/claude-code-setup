@@ -138,6 +138,8 @@ Use the same recorder with `phase: 'guide'`, `scenarioApproval`, and `guideAppro
 
 Use clean deterministic data and the approved critical path. Remove review-only pauses and debugging UI. Keep captions instructional and use each step's optional `narration` as the future voice-over source. Produce guide WebM, SRT, chapters, caption-free screenshots, observations, execution metadata, scenario, and both approval files. Treat the screenshots as reusable documentation sources; preserve stable step and evidence slugs so `ultivis-docs` can map a guide section to the exact frame.
 
+Record guide actions at a pace a first-time user can follow. Before each action, leave the current state visible long enough to locate the target; slow clicks, selections, and field entry instead of executing them at automation speed; after navigation or submission, hold the resulting screen before moving on. Keep each caption visible for at least 4 seconds and allow up to 8 seconds for longer Korean captions. Use Playwright `slowMo` or equivalent action-level pacing in addition to caption dwell time. Inspect the finished video at normal playback speed; if a reviewer cannot identify what changed without pausing, create the next guide pass with slower pacing.
+
 Store guide passes in `guide-01`, `guide-02`, and so on inside the numbered scenario directory. The validated guide directory is also the delivery location; do not duplicate final videos into a separate `tmp/guides` tree.
 
 Do not silently repair the scenario while filming. Stop and return to review when the product no longer matches an expected result.
