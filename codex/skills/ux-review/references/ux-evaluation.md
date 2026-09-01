@@ -14,15 +14,39 @@ Use these as complementary layers, not interchangeable checklists:
 
 Standards conformance does not prove that the job is usable. Visual polish does not prove task success. The declared user's observed ability to complete and verify the job is the final integration criterion.
 
+## Product-native consistency
+
+Read `<scenario-directory>/consistency-baseline.md` before evaluating the review capture. Existing product behavior is the primary comparison for whether the feature belongs in the product; generic heuristics explain the usability impact but do not replace that comparison.
+
+Compare the reviewed interface against genuinely analogous product surfaces for:
+
+- page and navigation grammar: shell, breadcrumb, list-to-detail context, header, tabs, widgets, and return path;
+- action grammar: primary and secondary placement, button labels, destructive-action treatment, menus, and confirmation dialogs;
+- data grammar: tables, filters, empty/loading/error states, status badges, timestamps, audit identity, and technical identifiers;
+- language grammar: domain terms, capitalization, translation, tone, and state names;
+- visual grammar: spacing, density, grouping, typography, color semantics, icon use, and responsive collapse;
+- workflow grammar: creation, save, approval, handoff, retry, cancellation, and success feedback.
+
+For every material difference, classify it as one of:
+
+- **aligned**: follows the established pattern;
+- **intentional deviation**: the user's job requires a different pattern and the reason is explicit;
+- **feature-local inconsistency**: an avoidable one-off that should be corrected here;
+- **systemic product issue**: the reviewed feature matches an existing pattern that is itself inaccessible, unsafe, or confusing;
+- **evidence gap**: no valid comparable surface was available.
+
+Do not recommend copying an existing defect. When the baseline itself fails accessibility, safety, or task effectiveness, report the systemic issue separately and recommend the smallest shared-component correction. Do not call a purposeful job-specific difference inconsistent merely because it is visually unique.
+
 ## Hard gates
 
-A review is not guide-ready while any applicable hard gate is unresolved:
+A review is not guide-ready while any applicable hard gate is unresolved. Use these stable IDs in the review decision:
 
-- the critical-path job cannot complete or its result cannot be verified;
-- the flow risks unintended data loss, duplicate work, or an unsafe irreversible action;
-- the primary action is not keyboard reachable, has unusable focus behavior, or fails an applicable WCAG 2.2 AA criterion;
-- the interface hides required state, permission, validation, or recovery information;
-- runtime errors make the observed result unreliable.
+- `task-completion`: the critical-path job cannot complete or its result cannot be verified;
+- `data-safety`: the flow risks unintended data loss, duplicate work, or an unsafe irreversible action;
+- `accessibility`: the primary action is not keyboard reachable, has unusable focus behavior, or fails an applicable WCAG 2.2 AA criterion;
+- `state-visibility`: the interface hides required state, permission, validation, or recovery information;
+- `runtime-reliability`: runtime errors make the observed result unreliable;
+- `product-consistency`: a primary-path layout or interaction departs from the recorded product baseline without an explicit job-based reason, leaving users unable to transfer learned behavior.
 
 ## Evaluation dimensions
 
@@ -32,7 +56,7 @@ A review is not guide-ready while any applicable hard gate is unresolved:
 4. **Hierarchy**: Does the screen emphasize the decision and information needed now?
 5. **Clarity**: Are labels, terminology, controls, statuses, and consequences understandable?
 6. **Feedback**: Does the UI communicate loading, success, failure, empty states, and saved state at the right time?
-7. **Consistency**: Do similar jobs use consistent layout, interaction, density, and control placement?
+7. **Product fit**: Does the interface follow the recorded product baseline for layout grammar, interaction sequence, terminology, state feedback, density, and responsive behavior? Are deviations intentional and justified?
 8. **Error handling**: Does the UI prevent likely mistakes and preserve user work during recovery?
 9. **Accessibility**: Are controls named, keyboard reachable, readable, and perceivable without color alone?
 10. **Responsiveness**: Does the workflow remain usable at the declared viewport without clipping, overflow, or lost actions?
@@ -42,8 +66,9 @@ Where evidence permits, report task success, elapsed time, action count, route/c
 
 ## Evidence rules
 
-- Cite the exact scenario step and video timestamp.
+- Cite the exact journey, scenario step, and video timestamp.
 - Link the matching screenshot and route.
+- For consistency claims, cite the comparable baseline route, screenshot, shared component, or interaction and state why it is analogous.
 - State what is observed before interpreting it.
 - Explain impact in the audience role's job language.
 - Separate product issues from data/configuration, harness, and environment problems.
@@ -73,7 +98,8 @@ Where evidence permits, report task success, elapsed time, action count, route/c
 
 End with:
 
+- a product-consistency summary listing aligned patterns, intentional deviations, feature-local inconsistencies, systemic issues, and evidence gaps;
 - top three improvements by user impact;
-- findings grouped as fix, defer, reject, or evidence needed after user review;
+- findings mapped after user review to `fixed`, `deferred`, `rejected`, or `evidence-needed`;
 - hard-gate status and guide-readiness recommendation, clearly labeled as an LLM recommendation rather than approval;
 - whether another capture is needed before a guide is ready.

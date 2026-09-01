@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
 
 const experiences = new Set(['beginner', 'intermediate', 'advanced']);
-const recordingPolicies = new Set(['disposable-write', 'preview-only', 'read-only']);
+const mutationModes = new Set(['disposable-write', 'preview-only', 'read-only']);
+const journeyKinds = new Set(['critical', 'recovery']);
 const stages = new Set(['orientation', 'action', 'verification', 'handoff', 'recovery']);
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const environmentVariablePattern = /^[A-Z_][A-Z0-9_]*$/;
 
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -15,8 +17,13 @@ function canonicalize(value) {
   );
 }
 
+export function sha256(value) {
+  const content = Buffer.isBuffer(value) ? value : Buffer.from(String(value));
+  return createHash('sha256').update(content).digest('hex');
+}
+
 export function scenarioHash(scenario) {
-  return createHash('sha256').update(JSON.stringify(canonicalize(scenario))).digest('hex');
+  return sha256(JSON.stringify(canonicalize(scenario)));
 }
 
 export function validateScenario(scenario) {
@@ -24,15 +31,22 @@ export function validateScenario(scenario) {
   const requiredString = (value, field) => {
     if (typeof value !== 'string' || !value.trim()) failures.push(`${field} is required`);
   };
-  const requiredStringArray = (value, field) => {
-    if (!Array.isArray(value) || value.length === 0) {
-      failures.push(`${field} must contain at least one item`);
+  const stringArray = (value, field, { nonEmpty = false } = {}) => {
+    if (!Array.isArray(value)) {
+      failures.push(`${field} must be an array`);
       return;
     }
+    if (nonEmpty && value.length === 0) failures.push(`${field} must contain at least one item`);
     value.forEach((item, index) => requiredString(item, `${field}[${index}]`));
   };
+  const environmentVariable = (value, field) => {
+    requiredString(value, field);
+    if (value && !environmentVariablePattern.test(value)) {
+      failures.push(`${field} must be an uppercase environment-variable name`);
+    }
+  };
 
-  if (scenario?.schemaVersion !== 1) failures.push('schemaVersion must be 1');
+  if (scenario?.schemaVersion !== 2) failures.push('schemaVersion must be 2');
   requiredString(scenario?.id, 'id');
   if (scenario?.id && !slugPattern.test(scenario.id)) failures.push('id must be kebab-case');
   requiredString(scenario?.title, 'title');
@@ -41,13 +55,22 @@ export function validateScenario(scenario) {
   if (!experiences.has(scenario?.audience?.experience)) {
     failures.push('audience.experience must be beginner, intermediate, or advanced');
   }
-  requiredStringArray(scenario?.audience?.permissions, 'audience.permissions');
+  stringArray(scenario?.audience?.permissions, 'audience.permissions');
   requiredString(scenario?.job?.trigger, 'job.trigger');
   requiredString(scenario?.job?.outcome, 'job.outcome');
-  requiredStringArray(scenario?.job?.successCriteria, 'job.successCriteria');
-  requiredStringArray(scenario?.prerequisites, 'prerequisites');
-  requiredStringArray(scenario?.dataSetup, 'dataSetup');
-  requiredString(scenario?.environment?.baseUrlEnvironmentVariable, 'environment.baseUrlEnvironmentVariable');
+  stringArray(scenario?.job?.successCriteria, 'job.successCriteria', { nonEmpty: true });
+  stringArray(scenario?.prerequisites, 'prerequisites');
+  stringArray(scenario?.dataSetup, 'dataSetup');
+  stringArray(scenario?.exclusions, 'exclusions');
+
+  environmentVariable(
+    scenario?.environment?.baseUrlEnvironmentVariable,
+    'environment.baseUrlEnvironmentVariable'
+  );
+  environmentVariable(
+    scenario?.environment?.sourceRevisionEnvironmentVariable,
+    'environment.sourceRevisionEnvironmentVariable'
+  );
   requiredString(scenario?.environment?.locale, 'environment.locale');
   if (!Number.isInteger(scenario?.environment?.viewport?.width) || scenario.environment.viewport.width < 240) {
     failures.push('environment.viewport.width must be an integer >= 240');
@@ -55,21 +78,58 @@ export function validateScenario(scenario) {
   if (!Number.isInteger(scenario?.environment?.viewport?.height) || scenario.environment.viewport.height < 240) {
     failures.push('environment.viewport.height must be an integer >= 240');
   }
-  if (!recordingPolicies.has(scenario?.recordingPolicy)) {
-    failures.push('recordingPolicy is invalid');
+
+  const mutationMode = scenario?.mutationPolicy?.mode;
+  if (!mutationModes.has(mutationMode)) failures.push('mutationPolicy.mode is invalid');
+  stringArray(scenario?.mutationPolicy?.allowed, 'mutationPolicy.allowed');
+  stringArray(scenario?.mutationPolicy?.cleanup, 'mutationPolicy.cleanup');
+  if (['read-only', 'preview-only'].includes(mutationMode) && scenario?.mutationPolicy?.allowed?.length) {
+    failures.push(`${mutationMode} mutationPolicy.allowed must be empty`);
+  }
+  if (mutationMode === 'disposable-write') {
+    if (!scenario?.mutationPolicy?.allowed?.length) {
+      failures.push('disposable-write mutationPolicy.allowed must describe permitted writes');
+    }
+    if (!scenario?.mutationPolicy?.cleanup?.length) {
+      failures.push('disposable-write mutationPolicy.cleanup must describe cleanup');
+    }
   }
 
-  if (!Array.isArray(scenario?.steps) || scenario.steps.length < 3) {
-    failures.push('steps must contain orientation, action, and outcome verification');
-  } else {
-    const stepNumbers = new Set();
-    const slugs = new Set();
-    scenario.steps.forEach((step, index) => {
-      const field = `steps[${index}]`;
-      if (!Number.isInteger(step.step) || step.step < 1 || stepNumbers.has(step.step)) {
-        failures.push(`${field}.step must be a unique positive integer`);
-      }
-      stepNumbers.add(step.step);
+  if (!Array.isArray(scenario?.journeys) || scenario.journeys.length < 2) {
+    failures.push('journeys must contain one critical journey and at least one recovery journey');
+    return failures;
+  }
+
+  const journeyIds = new Set();
+  let criticalCount = 0;
+  let recoveryCount = 0;
+  scenario.journeys.forEach((journey, journeyIndex) => {
+    const journeyField = `journeys[${journeyIndex}]`;
+    requiredString(journey.id, `${journeyField}.id`);
+    if (journey.id && !slugPattern.test(journey.id)) {
+      failures.push(`${journeyField}.id must be kebab-case`);
+    }
+    if (journeyIds.has(journey.id)) failures.push(`${journeyField}.id must be unique`);
+    journeyIds.add(journey.id);
+    if (!journeyKinds.has(journey.kind)) failures.push(`${journeyField}.kind is invalid`);
+    if (journey.kind === 'critical') criticalCount += 1;
+    if (journey.kind === 'recovery') {
+      recoveryCount += 1;
+      requiredString(journey.trigger, `${journeyField}.trigger`);
+    }
+
+    if (!Array.isArray(journey.steps) || journey.steps.length === 0) {
+      failures.push(`${journeyField}.steps must contain at least one step`);
+      return;
+    }
+    if (journey.kind === 'critical' && journey.steps.length < 3) {
+      failures.push(`${journeyField}.steps must contain orientation, action, and verification`);
+    }
+
+    const evidenceSlugs = new Set();
+    journey.steps.forEach((step, stepIndex) => {
+      const field = `${journeyField}.steps[${stepIndex}]`;
+      if (step.step !== stepIndex + 1) failures.push(`${field}.step must equal ${stepIndex + 1}`);
       if (!stages.has(step.stage)) failures.push(`${field}.stage is invalid`);
       for (const key of ['goal', 'startingState', 'action', 'expected', 'caption', 'evidenceSlug']) {
         requiredString(step[key], `${field}.${key}`);
@@ -77,33 +137,33 @@ export function validateScenario(scenario) {
       if (step.evidenceSlug && !slugPattern.test(step.evidenceSlug)) {
         failures.push(`${field}.evidenceSlug must be kebab-case`);
       }
-      if (slugs.has(step.evidenceSlug)) failures.push(`${field}.evidenceSlug must be unique`);
-      slugs.add(step.evidenceSlug);
+      if (evidenceSlugs.has(step.evidenceSlug)) failures.push(`${field}.evidenceSlug must be unique`);
+      evidenceSlugs.add(step.evidenceSlug);
       if (step.caption?.length > 160) failures.push(`${field}.caption must be 160 characters or fewer`);
-    });
-    if (scenario.steps[0]?.stage !== 'orientation') failures.push('the first step must be orientation');
-    if (!['verification', 'handoff'].includes(scenario.steps.at(-1)?.stage)) {
-      failures.push('the last step must be verification or handoff');
-    }
-  }
-
-  if (!Array.isArray(scenario?.recoveryPaths) || scenario.recoveryPaths.length === 0) {
-    failures.push('recoveryPaths must contain at least one realistic recovery path');
-  } else {
-    const stepNumbers = new Set((scenario.steps || []).map(({ step }) => step));
-    scenario.recoveryPaths.forEach((recovery, index) => {
-      const field = `recoveryPaths[${index}]`;
-      requiredString(recovery.id, `${field}.id`);
-      requiredString(recovery.trigger, `${field}.trigger`);
-      requiredString(recovery.expected, `${field}.expected`);
-      if (!Array.isArray(recovery.stepIds) || recovery.stepIds.length === 0) {
-        failures.push(`${field}.stepIds must contain at least one step`);
-      } else if (recovery.stepIds.some((step) => !stepNumbers.has(step))) {
-        failures.push(`${field}.stepIds contains an unknown step`);
+      if (step.narration !== undefined && typeof step.narration !== 'string') {
+        failures.push(`${field}.narration must be a string`);
       }
     });
-  }
 
-  if (!Array.isArray(scenario?.exclusions)) failures.push('exclusions must be an array');
+    const journeyStages = journey.steps.map(({ stage }) => stage);
+    if (journey.kind === 'critical') {
+      if (journey.steps[0]?.stage !== 'orientation') {
+        failures.push(`${journeyField} must start with orientation`);
+      }
+      if (!journeyStages.includes('action')) failures.push(`${journeyField} must contain an action`);
+      if (!['verification', 'handoff'].includes(journey.steps.at(-1)?.stage)) {
+        failures.push(`${journeyField} must end with verification or handoff`);
+      }
+    }
+    if (journey.kind === 'recovery') {
+      if (!journeyStages.includes('recovery')) failures.push(`${journeyField} must contain recovery`);
+      if (journey.steps.at(-1)?.stage !== 'verification') {
+        failures.push(`${journeyField} must end with verification`);
+      }
+    }
+  });
+
+  if (criticalCount !== 1) failures.push('journeys must contain exactly one critical journey');
+  if (recoveryCount < 1) failures.push('journeys must contain at least one recovery journey');
   return failures;
 }

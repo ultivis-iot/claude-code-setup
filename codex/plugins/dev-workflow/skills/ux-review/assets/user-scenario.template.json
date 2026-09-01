@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "operator-request-to-approval",
   "title": "새 요청을 등록하고 승인 상태 확인하기",
   "product": "제품 이름",
@@ -20,51 +20,83 @@
   "dataSetup": ["요청을 분류할 기준정보가 준비되어 있다"],
   "environment": {
     "baseUrlEnvironmentVariable": "UX_REVIEW_BASE_URL",
+    "sourceRevisionEnvironmentVariable": "UX_REVIEW_SOURCE_REVISION",
     "locale": "ko",
     "viewport": { "width": 1440, "height": 1000 }
   },
-  "recordingPolicy": "disposable-write",
-  "steps": [
+  "mutationPolicy": {
+    "mode": "disposable-write",
+    "allowed": ["검증용 요청 한 건을 생성한다"],
+    "cleanup": ["검증용 요청을 삭제하거나 격리된 테스트 데이터를 초기화한다"]
+  },
+  "journeys": [
     {
-      "step": 1,
-      "stage": "orientation",
-      "goal": "오늘 처리할 요청을 파악한다",
-      "startingState": "업무 홈에 진입했다",
-      "action": "대기 중인 요청과 주요 상태를 확인한다",
-      "expected": "새 요청을 시작할 위치와 현재 대기량이 보인다",
-      "caption": "먼저 처리할 요청과 현재 상태를 확인합니다.",
-      "narration": "업무 홈에서는 현재 대기 중인 요청과 처리 상태를 한눈에 확인할 수 있습니다.",
-      "evidenceSlug": "work-overview"
+      "id": "critical",
+      "kind": "critical",
+      "steps": [
+        {
+          "step": 1,
+          "stage": "orientation",
+          "goal": "오늘 처리할 요청을 파악한다",
+          "startingState": "업무 홈에 진입했다",
+          "action": "대기 중인 요청과 주요 상태를 확인한다",
+          "expected": "새 요청을 시작할 위치와 현재 대기량이 보인다",
+          "caption": "먼저 처리할 요청과 현재 상태를 확인합니다.",
+          "narration": "업무 홈에서는 현재 대기 중인 요청과 처리 상태를 한눈에 확인할 수 있습니다.",
+          "evidenceSlug": "work-overview"
+        },
+        {
+          "step": 2,
+          "stage": "action",
+          "goal": "새 요청을 등록한다",
+          "startingState": "새 요청 등록 버튼이 보인다",
+          "action": "필수 정보를 입력하고 요청을 저장한다",
+          "expected": "저장 성공 피드백과 생성된 요청 정보가 보인다",
+          "caption": "필수 정보를 입력하고 요청을 저장합니다.",
+          "narration": "필수 항목을 입력한 뒤 저장하면 새 요청이 생성됩니다.",
+          "evidenceSlug": "create-request"
+        },
+        {
+          "step": 3,
+          "stage": "verification",
+          "goal": "등록 결과를 확인한다",
+          "startingState": "요청 저장이 완료되었다",
+          "action": "목록에서 요청을 찾고 상세를 연다",
+          "expected": "등록 내용과 승인 대기 상태가 일치한다",
+          "caption": "목록과 상세에서 등록 결과와 상태를 확인합니다.",
+          "narration": "마지막으로 목록과 상세 화면에서 입력 내용과 승인 대기 상태를 확인합니다.",
+          "evidenceSlug": "verify-request"
+        }
+      ]
     },
-    {
-      "step": 2,
-      "stage": "action",
-      "goal": "새 요청을 등록한다",
-      "startingState": "새 요청 등록 버튼이 보인다",
-      "action": "필수 정보를 입력하고 요청을 저장한다",
-      "expected": "저장 성공 피드백과 생성된 요청 정보가 보인다",
-      "caption": "필수 정보를 입력하고 요청을 저장합니다.",
-      "narration": "필수 항목을 입력한 뒤 저장하면 새 요청이 생성됩니다.",
-      "evidenceSlug": "create-request"
-    },
-    {
-      "step": 3,
-      "stage": "verification",
-      "goal": "등록 결과를 확인한다",
-      "startingState": "요청 저장이 완료되었다",
-      "action": "목록에서 요청을 찾고 상세를 연다",
-      "expected": "등록 내용과 승인 대기 상태가 일치한다",
-      "caption": "목록과 상세에서 등록 결과와 상태를 확인합니다.",
-      "narration": "마지막으로 목록과 상세 화면에서 입력 내용과 승인 대기 상태를 확인합니다.",
-      "evidenceSlug": "verify-request"
-    }
-  ],
-  "recoveryPaths": [
     {
       "id": "required-field-validation",
+      "kind": "recovery",
       "trigger": "필수 항목을 입력하지 않고 저장한다",
-      "expected": "누락된 항목이 명확히 표시되고 입력값은 유지된다",
-      "stepIds": [2]
+      "steps": [
+        {
+          "step": 1,
+          "stage": "recovery",
+          "goal": "누락된 필수 항목을 찾는다",
+          "startingState": "새 요청 입력 화면이 열려 있다",
+          "action": "필수 항목을 비운 채 저장한다",
+          "expected": "누락된 항목이 명확히 표시되고 기존 입력값은 유지된다",
+          "caption": "필수 항목이 누락되면 해당 위치에서 안내를 확인합니다.",
+          "narration": "필수 항목을 빠뜨린 경우 입력값을 잃지 않고 누락 위치를 바로 확인할 수 있어야 합니다.",
+          "evidenceSlug": "required-field-error"
+        },
+        {
+          "step": 2,
+          "stage": "verification",
+          "goal": "오류를 수정하고 작업을 계속할 수 있는지 확인한다",
+          "startingState": "필수 항목 오류가 표시되어 있다",
+          "action": "누락된 값을 입력하고 오류가 해소되는지 확인한다",
+          "expected": "오류가 해소되고 저장을 다시 시도할 수 있다",
+          "caption": "누락된 값을 입력하면 기존 작업을 유지한 채 계속할 수 있습니다.",
+          "narration": "오류를 수정한 뒤 처음부터 다시 입력하지 않고 작업을 이어갈 수 있습니다.",
+          "evidenceSlug": "recover-required-field"
+        }
+      ]
     }
   ],
   "exclusions": ["승인 담당자의 후속 승인 처리"]

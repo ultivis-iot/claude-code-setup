@@ -11,30 +11,36 @@ const option = (name) => {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : null;
 };
-const approvedBy = option('--by');
+const requestedBy = option('--requested-by');
+const request = option('--request');
 
-if (!scenarioPath || !approvedBy) {
-  console.error('Usage: approve-scenario.mjs <scenario.json> --by <approver>');
+if (!scenarioPath || !requestedBy?.trim() || !request?.trim()) {
+  console.error(
+    'Usage: record-guide-request.mjs <scenario.json> --requested-by <requester> --request <request-summary>'
+  );
   process.exitCode = 2;
 } else {
   const repositoryRoot = await findRepositoryRoot(scenarioPath);
   const scenario = JSON.parse(await readFile(scenarioPath, 'utf8'));
   const failures = validateScenario(scenario);
   if (failures.length > 0) throw new Error(failures.join('\n'));
-  const approval = {
-    schemaVersion: 2,
-    approvalType: 'review-scenario',
+
+  const authorization = {
+    schemaVersion: 1,
+    authorizationType: 'direct-guide-request',
     scenarioId: scenario.id,
     scenarioHash: scenarioHash(scenario),
-    approvedAt: new Date().toISOString(),
-    approvedBy,
+    recordedAt: new Date().toISOString(),
+    requestedBy: requestedBy.trim(),
+    request: request.trim(),
     pathBase: 'repository-root',
     scenarioFile: toRepositoryRelativePath(repositoryRoot, scenarioPath, 'scenario file'),
+    claimsUxReviewReadiness: false,
   };
-  const approvalPath = path.join(
+  const authorizationPath = path.join(
     path.dirname(scenarioPath),
-    `${scenario.id}-scenario-approval.json`
+    `${scenario.id}-direct-guide-request.json`
   );
-  await writeFile(approvalPath, `${JSON.stringify(approval, null, 2)}\n`, 'utf8');
-  console.log(JSON.stringify({ approvalPath, ...approval }, null, 2));
+  await writeFile(authorizationPath, `${JSON.stringify(authorization, null, 2)}\n`, 'utf8');
+  console.log(JSON.stringify({ authorizationPath, ...authorization }, null, 2));
 }

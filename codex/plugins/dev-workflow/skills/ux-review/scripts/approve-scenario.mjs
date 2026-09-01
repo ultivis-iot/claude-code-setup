@@ -2,6 +2,7 @@
 
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { findRepositoryRoot, toRepositoryRelativePath } from './repository-paths.mjs';
 import { scenarioHash, validateScenario } from './scenario-contract.mjs';
 
 const args = process.argv.slice(2);
@@ -16,16 +17,19 @@ if (!scenarioPath || !approvedBy) {
   console.error('Usage: approve-scenario.mjs <scenario.json> --by <approver>');
   process.exitCode = 2;
 } else {
+  const repositoryRoot = await findRepositoryRoot(scenarioPath);
   const scenario = JSON.parse(await readFile(scenarioPath, 'utf8'));
   const failures = validateScenario(scenario);
   if (failures.length > 0) throw new Error(failures.join('\n'));
   const approval = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     approvalType: 'review-scenario',
     scenarioId: scenario.id,
     scenarioHash: scenarioHash(scenario),
     approvedAt: new Date().toISOString(),
     approvedBy,
+    pathBase: 'repository-root',
+    scenarioFile: toRepositoryRelativePath(repositoryRoot, scenarioPath, 'scenario file'),
   };
   const approvalPath = path.join(
     path.dirname(scenarioPath),

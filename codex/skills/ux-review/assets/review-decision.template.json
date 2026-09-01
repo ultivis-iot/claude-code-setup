@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "readiness": "ready-with-deferred-findings",
+  "findings": [
+    {
+      "id": "UX-01",
+      "severity": "P2",
+      "disposition": "deferred",
+      "rationale": "사용자가 현재 범위에서 보류하기로 결정한 이유"
+    }
+  ],
+  "hardGates": [
+    { "id": "task-completion", "status": "resolved", "evidence": "검증 근거" },
+    { "id": "data-safety", "status": "resolved", "evidence": "검증 근거" },
+    { "id": "accessibility", "status": "resolved", "evidence": "검증 근거" },
+    { "id": "state-visibility", "status": "resolved", "evidence": "검증 근거" },
+    { "id": "runtime-reliability", "status": "resolved", "evidence": "검증 근거" },
+    { "id": "product-consistency", "status": "resolved", "evidence": "검증 근거" }
+  ]
+}
