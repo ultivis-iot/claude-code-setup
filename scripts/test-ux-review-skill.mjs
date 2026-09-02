@@ -157,8 +157,22 @@ try {
     guideApproval: null,
     directGuideRequest,
     videoFixture,
+    useInteractionHelpers: true,
   });
   await nodeScript('validate-artifacts.mjs', [directGuideDirectory, '--phase', 'guide']);
+  const directGuideExecution = JSON.parse(
+    await readFile(path.join(directGuideDirectory, `${scenario.id}-guide-execution.json`), 'utf8')
+  );
+  const criticalStepCount = scenario.journeys.find(({ kind }) => kind === 'critical').steps.length;
+  if (
+    directGuideExecution.interactionCounts.clicks !== criticalStepCount ||
+    directGuideExecution.interactionCounts.fills !== criticalStepCount ||
+    directGuideExecution.interactionCounts.targetHighlights !== criticalStepCount * 2 ||
+    directGuideExecution.interactionPacing.typeDelayMs < 80 ||
+    directGuideExecution.interactionPacing.clickDelayMs < 200
+  ) {
+    throw new Error('Guide execution did not record slow highlighted interactions.');
+  }
   await verifyRecorderOrder({
     directory: path.join(scenarioDirectory, 'review-02'),
     phase: 'review',
@@ -381,6 +395,7 @@ async function verifyRecorderOrder({
   videoFixture,
   stopAfter = null,
   terminal = null,
+  useInteractionHelpers = false,
 }) {
   await mkdir(directory);
   const events = [];
@@ -395,6 +410,10 @@ async function verifyRecorderOrder({
         events.push('caption');
         return undefined;
       }
+      if (payload?.styleId === 'ux-journey-target-style') {
+        events.push('highlight-style');
+        return undefined;
+      }
       return {
         url: 'https://example.test/work',
         locale: 'ko-KR',
@@ -405,10 +424,15 @@ async function verifyRecorderOrder({
         unnamedControls: 0,
       };
     },
-    locator() {
-      return { async evaluateAll() {} };
+    locator(selector) {
+      return {
+        async evaluateAll() {
+          if (selector.includes('data-ux-journey-target')) events.push('highlight-clear');
+        },
+      };
     },
-    async waitForTimeout() {
+    async waitForTimeout(milliseconds) {
+      events.push(`wait:${milliseconds}`);
       await new Promise((resolve) => setTimeout(resolve, 2));
     },
     async screenshot({ path: screenshotPath }) {
@@ -424,6 +448,32 @@ async function verifyRecorderOrder({
       };
     },
     async close() {},
+  };
+  const target = {
+    async scrollIntoViewIfNeeded() {
+      events.push('target-scroll');
+    },
+    async evaluate() {
+      events.push('target-highlight');
+    },
+    async click({ delay } = {}) {
+      events.push(`target-click:${delay}`);
+    },
+    async fill(value) {
+      events.push(`target-fill:${value}`);
+    },
+    async pressSequentially(value, { delay } = {}) {
+      events.push(`target-type:${value}:${delay}`);
+    },
+    async selectOption() {
+      events.push('target-select');
+    },
+    async check() {
+      events.push('target-check');
+    },
+    async uncheck() {
+      events.push('target-uncheck');
+    },
   };
   const context = { async close() {} };
   const recorder = createJourneyRecorder({
@@ -441,7 +491,13 @@ async function verifyRecorderOrder({
   const criticalSteps = scenario.journeys.find(({ kind }) => kind === 'critical').steps;
   const stepsToRecord = stopAfter === null ? criticalSteps : criticalSteps.slice(0, stopAfter);
   for (const step of stepsToRecord) {
-    await recorder.step(step.step, async () => events.push('action'));
+    await recorder.step(step.step, async (_expectedStep, ui) => {
+      if (useInteractionHelpers) {
+        await ui.fill(target, 'demo');
+        await ui.click(target);
+      }
+      events.push('action');
+    });
   }
   await recorder.finish(terminal || undefined);
   const captionIndex = events.indexOf('caption');
@@ -456,6 +512,29 @@ async function verifyRecorderOrder({
     !(actionIndex < screenshotIndex && screenshotIndex < captionIndex)
   ) {
     throw new Error('Review recorder order must be action, clean screenshot, then result caption.');
+  }
+  if (useInteractionHelpers) {
+    const highlightIndex = events.indexOf('target-highlight');
+    const clickEvent = events.find((event) => event.startsWith('target-click:'));
+    const typeEvent = events.find((event) => event.startsWith('target-type:'));
+    const clickIndex = events.indexOf(clickEvent);
+    const clearAfterClickIndex = events.findIndex(
+      (event, index) => index > clickIndex && event === 'highlight-clear'
+    );
+    if (
+      !(highlightIndex >= 0 && highlightIndex < clickIndex && clearAfterClickIndex < screenshotIndex)
+    ) {
+      throw new Error('Interaction helper did not highlight before action and clear before screenshot.');
+    }
+    if (Number(clickEvent.split(':').at(-1)) < 200) {
+      throw new Error('Guide click delay is too short.');
+    }
+    if (Number(typeEvent.split(':').at(-1)) < 80) {
+      throw new Error('Guide typing delay is too short.');
+    }
+    if (!events.some((event) => event === 'wait:900')) {
+      throw new Error('Guide target highlight lead time is missing.');
+    }
   }
 }
 

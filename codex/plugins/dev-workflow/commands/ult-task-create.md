@@ -46,6 +46,7 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 | 인자 | 동작 |
 |---|---|
 | `<story title or url>` | 해당 Story에 추가. Notion URL/id, GitHub Task Issue URL, `repo#issue`, title 지원 |
+| `--project` | Repository의 Project relation이 비어 있을 때 쓰는 임시 우회. Project name/page id/URL. 지정해도 선택된 Story의 Project 검증은 그대로 수행 |
 | `--name` | Task 이름 |
 | `--topic` | `Feature`, `Fix`, `Update`, `Refactor`, `Style`, `Other` |
 | `--description` | GitHub Issue body 및 Task 본문 |

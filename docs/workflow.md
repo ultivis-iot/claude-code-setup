@@ -155,6 +155,8 @@ Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만
 
 하나의 Story가 여러 repository를 건드릴 수 있습니다.
 
+과거에는 Story 단위 GitHub Issue와 Story 브랜치를 만들고 Task 브랜치가 그 아래에서 갈라져 Story 브랜치로 PR하는 구조였습니다. 이 구조는 Story 브랜치가 단일 repository 안에만 존재할 수 있어서, cross-repo Story에서는 Task PR이 target할 브랜치 자체가 성립하지 않습니다. 그래서 v0.6.4에서 Story는 Notion 조율 단위로만 남기고 GitHub Issue/PR/브랜치는 Task 단위에만 두도록 바꿨습니다.
+
 - Story 자체에 direct Repository relation은 필요 없습니다.
 - Task의 `Repository` relation이 repository ownership의 source of truth입니다.
 - Story가 건드리는 repository는 연결된 Task들의 Repository로 판단합니다.

@@ -68,6 +68,55 @@ async function hideCaption(page) {
     .evaluateAll((elements) => elements.forEach((element) => element.remove()));
 }
 
+const targetAttribute = 'data-ux-journey-target';
+
+async function installTargetHighlightStyle(page) {
+  await page.evaluate(({ styleId, attribute }) => {
+    if (document.getElementById(styleId)) return;
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      @keyframes ux-journey-target-pulse {
+        0%, 100% { outline-offset: 3px; box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.28), 0 0 24px rgba(245, 158, 11, 0.42); }
+        50% { outline-offset: 6px; box-shadow: 0 0 0 11px rgba(245, 158, 11, 0.14), 0 0 34px rgba(245, 158, 11, 0.56); }
+      }
+      [${attribute}="active"] {
+        z-index: 2147483646 !important;
+        outline: 4px solid #f59e0b !important;
+        animation: ux-journey-target-pulse 850ms ease-in-out infinite !important;
+      }
+    `;
+    document.head.append(style);
+  }, { styleId: 'ux-journey-target-style', attribute: targetAttribute });
+}
+
+async function clearTargetHighlight(page) {
+  await page
+    .locator(`[${targetAttribute}]`)
+    .evaluateAll((elements, attribute) => {
+      elements.forEach((element) => element.removeAttribute(attribute));
+    }, targetAttribute)
+    .catch(() => {});
+}
+
+async function markTarget(page, locator) {
+  if (!locator || typeof locator.evaluate !== 'function') {
+    throw new Error('Interaction helpers require a Playwright Locator target.');
+  }
+  await installTargetHighlightStyle(page);
+  await clearTargetHighlight(page);
+  if (typeof locator.scrollIntoViewIfNeeded === 'function') {
+    await locator.scrollIntoViewIfNeeded();
+  }
+  await locator.evaluate((element, attribute) => {
+    const control =
+      element.closest(
+        'button, a[href], input, select, textarea, [role="button"], [role="checkbox"], [role="radio"], [role="option"]'
+      ) || element;
+    control.setAttribute(attribute, 'active');
+  }, targetAttribute);
+}
+
 async function collectPageMetrics(page) {
   return page.evaluate(() => {
     const visible = (element) => {
@@ -119,6 +168,7 @@ export function createJourneyRecorder({
   getRuntimeEvidence = async () => ({}),
   getMutationLedger = async () => null,
   guidePacing = {},
+  interactionPacing = {},
   captionPlacement = null,
 }) {
   const failures = validateScenario(scenario);
@@ -214,13 +264,112 @@ export function createJourneyRecorder({
   const scenarioBinding = directGuide ? directGuideRequest : scenarioApproval;
   const resolvedCaptionPlacement = captionPlacement || 'bottom';
   const pacing = {
-    beforeActionMs: 900,
-    captionLeadMs: 1_200,
-    afterActionMs: 1_500,
-    minCaptionMs: 4_000,
+    beforeActionMs: 1_200,
+    captionLeadMs: 1_800,
+    afterActionMs: 2_000,
+    minCaptionMs: 4_500,
     maxCaptionMs: 8_000,
-    captionMsPerCharacter: 120,
+    captionMsPerCharacter: 135,
     ...guidePacing,
+  };
+  const interaction = {
+    targetLeadMs: phase === 'guide' ? 900 : 350,
+    targetHoldMs: phase === 'guide' ? 700 : 300,
+    clickDelayMs: phase === 'guide' ? 220 : 120,
+    typeDelayMs: phase === 'guide' ? 90 : 45,
+    fieldSettleMs: phase === 'guide' ? 650 : 300,
+    selectionSettleMs: phase === 'guide' ? 750 : 350,
+    ...interactionPacing,
+  };
+  const interactionCounts = {
+    targetHighlights: 0,
+    clicks: 0,
+    fills: 0,
+    selections: 0,
+    checks: 0,
+  };
+
+  async function waitFor(milliseconds) {
+    if (Number.isFinite(milliseconds) && milliseconds > 0) {
+      await page.waitForTimeout(milliseconds);
+    }
+  }
+
+  async function withHighlightedTarget(locator, operation, settleMs) {
+    await markTarget(page, locator);
+    interactionCounts.targetHighlights += 1;
+    try {
+      await waitFor(interaction.targetLeadMs);
+      const result = await operation();
+      await waitFor(settleMs);
+      return result;
+    } finally {
+      await clearTargetHighlight(page);
+      await waitFor(interaction.targetHoldMs);
+    }
+  }
+
+  const ui = {
+    async highlight(locator, holdMs = interaction.targetLeadMs + interaction.targetHoldMs) {
+      await markTarget(page, locator);
+      interactionCounts.targetHighlights += 1;
+      try {
+        await waitFor(holdMs);
+      } finally {
+        await clearTargetHighlight(page);
+      }
+    },
+    async click(locator, options = {}) {
+      interactionCounts.clicks += 1;
+      return withHighlightedTarget(
+        locator,
+        () =>
+          locator.click({
+            ...options,
+            delay: options.delay ?? interaction.clickDelayMs,
+          }),
+        interaction.selectionSettleMs
+      );
+    },
+    async fill(locator, value, options = {}) {
+      interactionCounts.fills += 1;
+      return withHighlightedTarget(
+        locator,
+        async () => {
+          await locator.click({ delay: interaction.clickDelayMs });
+          await locator.fill('');
+          return locator.pressSequentially(String(value), {
+            ...options,
+            delay: options.delay ?? interaction.typeDelayMs,
+          });
+        },
+        interaction.fieldSettleMs
+      );
+    },
+    async selectOption(locator, values, options = {}) {
+      interactionCounts.selections += 1;
+      return withHighlightedTarget(
+        locator,
+        () => locator.selectOption(values, options),
+        interaction.selectionSettleMs
+      );
+    },
+    async check(locator, options = {}) {
+      interactionCounts.checks += 1;
+      return withHighlightedTarget(
+        locator,
+        () => locator.check(options),
+        interaction.selectionSettleMs
+      );
+    },
+    async uncheck(locator, options = {}) {
+      interactionCounts.checks += 1;
+      return withHighlightedTarget(
+        locator,
+        () => locator.uncheck(options),
+        interaction.selectionSettleMs
+      );
+    },
   };
 
   page.on('console', (message) => {
@@ -400,7 +549,8 @@ export function createJourneyRecorder({
         const cueStart = Date.now() - startedAt;
         await showCaption(page, expectedStep.caption, resolvedCaptionPlacement);
         await page.waitForTimeout(Math.min(pacing.captionLeadMs, readingTime));
-        await action(expectedStep);
+        await action(expectedStep, ui);
+        await clearTargetHighlight(page);
         await page.waitForTimeout(pacing.afterActionMs);
         const elapsed = Date.now() - startedAt - cueStart;
         await page.waitForTimeout(Math.max(0, (dwell ?? readingTime) - elapsed));
@@ -410,7 +560,8 @@ export function createJourneyRecorder({
         sequence += 1;
         await observe(expectedStep, cueStart, cueEnd);
       } else {
-        await action(expectedStep);
+        await action(expectedStep, ui);
+        await clearTargetHighlight(page);
         sequence += 1;
         await observe(expectedStep, null, null);
         const cueStart = Date.now() - startedAt;
@@ -438,6 +589,7 @@ export function createJourneyRecorder({
         throw new Error('A completed journey cannot be finalized as failed or blocked.');
       }
       await hideCaption(page);
+      await clearTargetHighlight(page);
       let normalizedFailure = null;
       let terminal = null;
       if (status !== 'completed') {
@@ -515,6 +667,8 @@ export function createJourneyRecorder({
             environmentFingerprint,
             environment: scenario.environment,
             mutationMode: scenario.mutationPolicy.mode,
+            interactionPacing: interaction,
+            interactionCounts,
             startedAt: startedAtIso,
             completedAt: new Date().toISOString(),
             durationMs: Date.now() - startedAt,

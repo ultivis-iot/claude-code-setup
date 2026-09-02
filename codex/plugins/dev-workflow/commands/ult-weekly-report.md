@@ -54,13 +54,22 @@ Notion Week 기간 기준으로 작업을 집계하고, LLM이 Weekly Review 초
 
 - 사용자가 명시적으로 발행을 요청한 경우에만 `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-weekly-publish.sh`를 사용한다
 - 기본 템플릿은 `마케팅`이고, Project가 템플릿 기본값과 다르면 `--project <Project name|Notion page id|URL>`을 쓴다
+- 다른 Weekly Review 템플릿으로 발행할 때만 `--template <이름|template id>`을 쓴다
 - `Task 보기`의 linked database 필터는 Notion 템플릿/뷰 소관이다. 현재 Notion API 도구는 페이지 생성과 `❤️‍🔥 Week`/`🛡️ Project` relation 설정까지만 가능하고, linked view 필터 수정은 현재 환경에서 검증되기 전에는 가능하다고 안내하지 않는다
 
 ## 옵션
 
+수집 (`ult-weekly-collect.sh`):
+
 - 기본: 직전 주, 본인
 - `--week <YYYY-MM-DD>`: 해당 날짜 포함 주
 - `--team`: 팀 전체
+
+발행 (`ult-weekly-publish.sh`):
+
+- 마크다운은 표준입력으로 넘긴다
+- `--project <name|page id|URL>`: Weekly Review의 `🛡️ Project` relation
+- `--template <이름|template id>`: 기본 `마케팅`. 세 번째 위치 인자로도 지정 가능
 
 reference를 안 열어도 되는 경우:
 

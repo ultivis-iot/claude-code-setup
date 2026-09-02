@@ -105,3 +105,17 @@ node ~/.codex/skills/ux-review/scripts/approve-guide.mjs \
 Record only the critical journey. If the source revision, base URL, locale, viewport, scenario, baseline, UX review, review bundle, or decision changes, return to review rather than repairing the guide approval.
 
 For a direct guide request, pass its manifest to the recorder instead of the reviewed approval pair. Direct guides still require the exact scenario, repository boundary, environment, and mutation policy, but do not require baseline, review evidence, findings, or readiness approval. Both guide routes finalize only after the critical journey completes.
+
+## Guide interaction pacing
+
+Use the recorder's second action argument for visible interactions:
+
+```js
+await recorder.step(2, async (_expectedStep, ui) => {
+  await ui.fill(page.getByLabel('요청 이름'), '정기 점검 요청');
+  await ui.selectOption(page.getByLabel('우선순위'), 'high');
+  await ui.click(page.getByRole('button', { name: '저장' }));
+});
+```
+
+Guide defaults give the viewer 900 ms to find an amber pulsing target, use a 220 ms click, type at 90 ms per character, and hold the changed state before continuing. The caption also leads the action by 1.8 seconds. `interactionPacing` may lengthen these values for a dense or unfamiliar UI; do not shorten them merely to reduce runtime. The highlight is recording-only and must be cleared before each evidence screenshot. Execution metadata records the resolved pacing and helper counts.

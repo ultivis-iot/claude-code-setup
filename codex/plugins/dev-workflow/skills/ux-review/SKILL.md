@@ -92,7 +92,9 @@ node ~/.codex/skills/ux-review/scripts/approve-guide.mjs \
   --review-decision <id-review-decision.json>
 ```
 
-For the direct route, pass `directGuideRequest` instead of `scenarioApproval` and `guideApproval`. For either route, allocate `guide-NN` and record only the critical journey with `phase: 'guide'`. A guide is finalized only when every critical step completes; failed attempts are not delivered as guide artifacts. Guide capture shows the instructional caption before the action, leaves time to locate the target, performs the action while the caption is visible, holds the result, then saves a caption-free screenshot. Keep captions visible for 4–8 seconds and reposition only the affected step when the lower third covers its control or result.
+For the direct route, pass `directGuideRequest` instead of `scenarioApproval` and `guideApproval`. For either route, allocate `guide-NN` and record only the critical journey with `phase: 'guide'`. A guide is finalized only when every critical step completes; failed attempts are not delivered as guide artifacts.
+
+The action callback receives `(expectedStep, ui)`. Use `ui.fill(locator, value)`, `ui.click(locator)`, `ui.selectOption(locator, value)`, `ui.check(locator)`, and `ui.uncheck(locator)` for every visible guide interaction. These helpers scroll the target into view, show a high-contrast amber pulse before the action, type character by character, slow the click, hold the result, and remove the highlight before the clean screenshot. Use direct Locator actions only for invisible setup outside the recorded journey. Guide capture shows the instructional caption before the action and keeps it visible through the interaction. Keep captions visible for 4–8 seconds and reposition only the affected step when the lower third covers its control or result.
 
 ## 5. Validate and deliver
 

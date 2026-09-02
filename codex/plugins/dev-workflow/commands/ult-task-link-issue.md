@@ -23,6 +23,17 @@ ${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-link-issue
 /ult:ult-task-link-issue #234 --name "Token refresh 처리"
 ```
 
+## 옵션
+
+| 인자 | 동작 |
+|---|---|
+| `--task`, `-t` | 연결할 Notion Task page id 또는 URL |
+| `--name`, `-n` | Issue title 대신 사용할 Task title 검색어 |
+| `--auto` | 대화형 선택 없이 title이 유일하게 매칭될 때만 연결. 기존 Issue URL은 덮어쓰지 않고 중단 |
+| `--yes`, `-y` | 기존 Issue URL 덮어쓰기 확인 생략 |
+
+`/ult-task-status`가 Task를 못 찾으면 내부적으로 `--auto`로 이 스크립트를 먼저 호출합니다.
+
 ## 주의
 
 - 정상 발행 플로우에서는 Story/Task 생성 시 GitHub Issue를 만들고 Issue URL을 즉시 Task에 반영해야 합니다.

@@ -93,8 +93,9 @@ Every journey supplies:
 ## Media and captions
 
 - Review captions describe the result after the action; guide captions instruct before the action.
+- Visible guide actions use the recorder interaction helpers. The WebM shows an amber pulse around the active control before slow typing, selection, or click; execution JSON records pacing and helper counts.
 - SRT text must equal the approved step caption and cues must be ordered and positive in duration. A review cue starts when its post-action caption is actually shown, after the clean result screenshot.
-- Screenshots are caption-free PNGs named from their exact journey step and evidence slug.
+- Screenshots are caption- and target-highlight-free PNGs named from their exact journey step and evidence slug.
 - WebM is the source artifact. Validation requires a valid container, positive duration and dimensions, and readable first/middle/last frames.
 - Guide chapters start at the matching SRT cue.
 

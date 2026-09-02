@@ -286,8 +286,8 @@ parent_ready_from_handoff() {
 
 run_handoff_story() {
     local handoff="$1"
-    local source story_title story_url story_issue_url story_pr_url story_repo story_issue_num story_id
-    local story_branch story_base story_worktree output_root run_key output_dir summary_md summary_json ready_json
+    local source story_title story_url story_repo story_id
+    local story_base output_root run_key output_dir summary_md summary_json ready_json
 
     source=$(printf '%s\n' "$handoff" | jq -r '._source // "handoff"')
     story_title=$(printf '%s\n' "$handoff" | jq -r '.story.title // "(제목 없음)"')
@@ -296,20 +296,12 @@ run_handoff_story() {
     if [ -z "$story_id" ] && [ -n "$story_url" ]; then
         story_id=$(normalize_notion_page_id "$story_url" 2>/dev/null || true)
     fi
-    story_issue_url=$(printf '%s\n' "$handoff" | jq -r '.story.github_issue_url // ""')
-    story_pr_url=$(printf '%s\n' "$handoff" | jq -r '.story.pr_url // ""')
     story_repo=$(printf '%s\n' "$handoff" | jq -r '.story.github_repo // empty')
-    [ -n "$story_repo" ] || story_repo=$(repo_slug_from_issue_url "$story_issue_url")
-    story_issue_num=$(issue_num_from_url "$story_issue_url")
-    story_branch=$(printf '%s\n' "$handoff" | jq -r '.story.branch // ""')
     story_base=$(printf '%s\n' "$handoff" | jq -r '.story.base_branch // ""')
-    story_worktree=$(printf '%s\n' "$handoff" | jq -r '.story.worktree // ""')
-    [ -n "$story_branch" ] || story_branch=$(branch_for_issue "$story_issue_num" 2>/dev/null || true)
-    [ -n "$story_base" ] || story_base=$(branch_base "$story_branch")
-    [ -n "$story_worktree" ] || story_worktree=$(worktree_for_branch "$story_branch" 2>/dev/null || true)
 
-    output_root="${story_worktree:-$(pwd)}/tmp/story-run"
-    run_key="${story_issue_num:-story}"
+    # Story는 GitHub Issue/branch/worktree를 갖지 않는다. run_key는 Notion Story id로 잡아 Story가 여러 개일 때 서로 덮어쓰지 않게 한다.
+    output_root="$(pwd)/tmp/story-run"
+    run_key="${story_id:-$(make_slug "$story_title")}"
     output_dir="$output_root/$run_key"
     mkdir -p "$output_dir/prompts"
 

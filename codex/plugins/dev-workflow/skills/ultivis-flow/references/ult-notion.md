@@ -20,8 +20,10 @@ Use the globally installed workflow scripts, not repository-local `scripts/`.
 Global scripts:
 
 - `issue.sh`
+- `ult-cache-refresh.sh`
 - `ult-my-tasks.sh`
 - `ult-story-create-exec.sh`
+- `ult-story-run.sh`
 - `ult-sync-task.sh`
 - `ult-task-create.sh`
 - `ult-task-link-issue.sh`
@@ -29,6 +31,7 @@ Global scripts:
 - `ult-task-status.sh`
 - `ult-weekly-collect.sh`
 - `ult-weekly-publish.sh`
+- `ult-wt-add.sh`
 
 If Notion integration is required, verify credentials and the available MCP/tooling in the current environment before promising automation.
 
@@ -127,6 +130,8 @@ In this workflow, Notion `Parent Task` means prerequisite/dependency, not owners
 ## Cross-Repo Story Rules
 
 A Story may span multiple repositories.
+
+An earlier model gave the Story its own GitHub Issue and branch, with Task branches cut from it and Task PRs targeting it. That model breaks here: a Story branch can only exist inside one repository, so a cross-repo Story has no branch for its Task PRs to target. v0.6.4 therefore kept Story as a Notion-only coordination unit and moved every GitHub Issue, branch, and PR down to the Task level. Do not reintroduce a Story branch or Story Issue.
 
 - Do not require a direct Repository relation on Story.
 - Task `Repository` relation is the source of truth for repository ownership.

@@ -67,6 +67,8 @@ Story 기반 작업은 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유
 
 하나의 Story가 여러 repository를 건드릴 수 있다.
 
+과거에는 Story 단위 GitHub Issue와 Story 브랜치를 만들고 Task 브랜치가 그 아래에서 갈라져 Story 브랜치로 PR하는 구조였다. 이 구조는 Story 브랜치가 단일 repository 안에만 존재할 수 있어서, cross-repo Story에서는 Task PR이 target할 브랜치 자체가 성립하지 않는다. 그래서 v0.6.4에서 Story는 Notion 조율 단위로만 남기고 GitHub Issue/PR/브랜치는 Task 단위에만 두도록 바꿨다.
+
 - Story 자체에 direct Repository relation을 둘 필요는 없다.
 - repository ownership의 source of truth는 Task의 `Repository` relation이다.
 - Story가 건드리는 repository 목록은 연결된 Task들의 `Repository`로 판단한다.

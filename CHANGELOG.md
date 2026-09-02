@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.8.1 (2026-09-03)
+
+- `ux-review` 가이드 녹화에 interaction helper 도입: action 콜백이 `(expectedStep, ui)`를 받고 `ui.fill`/`click`/`selectOption`/`check`/`uncheck`가 대상 스크롤, 앰버 펄스 하이라이트, 한 글자씩 타이핑, 감속 클릭, 결과 홀드, 스크린샷 전 하이라이트 제거를 담당. 보이는 조작은 헬퍼를 쓰고 직접 Locator 조작은 녹화 대상 밖 setup에만 허용.
+- 가이드 페이싱 기본값과 계약 명문화: 타깃 인지 900ms, 클릭 220ms, 타이핑 90ms/자, 캡션 1.8초 선행. `interactionPacing`으로 연장만 허용하고, 증거 스크린샷은 캡션뿐 아니라 타깃 하이라이트도 없어야 하며 실행 메타데이터에 pacing과 헬퍼 호출 수를 기록.
+- `ult-story-run.sh`에 남아 있던 Story 브랜치 모델 잔재 제거: handoff에서 더 이상 생성되지 않는 `story.github_issue_url`/`pr_url`/`branch`/`worktree` 조회를 걷어내고, 산출물 경로를 현재 worktree 기준 `tmp/story-run/<Notion Story id>/`로 고정. 기존에는 `run_key`가 항상 `story`로 고정돼 Story가 여러 개일 때 summary/prompts를 서로 덮어썼음.
+- Story 브랜치·Story GitHub Issue 모델을 v0.6.4에서 제거한 이유(Story 브랜치는 단일 repository 안에만 존재할 수 있어 cross-repo Story에서 Task PR의 target이 성립하지 않음)를 `docs/workflow.md`, `docs/references/task-publishing-model.md`, `ult-notion.md`의 Cross-Repo 절에 명시.
+- 문서-스크립트 드리프트 정리: `/ult-task-create`에 `--project`, `/ult-task-link-issue`에 `--auto`/`--yes`, `/ult-weekly-report`에 발행용 `--template` 옵션을 문서화하고, `ult-notion.md`의 Global scripts 목록에 `ult-story-run.sh`/`ult-wt-add.sh`/`ult-cache-refresh.sh` 추가.
+- `verify-workflow.sh`가 `ult-weekly-collect.sh`, `ult-weekly-publish.sh`도 문법 검사하도록 확장.
+
 ## v0.8.0 (2026-08-28)
 
 - `ux-review` 스킬 추가: 사용자 업무 시나리오 승인 → Playwright WebM·스크린샷·SRT 증거 수집 → ISO 9241/WCAG 2.2/ARIA APG/Nielsen 기준의 LLM UI/UX 평가 → 개선 반복 → 사용자 승인 교육 영상 제작 흐름을 제공.
