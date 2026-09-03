@@ -525,7 +525,10 @@ body{margin:0;background:hsl(var(--background));color:hsl(var(--foreground));
   padding:8px 10px 8px 16px;border-top:1px solid hsl(var(--sidebar-border));
   color:hsl(var(--muted-foreground));font-size:11.5px;line-height:1.5}
 .sf #meta{flex:1;min-width:0;word-break:break-all}
-.sf button{flex-shrink:0;height:26px;width:26px;padding:0;font-size:13px}
+.sf button{flex-shrink:0;height:26px;width:26px;padding:0;
+  color:hsl(var(--muted-foreground))}
+.sf button:hover{color:hsl(var(--foreground))}
+.sf button svg{display:block}
 a{color:inherit;text-decoration:none}
 
 /* 저장소 — 접이식 헤더 */
@@ -685,7 +688,7 @@ button.danger:hover{background:hsl(var(--sev-p0));color:#fff;border-color:hsl(va
 #side{max-height:52vh;border-right:0;border-bottom:1px solid hsl(var(--sidebar-border))}}
 </style></head><body>
 <div id="app">
-  <div id="side"><div class="sh"><b>ux-review</b></div><div id="tree"></div><div class="sf"><span id="meta">불러오는 중…</span><button id="th" title="테마 전환" aria-label="테마 전환">◐</button></div></div>
+  <div id="side"><div class="sh"><b>ux-review</b></div><div id="tree"></div><div class="sf"><span id="meta">불러오는 중…</span><button id="th" title="테마 전환" aria-label="테마 전환"></button></div></div>
   <div id="main"><div class="empty">왼쪽에서 시나리오를 선택하세요</div></div>
 </div>
 <div id="lb" onclick="this.style.display='none'"><img id="lbi"></div>
@@ -1020,9 +1023,18 @@ function prefersDark(){
 function storedTheme(){
   try{ return localStorage.getItem('ux-theme'); }catch{ return null; }
 }
+// lucide-react 의 sun / moon 과 같은 아이콘 (라이브러리가 쓰는 아이콘 셋)
+const ICON_SUN='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
+  +' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  +'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="m19.07 4.93-1.41 1.41"/>'
+  +'<path d="M20 12h2"/><path d="m19.07 19.07-1.41-1.41"/><path d="M12 20v2"/>'
+  +'<path d="m4.93 19.07 1.41-1.41"/><path d="M2 12h2"/><path d="m4.93 4.93 1.41 1.41"/></svg>';
+const ICON_MOON='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
+  +' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  +'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
 function applyTheme(t){
   document.documentElement.classList.toggle('dark', t==='dark');
-  const b=$('#th'); if(b)b.textContent = t==='dark' ? '☾' : '☀';
+  const b=$('#th'); if(b)b.innerHTML = t==='dark' ? ICON_MOON : ICON_SUN;
 }
 function currentTheme(){ return storedTheme() || (prefersDark()?'dark':'light'); }
 applyTheme(currentTheme());
