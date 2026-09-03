@@ -26,6 +26,29 @@ export function scenarioHash(scenario) {
   return sha256(JSON.stringify(canonicalize(scenario)));
 }
 
+// 자막은 한 번에 두 줄까지만 보여 준다. 두 줄을 넘는 자막은 글꼴을 줄이는 대신
+// 어절 경계에서 여러 큐로 나눠 순차 재생한다. 좁은 뷰포트에서는 좌우 폭을 다 쓰는 밴드로 그린다.
+export const CAPTION_FULL_BLEED_MAX_VIEWPORT_WIDTH = 768;
+export const CAPTION_MAX_LINES = 2;
+export const CAPTION_FONT_SIZE = 18;
+export const CAPTION_LINE_HEIGHT_RATIO = 1.45;
+
+export function normalizeCaption(caption) {
+  return String(caption ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 큐를 순서대로 이어 붙이면 승인된 자막과 같아야 한다. recorder 와 validator 가 같은 규칙을 쓴다.
+export function captionSegmentsMatch(segments, caption) {
+  return (
+    Array.isArray(segments) &&
+    segments.length > 0 &&
+    segments.every((segment) => typeof segment === 'string' && segment.trim()) &&
+    segments.map((segment) => normalizeCaption(segment)).join(' ') === normalizeCaption(caption)
+  );
+}
+
 export function validateScenario(scenario) {
   const failures = [];
   const requiredString = (value, field) => {

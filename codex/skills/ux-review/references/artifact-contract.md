@@ -93,11 +93,13 @@ Every journey supplies:
 ## Media and captions
 
 - Review captions describe the result after the action; guide captions instruct before the action.
+- Captions render as a centered pill on wide viewports and, at 768 CSS pixels or narrower, as a full-bleed band flush to the viewport edges so a mobile caption uses the full width instead of wrapping inside a shrunken pill.
+- A caption never occupies more than two rendered lines at once. The recorder measures the caption against the live viewport and splits a longer one at word boundaries into consecutive cues, held at a fixed 18 px; the step's existing caption time is divided between them rather than the type being shrunk.
 - Visible guide actions use the recorder interaction helpers. The WebM shows an amber pulse around the active control before slow typing, selection, or click; execution JSON records pacing and helper counts.
-- SRT text must equal the approved step caption and cues must be ordered and positive in duration. A review cue starts when its post-action caption is actually shown, after the clean result screenshot.
+- A step owns one or more ordered SRT cues. Joining a step's cue texts with single spaces must reproduce its approved caption, and every cue must be ordered and positive in duration. Observations record the split as `captionSegments`. A review cue starts when its post-action caption is actually shown, after the clean result screenshot.
 - Screenshots are caption- and target-highlight-free PNGs named from their exact journey step and evidence slug.
 - WebM is the source artifact. Validation requires a valid container, positive duration and dimensions, and readable first/middle/last frames.
-- Guide chapters start at the matching SRT cue.
+- Guide chapters are one per step and start at that step's first SRT cue.
 
 ## Storage and publication
 

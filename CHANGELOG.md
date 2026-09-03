@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.9.1 (2026-09-03)
+
+- `ux-review` 자막을 좁은 뷰포트(768px 이하)에서 가운데 알약 대신 좌우 폭을 다 쓰는 밴드로 그림. 자막 박스가 1920 기준(최대 폭 `100vw-32px`, 18px)으로만 튜닝돼 있어 `390×844` 에서는 텍스트 폭 326px 에 줄당 18자, 하단 28px 틈까지 남기며 탭바·CTA 자리를 덮었음. 밴드는 `bottom: 0` 에 붙고 `box-sizing: border-box` 로 앱 CSS 와 무관하게 가로 스크롤이 생기지 않음. 데스크톱 알약은 그대로.
+- 자막이 두 줄을 넘으면 글꼴을 줄이는 대신 어절 경계에서 여러 큐로 나눠 순차 재생. recorder 가 그 페이지에 숨은 프로브를 띄워 실제 렌더 높이로 재므로 폰트·언어와 무관하게 정확하고, 스텝의 자막 시간(`dwell ?? readingTime`)을 글자 수 비율로 나눠 쓰므로 녹화 길이는 변하지 않음. 가이드는 첫 큐 → 1.8초 리드 → 액션 → 나머지 큐가 결과 유지 중 이어지고, 리뷰는 큐마다 `dwell ?? 1200` 을 온전히 줌. 큐 최소 노출 `minCaptionSegmentMs: 900`.
+- 아티팩트 계약 변경: SRT 큐와 스텝의 1:1 을 1:N 으로 완화. 관찰의 `captionSegments` 로 매핑하고 큐를 공백 하나로 이어 붙인 결과가 승인 자막과 다르면 거부. 챕터는 스텝당 하나로 첫 큐 시각에 걺. `normalizeCaption`/`captionSegmentsMatch` 를 `scenario-contract.mjs` 에 두어 recorder 와 validator 가 같은 규칙을 씀. `captionSegments` 가 없는 기존 번들은 예전 규칙으로 통과시켜 `approve-review-decision` 재검증이 깨지지 않음.
+- `scripts/test-ux-review-skill.mjs` 에 분할 경로 케이스 추가: 자막을 반으로 쪼갠 가이드 번들은 통과, 큐를 승인되지 않은 문장으로 바꾼 번들은 거부.
+
 ## v0.9.0 (2026-09-03)
 
 - `ux-review` 산출물을 중앙 저장소 `~/.local/share/ux-review/<부모 저장소>/<worktree>/<날짜>/<NN.시나리오>/`로 옮기고 저장소 쪽 `tmp/ux-review`는 심볼릭 링크로 남김. 산출물 5곳 중 3곳이 worktree 였고 `tmp/`가 gitignore 대상이라 `git worktree remove` 한 번에 증거 237MB 가 사라질 수 있었음. 경로 문자열과 `pathBase: "repository-root"`가 그대로 유효해 기존 매니페스트와 해시 검증은 손대지 않음. `UX_REVIEW_STORE`로 위치 재정의 가능.

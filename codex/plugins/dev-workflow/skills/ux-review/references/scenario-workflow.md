@@ -8,7 +8,7 @@ Start from the user's job rather than navigation. Define audience, trigger, obse
 
 When presenting the scenario for approval, show which plan item each success criterion came from, and name any criterion that has no plan behind it. Criteria drawn from the product or from the user's request are equally valid; the point is that the reader can see the difference before approving. Do not add fields to the scenario schema for this: the snapshot and the approval conversation already carry the provenance.
 
-The environment fixes one locale and viewport and names environment variables for the base URL and reviewed source revision. Desktop scenarios use `1920 × 1080` so evidence keeps a 16:9 frame and stays comparable across reviews; mobile scenarios use the device's own ratio (for example `390 × 844`). The viewport is also the recording size, so a wider frame means a larger WebM. Use a separate approved scenario ID for another mobile/desktop viewport or locale so evidence never silently departs from its approval.
+The environment fixes one locale and viewport and names environment variables for the base URL and reviewed source revision. Desktop scenarios use `1920 × 1080` so evidence keeps a 16:9 frame and stays comparable across reviews; mobile scenarios use the device's own ratio (for example `390 × 844`). The viewport is also the recording size, so a wider frame means a larger WebM. Use a separate approved scenario ID for another mobile/desktop viewport or locale so evidence never silently departs from its approval. A narrower viewport does not shorten what a caption may say: a caption that needs more than two lines is played as consecutive cues at the same type size.
 
 The mutation policy is one of:
 

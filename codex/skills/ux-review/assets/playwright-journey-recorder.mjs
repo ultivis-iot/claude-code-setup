@@ -1,7 +1,16 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { findRepositoryRoot, resolveRepositoryRelativePath } from '../scripts/repository-paths.mjs';
-import { scenarioHash, sha256, validateScenario } from '../scripts/scenario-contract.mjs';
+import {
+  CAPTION_FONT_SIZE,
+  CAPTION_FULL_BLEED_MAX_VIEWPORT_WIDTH,
+  CAPTION_LINE_HEIGHT_RATIO,
+  CAPTION_MAX_LINES,
+  normalizeCaption,
+  scenarioHash,
+  sha256,
+  validateScenario,
+} from '../scripts/scenario-contract.mjs';
 
 function formatSrtTime(milliseconds) {
   const total = Math.max(0, Math.round(milliseconds));
@@ -29,37 +38,132 @@ function sanitize(value) {
 }
 
 async function showCaption(page, text, placement) {
-  await page.evaluate(({ caption, captionPlacement }) => {
-    let element = document.querySelector('[data-testid="ux-journey-caption"]');
-    if (!element) {
-      element = document.createElement('div');
-      element.dataset.testid = 'ux-journey-caption';
+  await page.evaluate(
+    ({
+      caption,
+      captionPlacement,
+      fullBleedMaxViewportWidth,
+      maxLines,
+      maxFontSize,
+      minFontSize,
+      lineHeightRatio,
+    }) => {
+      const fullBleed = window.innerWidth <= fullBleedMaxViewportWidth;
+      const atTop = captionPlacement === 'top';
+      let element = document.querySelector('[data-testid="ux-journey-caption"]');
+      if (!element) {
+        element = document.createElement('div');
+        element.dataset.testid = 'ux-journey-caption';
+        element.append(document.createElement('span'));
+        document.body.append(element);
+      }
       Object.assign(element.style, {
         position: 'fixed',
-        left: '50%',
-        bottom: '28px',
         zIndex: '2147483647',
-        maxWidth: 'calc(100vw - 32px)',
-        transform: 'translateX(-50%)',
-        padding: '10px 16px',
-        borderRadius: '10px',
-        border: '1px solid rgba(15, 23, 42, 0.18)',
+        boxSizing: 'border-box',
+        top: atTop ? (fullBleed ? '0' : '72px') : 'auto',
+        bottom: atTop ? 'auto' : fullBleed ? '0' : '28px',
+        left: fullBleed ? '0' : '50%',
+        right: fullBleed ? '0' : 'auto',
+        width: 'auto',
+        maxWidth: fullBleed ? 'none' : 'calc(100vw - 32px)',
+        transform: fullBleed ? 'none' : 'translateX(-50%)',
+        padding: fullBleed ? '12px 16px' : '10px 16px',
+        borderRadius: fullBleed ? '0' : '10px',
+        border: fullBleed ? 'none' : '1px solid rgba(15, 23, 42, 0.18)',
+        boxShadow: fullBleed
+          ? `0 ${atTop ? '' : '-'}6px 20px rgba(0, 0, 0, 0.28)`
+          : '0 8px 24px rgba(0, 0, 0, 0.34)',
         background: 'rgba(255, 255, 255, 0.96)',
         color: '#111827',
         fontFamily: 'sans-serif',
-        fontSize: '18px',
         fontWeight: '600',
-        lineHeight: '1.45',
         textAlign: 'center',
-        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.34)',
         pointerEvents: 'none',
       });
-      document.body.append(element);
+      element.style.fontSize = `${fontSize}px`;
+      element.style.lineHeight = `${Math.round(fontSize * lineHeightRatio)}px`;
+      const line = element.firstElementChild;
+      line.style.display = 'block';
+      line.textContent = caption;
+    },
+    {
+      caption: text,
+      captionPlacement: placement,
+      fullBleedMaxViewportWidth: CAPTION_FULL_BLEED_MAX_VIEWPORT_WIDTH,
+      fontSize: CAPTION_FONT_SIZE,
+      lineHeightRatio: CAPTION_LINE_HEIGHT_RATIO,
     }
-    element.style.top = captionPlacement === 'top' ? '72px' : 'auto';
-    element.style.bottom = captionPlacement === 'top' ? 'auto' : '28px';
-    element.textContent = caption;
-  }, { caption: text, captionPlacement: placement });
+  );
+}
+
+// 자막이 두 줄을 넘으면 어절 경계에서 나눈다. 추정이 아니라 그 페이지의 실제 렌더 폭으로 잰다.
+// 측정에 실패하면 자막 하나를 그대로 쓴다.
+async function splitCaption(page, text, placement) {
+  const normalized = normalizeCaption(text);
+  const segments = await page.evaluate(
+    ({ captionText, captionPlacement, fullBleedMaxViewportWidth, fontSize, lineHeightRatio, maxLines }) => {
+      const fullBleed = window.innerWidth <= fullBleedMaxViewportWidth;
+      const lineHeight = Math.round(fontSize * lineHeightRatio);
+      const probe = document.createElement('div');
+      const line = document.createElement('span');
+      probe.append(line);
+      Object.assign(probe.style, {
+        position: 'fixed',
+        visibility: 'hidden',
+        boxSizing: 'border-box',
+        bottom: captionPlacement === 'top' ? 'auto' : '0',
+        top: captionPlacement === 'top' ? '0' : 'auto',
+        left: fullBleed ? '0' : '50%',
+        right: fullBleed ? '0' : 'auto',
+        width: 'auto',
+        maxWidth: fullBleed ? 'none' : 'calc(100vw - 32px)',
+        transform: fullBleed ? 'none' : 'translateX(-50%)',
+        padding: fullBleed ? '12px 16px' : '10px 16px',
+        border: fullBleed ? 'none' : '1px solid rgba(15, 23, 42, 0.18)',
+        fontFamily: 'sans-serif',
+        fontSize: `${fontSize}px`,
+        fontWeight: '600',
+        lineHeight: `${lineHeight}px`,
+        textAlign: 'center',
+        pointerEvents: 'none',
+      });
+      line.style.display = 'block';
+      document.body.append(probe);
+      const fits = (value) => {
+        line.textContent = value;
+        return Math.round(line.getBoundingClientRect().height / lineHeight) <= maxLines;
+      };
+      const packed = [];
+      let current = '';
+      for (const word of captionText.split(' ')) {
+        const candidate = current ? `${current} ${word}` : word;
+        if (!current || fits(candidate)) {
+          current = candidate;
+          continue;
+        }
+        packed.push(current);
+        current = word;
+      }
+      if (current) packed.push(current);
+      probe.remove();
+      return packed;
+    },
+    {
+      captionText: normalized,
+      captionPlacement: placement,
+      fullBleedMaxViewportWidth: CAPTION_FULL_BLEED_MAX_VIEWPORT_WIDTH,
+      fontSize: CAPTION_FONT_SIZE,
+      lineHeightRatio: CAPTION_LINE_HEIGHT_RATIO,
+      maxLines: CAPTION_MAX_LINES,
+    }
+  );
+  const usable =
+    Array.isArray(segments) &&
+    segments.length > 0 &&
+    segments.every((segment) => typeof segment === 'string' && segment.trim()) &&
+    segments.join(' ') === normalized;
+  return usable ? segments : [normalized];
 }
 
 async function hideCaption(page) {
@@ -269,6 +373,7 @@ export function createJourneyRecorder({
     afterActionMs: 2_000,
     minCaptionMs: 4_500,
     maxCaptionMs: 8_000,
+    minCaptionSegmentMs: 900,
     captionMsPerCharacter: 135,
     ...guidePacing,
   };
@@ -436,7 +541,7 @@ export function createJourneyRecorder({
     return delta;
   }
 
-  async function observe(expectedStep, cueStart, cueEnd) {
+  async function observe(expectedStep, cueStart, cueEnd, captionSegments) {
     const metrics = await collectPageMetrics(page);
     const expectedLocale = scenario.environment.locale.toLowerCase();
     if (!metrics.locale.toLowerCase().startsWith(expectedLocale)) {
@@ -468,6 +573,7 @@ export function createJourneyRecorder({
         : [],
       cueStartMs: cueStart,
       cueEndMs: cueEnd,
+      captionSegments,
     });
     await page.screenshot({
       path: path.join(
@@ -544,33 +650,54 @@ export function createJourneyRecorder({
         Math.max(pacing.minCaptionMs, expectedStep.caption.length * pacing.captionMsPerCharacter)
       );
 
+      // 두 줄을 넘는 자막은 큐 여러 개로 나눠 순차 재생한다. 스텝의 자막 시간은 그대로 두고 나눠 쓴다.
+      const segments = await splitCaption(page, expectedStep.caption, resolvedCaptionPlacement);
+      const captionCharacters = segments.reduce((total, segment) => total + segment.length, 0) || 1;
+      const pushCue = (start, text) => {
+        cues.push({
+          step: expectedStep.step,
+          title: expectedStep.goal,
+          start,
+          end: Date.now() - startedAt,
+          text,
+        });
+      };
+
       if (phase === 'guide') {
         await page.waitForTimeout(pacing.beforeActionMs);
-        const cueStart = Date.now() - startedAt;
-        await showCaption(page, expectedStep.caption, resolvedCaptionPlacement);
-        await page.waitForTimeout(Math.min(pacing.captionLeadMs, readingTime));
-        await action(expectedStep, ui);
-        await clearTargetHighlight(page);
-        await page.waitForTimeout(pacing.afterActionMs);
-        const elapsed = Date.now() - startedAt - cueStart;
-        await page.waitForTimeout(Math.max(0, (dwell ?? readingTime) - elapsed));
-        const cueEnd = Date.now() - startedAt;
-        cues.push({ step: expectedStep.step, title: expectedStep.goal, start: cueStart, end: cueEnd, text: expectedStep.caption });
+        const captionWindow = dwell ?? readingTime;
+        for (const [index, segment] of segments.entries()) {
+          const cueStart = Date.now() - startedAt;
+          await showCaption(page, segment, resolvedCaptionPlacement);
+          if (index === 0) {
+            await page.waitForTimeout(Math.min(pacing.captionLeadMs, readingTime));
+            await action(expectedStep, ui);
+            await clearTargetHighlight(page);
+            await page.waitForTimeout(pacing.afterActionMs);
+          }
+          const share = Math.max(
+            pacing.minCaptionSegmentMs,
+            Math.round((captionWindow * segment.length) / captionCharacters)
+          );
+          await page.waitForTimeout(Math.max(0, share - (Date.now() - startedAt - cueStart)));
+          pushCue(cueStart, segment);
+        }
         await hideCaption(page);
         sequence += 1;
-        await observe(expectedStep, cueStart, cueEnd);
+        await observe(expectedStep, cues.at(-segments.length).start, cues.at(-1).end, segments);
       } else {
         await action(expectedStep, ui);
         await clearTargetHighlight(page);
         sequence += 1;
-        await observe(expectedStep, null, null);
-        const cueStart = Date.now() - startedAt;
-        await showCaption(page, expectedStep.caption, resolvedCaptionPlacement);
-        await page.waitForTimeout(dwell ?? 1_200);
-        const cueEnd = Date.now() - startedAt;
-        observations.at(-1).cueStartMs = cueStart;
-        observations.at(-1).cueEndMs = cueEnd;
-        cues.push({ step: expectedStep.step, title: expectedStep.goal, start: cueStart, end: cueEnd, text: expectedStep.caption });
+        await observe(expectedStep, null, null, segments);
+        for (const segment of segments) {
+          const cueStart = Date.now() - startedAt;
+          await showCaption(page, segment, resolvedCaptionPlacement);
+          await page.waitForTimeout(dwell ?? 1_200);
+          pushCue(cueStart, segment);
+        }
+        observations.at(-1).cueStartMs = cues.at(-segments.length).start;
+        observations.at(-1).cueEndMs = cues.at(-1).end;
       }
     },
 
@@ -647,7 +774,14 @@ export function createJourneyRecorder({
         }
         await writeFile(
           path.join(outputDirectory, `${prefix}-chapters.json`),
-          `${JSON.stringify(cues.map(({ step, title, start }) => ({ step, title, startMs: start })), null, 2)}\n`,
+          `${JSON.stringify(
+            cues.reduce((chapters, { step, title, start }) => {
+              if (chapters.at(-1)?.step !== step) chapters.push({ step, title, startMs: start });
+              return chapters;
+            }, []),
+            null,
+            2
+          )}\n`,
           'utf8'
         );
       }

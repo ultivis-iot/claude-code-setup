@@ -249,6 +249,32 @@ try {
   });
   await nodeScript('validate-artifacts.mjs', [guideDirectory, '--phase', 'guide']);
 
+  const guideCritical = scenario.journeys.find(({ kind }) => kind === 'critical');
+  const splitStep = guideCritical.steps[0].step;
+  const writeGuide = (captionSegmentsFor) =>
+    writeJourneyArtifacts({
+      directory: guideDirectory,
+      phase: 'guide',
+      journey: guideCritical,
+      scenario,
+      sourceRevision,
+      environmentFingerprint,
+      videoFixture,
+      captionSegmentsFor,
+    });
+  await writeGuide((step) =>
+    step.step === splitStep ? splitCaptionInHalf(step.caption) : [step.caption]
+  );
+  await nodeScript('validate-artifacts.mjs', [guideDirectory, '--phase', 'guide']);
+  await writeGuide((step) =>
+    step.step === splitStep ? ['승인되지 않은 다른 문장'] : [step.caption]
+  );
+  await expectFailure(() =>
+    nodeScript('validate-artifacts.mjs', [guideDirectory, '--phase', 'guide'])
+  );
+  await writeGuide((step) => [step.caption]);
+  await nodeScript('validate-artifacts.mjs', [guideDirectory, '--phase', 'guide']);
+
   await writeFile(uxReviewPath, '# Tampered review\n', 'utf8');
   await expectFailure(() =>
     nodeScript('validate-artifacts.mjs', [guideDirectory, '--phase', 'guide'])
@@ -300,6 +326,7 @@ async function writeJourneyArtifacts({
   sourceRevision,
   environmentFingerprint,
   videoFixture,
+  captionSegmentsFor = (step) => [step.caption],
 }) {
   const prefix =
     journey.kind === 'critical'
@@ -329,6 +356,13 @@ async function writeJourneyArtifacts({
     failure: null,
     steps,
   });
+  const cueTexts = [];
+  const stepCues = journey.steps.map((step) => {
+    const segments = captionSegmentsFor(step);
+    const startIndex = cueTexts.length;
+    cueTexts.push(...segments);
+    return { segments, startIndex };
+  });
   await writeJson(
     path.join(directory, `${prefix}-observations.json`),
     journey.steps.map((step, index) => ({
@@ -348,25 +382,28 @@ async function writeJourneyArtifacts({
       failedRequests: [],
       responseErrors: [],
       graphqlErrors: [],
-      cueStartMs: index * 1000,
-      cueEndMs: (index + 1) * 1000,
+      cueStartMs: stepCues[index].startIndex * 1000,
+      cueEndMs: (stepCues[index].startIndex + stepCues[index].segments.length) * 1000,
+      captionSegments: stepCues[index].segments,
     }))
   );
   await writeJson(path.join(directory, `${prefix}-mutation-ledger.json`), {
     mutations: [],
     cleanupCompleted: true,
   });
-  const cues = journey.steps
-    .map(
-      (step, index) =>
-        `${index + 1}\n00:00:0${index},000 --> 00:00:0${index + 1},000\n${step.caption}\n`
-    )
+  const srtTime = (seconds) => `00:00:${String(seconds).padStart(2, '0')},000`;
+  const cues = cueTexts
+    .map((text, index) => `${index + 1}\n${srtTime(index)} --> ${srtTime(index + 1)}\n${text}\n`)
     .join('\n');
   await writeFile(path.join(directory, `${prefix}.srt`), cues, 'utf8');
   if (phase === 'guide') {
     await writeJson(
       path.join(directory, `${prefix}-chapters.json`),
-      journey.steps.map((step, index) => ({ step: step.step, title: step.goal, startMs: index * 1000 }))
+      journey.steps.map((step, index) => ({
+        step: step.step,
+        title: step.goal,
+        startMs: stepCues[index].startIndex * 1000,
+      }))
     );
   }
   const png = Buffer.from(
@@ -536,6 +573,12 @@ async function verifyRecorderOrder({
       throw new Error('Guide target highlight lead time is missing.');
     }
   }
+}
+
+function splitCaptionInHalf(caption) {
+  const words = caption.split(' ');
+  const middle = Math.ceil(words.length / 2);
+  return [words.slice(0, middle).join(' '), words.slice(middle).join(' ')];
 }
 
 async function nodeScript(name, args) {

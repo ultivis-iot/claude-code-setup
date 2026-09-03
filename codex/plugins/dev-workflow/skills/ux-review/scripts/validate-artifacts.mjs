@@ -10,7 +10,7 @@ import {
   findRepositoryRoot,
   resolveRepositoryRelativePath,
 } from './repository-paths.mjs';
-import { scenarioHash, validateScenario } from './scenario-contract.mjs';
+import { captionSegmentsMatch, scenarioHash, validateScenario } from './scenario-contract.mjs';
 
 const execFileAsync = promisify(execFile);
 const args = process.argv.slice(2);
@@ -262,11 +262,25 @@ async function validateJourney(
   const recordedSteps = expectedSteps.slice(0, recordedStepCount);
   compareSteps(`${prefix}: execution`, execution.steps, recordedSteps, false);
   compareSteps(`${prefix}: observations`, observations, recordedSteps, true);
-  if (srt.length !== recordedSteps.length) {
-    throw new Error(`${prefix}: SRT cues ${srt.length}/${recordedSteps.length}`);
+  // 자막이 두 줄을 넘으면 스텝 하나가 큐 여러 개를 갖는다. 큐를 이어 붙이면 승인된 자막과 같아야 한다.
+  const expectedCues = [];
+  const firstCueIndexByStep = [];
+  // 분할 도입 전 번들은 captionSegments 가 없다. 그 경우 예전 규칙(큐 하나 = 자막 전체)으로 본다.
+  recordedSteps.forEach((step, index) => {
+    const segments = observations[index]?.captionSegments ?? [step.caption];
+    if (!captionSegmentsMatch(segments, step.caption)) {
+      throw new Error(
+        `${prefix}: step ${step.step} caption segments do not reconstruct the approved caption`
+      );
+    }
+    firstCueIndexByStep.push(expectedCues.length);
+    expectedCues.push(...segments);
+  });
+  if (srt.length !== expectedCues.length) {
+    throw new Error(`${prefix}: SRT cues ${srt.length}/${expectedCues.length}`);
   }
   srt.forEach((cue, index) => {
-    if (cue.index !== index + 1 || cue.text !== recordedSteps[index].caption || cue.endMs <= cue.startMs) {
+    if (cue.index !== index + 1 || cue.text !== expectedCues[index] || cue.endMs <= cue.startMs) {
       throw new Error(`${prefix}: SRT cue ${index + 1} does not match the scenario caption or timing`);
     }
   });
@@ -356,7 +370,7 @@ async function validateJourney(
       if (
         chapter.step !== expectedSteps[index].step ||
         chapter.title !== expectedSteps[index].goal ||
-        chapter.startMs !== srt[index].startMs
+        chapter.startMs !== srt[firstCueIndexByStep[index]].startMs
       ) {
         throw new Error(`${prefix}: chapter ${index + 1} does not match its cue`);
       }
