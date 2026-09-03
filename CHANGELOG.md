@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.9.0 (2026-09-03)
+
+- `ux-review` 산출물을 중앙 저장소 `~/.local/share/ux-review/<부모 저장소>/<worktree>/<날짜>/<NN.시나리오>/`로 옮기고 저장소 쪽 `tmp/ux-review`는 심볼릭 링크로 남김. 산출물 5곳 중 3곳이 worktree 였고 `tmp/`가 gitignore 대상이라 `git worktree remove` 한 번에 증거 237MB 가 사라질 수 있었음. 경로 문자열과 `pathBase: "repository-root"`가 그대로 유효해 기존 매니페스트와 해시 검증은 손대지 않음. `UX_REVIEW_STORE`로 위치 재정의 가능.
+- `scripts/store-link.mjs` 추가: `allocate-output.mjs`가 시나리오를 할당할 때 링크가 없으면 만들어 새 worktree 도 처음부터 중앙에 저장. `scripts/migrate-store.mjs` 추가: 기존 산출물 이관(`--dry-run` 기본, `--apply` 로 실행), 같은 파일시스템이면 `rename`, 아니면 복사 후 삭제로 폴백.
+- `scripts/capture-origin.mjs` 추가: 시나리오 할당 시 `origin.json`(저장소·worktree·브랜치·리비전·GitHub Issue·Notion Task 링크)과 `plan-snapshot.md` 를 남김. Plan 은 `ult-story-create-exec.sh`가 Notion Story blocks 에만 넣고 GitHub Issue 본문에는 올리지 않으므로 로컬 파일을 복사함. GitHub·Notion 조회는 best-effort 라 실패하면 해당 필드만 비우고 저장은 성공.
+- `scripts/viewer.mjs` 추가: 표준 라이브러리만 쓰는 HTTP 뷰어. `python3 -m http.server`가 Range 요청을 무시하고 전체를 재전송해 영상 seek 이 불가능하므로 206 을 직접 구현. 해시 라우팅(`#/<저장소>/<worktree>/<날짜>/<시나리오>/<pass>/<탭>/<여정>`), 여정별 영상과 시나리오 단계 병렬 표시, SRT 타임코드로 단계 클릭 시 해당 시점 이동, Plan·리뷰 결과·시나리오 렌더, 스크린샷 갤러리, 다운로드, pass·시나리오 삭제, 이전 pass 일괄 정리, 다크/라이트 전환. `--ensure` 는 떠 있으면 재사용하고 없을 때만 기동하며 접근 가능한 주소(localhost, `.local`, LAN, Tailscale)를 출력.
+- 색·간격·형태 규격을 `@ultivis-iot/react` 의 light/dark 토큰과 button/badge 규격에서 가져오고 아이콘은 lucide 를 따름. 라이브러리를 의존성으로 들이지 않고 값만 이식. 심각도(P0/P1/P2)와 링크 색은 `--chart-*` 에서 분리했는데, light 의 chart-5 가 연주황이고 dark 는 핑크여서 같은 토큰이 테마마다 다른 의미가 되어 대비가 무너졌기 때문.
+- 데스크톱 시나리오 기본 뷰포트를 `1920 × 1080` 으로 통일. 기존 기본값 `1440×1000`(1.44:1)과 변형 `1600×1000`(1.60:1)은 실제 화면 비율과 맞지 않고 시나리오마다 달라 같은 화면을 비교하기 어려웠음. 뷰포트가 곧 녹화 크기라 WebM 이 1.44배가 됨. 모바일은 기기 실제 비율(`390×844`)을 유지. 승인된 시나리오는 뷰포트가 `scenarioHash` 에 묶여 있어 바꾸지 않음.
+- 시나리오 작성의 기본 입력을 `plan-snapshot.md` 로 지정. 전역 Plan 형식이 의도 섹션을 요구하므로 그 의도를 `job.outcome` 과 `successCriteria` 로 옮기면, 리뷰가 화면 반응이 아니라 승인된 의도의 충족 여부를 답하게 됨. Plan 이 없거나 다른 작업을 다루면 기존대로 요청과 제품에서 추론. 승인 화면에서 각 성공 기준의 출처를 밝히도록 하고 스키마는 바꾸지 않음.
+- `SKILL.md` 와 `references/scenario-workflow.md` 의 `~/.codex/skills/...` 하드코딩 15곳을 `$UX` 로 정리해 설치 위치와 무관하게 동작하도록 하고, 결과 보고를 파일 절대경로 대신 뷰어 딥링크로 변경.
+- 뷰어 자신을 대상으로 `ux-review` 를 수행해 P2 4건을 찾아 수정(준비도 ready, 하드 게이트 6/6): 세로 영상에서 좌측 컬럼이 비고 단계 목록이 눌리던 문제, pass·여정 버튼의 접근성 이름이 `review-017.1MB` 처럼 붙어 읽히던 문제, 정리된 리뷰 링크 진입 시 콘솔에 404 가 남던 문제, 녹화가 끝나지 않아 크기가 0인 WebM 을 재생하려다 416 이 나던 문제.
+
 ## v0.8.1 (2026-09-03)
 
 - `ux-review` 가이드 녹화에 interaction helper 도입: action 콜백이 `(expectedStep, ui)`를 받고 `ui.fill`/`click`/`selectOption`/`check`/`uncheck`가 대상 스크롤, 앰버 펄스 하이라이트, 한 글자씩 타이핑, 감속 클릭, 결과 홀드, 스크린샷 전 하이라이트 제거를 담당. 보이는 조작은 헬퍼를 쓰고 직접 Locator 조작은 녹화 대상 밖 setup에만 허용.

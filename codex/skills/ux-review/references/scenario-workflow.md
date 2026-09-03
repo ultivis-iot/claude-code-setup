@@ -4,6 +4,10 @@
 
 Start from the user's job rather than navigation. Define audience, trigger, observable outcome, success criteria, prerequisites, realistic data, exclusions, one critical journey, and at least one recovery journey.
 
+`plan-snapshot.md` in the scenario directory is the default starting point when it exists. The global plan format requires an explicit intent section, so read it and carry that intent into `job.outcome` and `successCriteria` — the review then answers whether the approved intent actually holds in the product, not merely whether screens respond. When the plan covers work outside this review, take only the part that matches and record the rest under `exclusions`.
+
+When presenting the scenario for approval, show which plan item each success criterion came from, and name any criterion that has no plan behind it. Criteria drawn from the product or from the user's request are equally valid; the point is that the reader can see the difference before approving. Do not add fields to the scenario schema for this: the snapshot and the approval conversation already carry the provenance.
+
 The environment fixes one locale and viewport and names environment variables for the base URL and reviewed source revision. Desktop scenarios use `1920 × 1080` so evidence keeps a 16:9 frame and stays comparable across reviews; mobile scenarios use the device's own ratio (for example `390 × 844`). The viewport is also the recording size, so a wider frame means a larger WebM. Use a separate approved scenario ID for another mobile/desktop viewport or locale so evidence never silently departs from its approval.
 
 The mutation policy is one of:

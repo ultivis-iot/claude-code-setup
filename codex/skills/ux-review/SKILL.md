@@ -50,7 +50,9 @@ Before evaluating a changed interface, build `consistency-baseline.md` from two 
 
 ## 1. Define the scenario
 
-Read [references/scenario-workflow.md](references/scenario-workflow.md). Copy [assets/user-scenario.template.json](assets/user-scenario.template.json), replace every placeholder, and validate it:
+Read [references/scenario-workflow.md](references/scenario-workflow.md). Allocating the scenario directory writes `plan-snapshot.md` when the repository holds a plan, so read that snapshot first: its stated intent is the default source for the job and success criteria. A plan is an input, not a constraint — write the scenario the user's request calls for when no plan exists, when the plan covers other work, or when the user asks for a different journey, and say which you did.
+
+Copy [assets/user-scenario.template.json](assets/user-scenario.template.json), replace every placeholder, and validate it:
 
 ```bash
 node "$UX/scripts/validate-scenario.mjs" <scenario.json>
