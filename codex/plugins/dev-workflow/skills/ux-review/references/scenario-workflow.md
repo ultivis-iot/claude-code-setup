@@ -4,7 +4,7 @@
 
 Start from the user's job rather than navigation. Define audience, trigger, observable outcome, success criteria, prerequisites, realistic data, exclusions, one critical journey, and at least one recovery journey.
 
-The environment fixes one locale and viewport and names environment variables for the base URL and reviewed source revision. Use a separate approved scenario ID for another mobile/desktop viewport or locale so evidence never silently departs from its approval.
+The environment fixes one locale and viewport and names environment variables for the base URL and reviewed source revision. Desktop scenarios use `1920 × 1080` so evidence keeps a 16:9 frame and stays comparable across reviews; mobile scenarios use the device's own ratio (for example `390 × 844`). The viewport is also the recording size, so a wider frame means a larger WebM. Use a separate approved scenario ID for another mobile/desktop viewport or locale so evidence never silently departs from its approval.
 
 The mutation policy is one of:
 

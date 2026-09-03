@@ -676,8 +676,6 @@ video{width:100%;max-height:min(70vh,560px);background:#0b0b0d;border-radius:var
 .step-n{flex-shrink:0;width:24px;height:24px;border-radius:999px;background:hsl(var(--secondary));
   color:hsl(var(--muted-foreground));font-size:11px;display:flex;align-items:center;justify-content:center}
 .step-b{flex:1;min-width:0}
-.stage{font-size:10px;color:hsl(var(--muted-foreground));background:hsl(var(--muted));
-  padding:1px 7px;border-radius:var(--radius-sm)}
 .goal{font-size:13.5px;font-weight:500;margin:3px 0 5px}
 .line{font-size:12.5px;color:hsl(var(--muted-foreground));margin:2px 0;display:flex;gap:8px}
 .line .lb{flex-shrink:0;width:26px;font-size:11px;opacity:.8}
@@ -953,7 +951,6 @@ function renderScenario(d){
       +'<span class="dim" style="font-weight:400"> '+steps.length+'단계</span></div>';
     for(const st of steps){
       h+='<div class="step"><div class="step-n">'+esc(st.step)+'</div><div class="step-b">'
-        +(st.stage?'<span class="stage">'+esc(st.stage)+'</span>':'')
         +'<div class="goal">'+esc(st.goal||'')+'</div>'
         +(st.startingState?'<div class="line"><span class="lb">시작</span>'+esc(st.startingState)+'</div>':'')
         +(st.action?'<div class="line"><span class="lb">행동</span>'+esc(st.action)+'</div>':'')
@@ -1020,7 +1017,6 @@ async function renderBody(tab,pass){
         const t=cue&&cue.start!=null?cue.start:null;
         return '<div class="vstep'+(t!=null?' seekable':'')+'"'+(t!=null?' data-seek="'+t+'"':'')+'>'
           +'<div class="vstep-h"><span class="vn">'+esc(st.step??i+1)+'</span>'
-          +(spec.stage?'<span class="stage">'+esc(spec.stage)+'</span>':'')
           +(t!=null?'<span class="ts">'+fmt(t)+'</span>':'')+'</div>'
           +(spec.goal?'<div class="goal">'+esc(spec.goal)+'</div>':'')
           +(spec.action?'<div class="line"><span class="lb">행동</span>'+esc(spec.action)+'</div>':'')

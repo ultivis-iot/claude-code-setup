@@ -22,7 +22,7 @@
     "baseUrlEnvironmentVariable": "UX_REVIEW_BASE_URL",
     "sourceRevisionEnvironmentVariable": "UX_REVIEW_SOURCE_REVISION",
     "locale": "ko",
-    "viewport": { "width": 1440, "height": 1000 }
+    "viewport": { "width": 1920, "height": 1080 }
   },
   "mutationPolicy": {
     "mode": "disposable-write",
