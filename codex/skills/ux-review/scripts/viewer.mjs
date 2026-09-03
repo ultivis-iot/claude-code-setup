@@ -160,7 +160,12 @@ async function buildScenario(relative) {
     try { passFiles = await readdir(passDirectory); } catch { continue; }
     // webm 하나가 여정 하나다. 같은 이름의 srt / execution.json 이 짝을 이룬다.
     const journeys = [];
+    const recording = [];
     for (const video of passFiles.filter((f) => f.endsWith('.webm')).sort()) {
+      // 녹화가 끝나기 전 파일은 크기가 0이다. 재생하면 416 이 되므로 목록에서 빼둔다.
+      try {
+        if ((await stat(path.join(passDirectory, video))).size === 0) { recording.push(video); continue; }
+      } catch { continue; }
       const base = video.replace(/\.webm$/, '');
       const execution = await readJson(path.join(passDirectory, `${base}-execution.json`));
       const srtName = `${base}.srt`;
@@ -185,7 +190,7 @@ async function buildScenario(relative) {
       status: primary?.status ?? null,
       durationMs: primary?.durationMs ?? null,
       failure: journeys.find((j) => j.failure)?.failure ?? null,
-      journeys,
+      journeys, recording,
       screenshots: passFiles.filter((f) => f.endsWith('.png')).sort(),
       reviewDoc: passFiles.find((f) => f.endsWith('-ux-review.md')) ?? null,
       size: await directorySize(passDirectory),
@@ -601,6 +606,7 @@ video{width:100%;max-height:min(70vh,560px);background:#0b0b0d;border-radius:var
 .jbtn .k{color:hsl(var(--muted-foreground));font-size:10.5px}
 /* 영상 + 단계 좌우 배치 */
 .vsplit{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:16px;align-items:start}
+.vsplit.portrait{grid-template-columns:minmax(0,0.72fr) minmax(320px,1.28fr)}
 .vleft{position:sticky;top:0}
 .vright{max-height:calc(100vh - 190px);overflow-y:auto;padding-right:4px}
 .vstep{border:1px solid transparent;border-left:2px solid hsl(var(--border));
@@ -777,13 +783,23 @@ async function route(){
     return;
   }
   if(!SC||SC.path!==r.path){
+    // 목록에 없는 경로는 조회하지 않는다. 정리된 링크를 여는 건 정상적인 일이라
+    // 404 를 오류로 남기지 않는다.
+    const known=INDEX&&INDEX.repositories.flatMap(x=>x.worktrees)
+      .flatMap(w=>w.scenarios).some(x=>x.path===r.path);
+    if(!known){
+      SC=null;
+      $('#main').innerHTML='<div class="empty">이 리뷰는 목록에 없습니다.'
+        +'<br><span style="font-size:12px">정리되었거나 다른 저장 위치의 링크일 수 있습니다. 왼쪽에서 다시 선택하세요.</span></div>';
+      return;
+    }
     if(LOADING)return;
     LOADING=true;
     $('#main').innerHTML='<div class="empty">불러오는 중…</div>';
     try{
       if(!CACHE[r.path]){
         const res=await fetch('/api/scenario?path='+encodeURIComponent(r.path));
-        if(!res.ok){$('#main').innerHTML='<div class="empty">시나리오를 찾을 수 없습니다</div>';LOADING=false;return;}
+        if(!res.ok){$('#main').innerHTML='<div class="empty">시나리오를 읽지 못했습니다</div>';LOADING=false;return;}
         CACHE[r.path]=await res.json();
       }
       SC=CACHE[r.path];
@@ -813,10 +829,16 @@ function renderDetail(r){
     +(pass?'<button class="danger" data-del="'+SC.path+'/'+pass.name+'" data-label="'+esc(pass.name)+'">'+esc(pass.name)+' 삭제</button>':'')
     +'<button class="danger" data-del="'+SC.path+'" data-label="'+esc(SC.id)+' 전체">시나리오 삭제</button>'
     +'</div></div><div class="badges">'+b.join('')+'</div>';
-  h+='<div class="passes">'+SC.passes.map(p=>'<a class="pass'+(p.name===passName?' on':'')
-    +(p.approved?' approved':'')+(p.status&&p.status!=='completed'?' failed':'')
-    +'" href="#/'+enc(SC.path)+'/'+p.name+'/'+tab+'">'+p.name
-    +'<span class="k">'+mb(p.size)+(p.durationMs?' · '+dur(p.durationMs):'')+'</span></a>').join('')
+  h+='<div class="passes">'+SC.passes.map(p=>{
+    const meta=[mb(p.size),p.durationMs?dur(p.durationMs):null].filter(Boolean).join(', ');
+    const label=[p.name,meta,p.approved?'승인됨':null,
+      p.status&&p.status!=='completed'?p.status:null].filter(Boolean).join(', ');
+    return '<a class="pass'+(p.name===passName?' on':'')
+      +(p.approved?' approved':'')+(p.status&&p.status!=='completed'?' failed':'')
+      +'" aria-label="'+label+'"'+(p.name===passName?' aria-current="true"':'')
+      +' href="#/'+enc(SC.path)+'/'+p.name+'/'+tab+'">'+p.name
+      +'<span class="k" aria-hidden="true">'+mb(p.size)+(p.durationMs?' · '+dur(p.durationMs):'')+'</span></a>';
+  }).join('')
     +(SC.passes.length?'':'<span class="dim">pass 없음</span>')+'</div>';
   h+='<div class="tabs">'+TABS.map(t=>'<a class="tab'+(tab===t[0]?' on':'')+'" href="#/'
     +enc(SC.path)+'/'+(passName||'-')+'/'+t[0]+'">'+t[1]+'</a>').join('')+'</div><div id="body"></div>';
@@ -892,7 +914,12 @@ async function renderBody(tab,pass){
   const base=SC.path+(pass?'/'+pass.name:'');
 
   if(tab==='video'){
-    if(!pass||!pass.journeys.length){el.innerHTML='<div class="empty">이 pass에 영상이 없습니다</div>';return;}
+    if(!pass||!pass.journeys.length){
+      el.innerHTML='<div class="empty">'+(pass&&pass.recording&&pass.recording.length
+        ? '영상을 기록하는 중입니다 · '+pass.recording.length+'개<br><span style="font-size:12px">녹화가 끝난 뒤 새로고침하면 보입니다.</span>'
+        : '이 pass에 영상이 없습니다')+'</div>';
+      return;
+    }
     const r=parseRoute();
     const jn=pass.journeys.find(x=>x.journeyId===r.jn)
       ||pass.journeys.find(x=>x.journeyKind==='critical')||pass.journeys[0];
@@ -900,11 +927,19 @@ async function renderBody(tab,pass){
     const def=(SC.journeyDefs||[]).find(d=>d.id===jn.journeyId);
 
     // 여정 선택
-    let h='<div class="jsel">'+pass.journeys.map(x=>'<a class="jbtn'+(x===jn?' on':'')
-      +'" href="#/'+enc(SC.path)+'/'+pass.name+'/video/'+encodeURIComponent(x.journeyId||x.base)+'">'
-      +esc(x.journeyId||x.base)
-      +'<span class="jk '+(x.journeyKind==='critical'?'crit':'rec')+'">'+esc(x.journeyKind||'')+'</span>'
-      +'<span class="k">'+(x.durationMs?dur(x.durationMs):'')+'</span></a>').join('')+'</div>';
+    let h=(pass.recording&&pass.recording.length
+      ? '<div class="dim" style="font-size:12px;margin-bottom:10px">기록 중인 영상 '+pass.recording.length+'개는 아직 표시되지 않습니다</div>'
+      : '');
+    h+='<div class="jsel">'+pass.journeys.map(x=>{
+      const name=x.journeyId||x.base;
+      const label=[name,x.journeyKind,x.durationMs?dur(x.durationMs):null].filter(Boolean).join(', ');
+      return '<a class="jbtn'+(x===jn?' on':'')+'" aria-label="'+esc(label)+'"'
+        +(x===jn?' aria-current="true"':'')
+        +' href="#/'+enc(SC.path)+'/'+pass.name+'/video/'+encodeURIComponent(name)+'">'
+        +esc(name)
+        +'<span class="jk '+(x.journeyKind==='critical'?'crit':'rec')+'" aria-hidden="true">'+esc(x.journeyKind||'')+'</span>'
+        +'<span class="k" aria-hidden="true">'+(x.durationMs?dur(x.durationMs):'')+'</span></a>';
+    }).join('')+'</div>';
 
     // 좌: 영상 / 우: 단계
     h+='<div class="vsplit"><div class="vleft">'
@@ -938,8 +973,18 @@ async function renderBody(tab,pass){
     h+='</div></div>';
     el.innerHTML=h;
 
-    // 단계 클릭 → 해당 시점으로 이동
+    // 세로 영상은 폭을 다 쓰지 못하므로 읽을 쪽에 공간을 넘긴다
     const video=el.querySelector('#vp');
+    if(video){
+      const fit=()=>{
+        if(!video.videoWidth)return;
+        el.querySelector('.vsplit')?.classList.toggle('portrait', video.videoHeight>video.videoWidth);
+      };
+      video.addEventListener('loadedmetadata',fit);
+      fit();
+    }
+
+    // 단계 클릭 → 해당 시점으로 이동
     el.querySelectorAll('[data-seek]').forEach(node=>node.onclick=()=>{
       if(!video)return;
       video.currentTime=Number(node.dataset.seek);
