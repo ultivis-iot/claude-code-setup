@@ -3,6 +3,8 @@
 import { mkdir, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { findRepositoryRoot, toRepositoryRelativePath } from './repository-paths.mjs';
+import { ensureStoreLink } from './store-link.mjs';
+import { captureOrigin, capturePlan } from './capture-origin.mjs';
 
 const [mode, target, value, ...rest] = process.argv.slice(2);
 const option = (name) => {
@@ -17,12 +19,32 @@ if (mode === 'scenario') {
   const repositoryRoot = await findRepositoryRoot(path.resolve(target));
   const date = option('--date') || localDate();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) fail('--date must use YYYY-MM-DD');
+
+  // tmp/ux-review 가 중앙 저장소를 가리키게 한다 (worktree 가 지워져도 증거는 남는다)
+  const link = await ensureStoreLink(repositoryRoot);
+
   const dateDirectory = path.join(repositoryRoot, 'tmp', 'ux-review', date);
   await mkdir(dateDirectory, { recursive: true });
   const directory = await allocateNumberedDirectory(dateDirectory, /^([0-9]{2})\./, (number) =>
     `${number}.${value}`
   );
-  result(repositoryRoot, directory, { mode, date, scenarioId: value });
+
+  // 출처와 Plan 은 best-effort 로 남긴다. 실패해도 할당은 성공시킨다.
+  let origin = null;
+  let planSource = null;
+  try { origin = await captureOrigin(directory); } catch { /* 무시 */ }
+  try { planSource = await capturePlan(directory); } catch { /* 무시 */ }
+
+  result(repositoryRoot, directory, {
+    mode, date, scenarioId: value,
+    store: link.target, storeLinked: Boolean(link.target),
+    origin: origin && {
+      repository: origin.repository, worktree: origin.worktree,
+      branch: origin.branch, issue: origin.issue, issueUrl: origin.issueUrl,
+      notionTaskUrl: origin.notionTaskUrl, notionStoryUrl: origin.notionStoryUrl,
+    },
+    planSource,
+  });
 } else if (mode === 'pass') {
   if (!target || !['review', 'guide'].includes(value)) {
     fail('Usage: allocate-output.mjs pass <scenario-directory> <review|guide>');

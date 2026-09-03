@@ -14,11 +14,19 @@ An explicit user request for a guide video authorizes the direct route; do not f
 
 ## Contract
 
-Keep all files inside the reviewed product's Git repository:
+Every command below uses `$UX` for the skill directory, so the same instructions work wherever the skill is installed. Define it once per session:
+
+```bash
+UX=$(ls -d ~/.claude/skills/ux-review ~/.codex/skills/ux-review 2>/dev/null | head -1)
+```
+
+Write artifacts through the repository path as always:
 
 ```text
 <repository-root>/tmp/ux-review/<YYYY-MM-DD>/<NN>.<scenario-id>/
 ├── consistency-baseline.md
+├── origin.json                           # repository, branch, issue and Notion links
+├── plan-snapshot.md                      # local plan copy (not published to the issue)
 ├── <id>-scenario.json
 ├── <id>-scenario-approval.json           # reviewed route
 ├── <id>-direct-guide-request.json        # direct route
@@ -26,7 +34,15 @@ Keep all files inside the reviewed product's Git repository:
 └── guide-01/
 ```
 
-All manifest paths use `pathBase: "repository-root"`; reject absolute paths and repository escapes. Use [scripts/allocate-output.mjs](scripts/allocate-output.mjs) to allocate scenario and pass directories atomically instead of choosing or reusing numbers manually.
+`tmp/ux-review` is a symlink into the central store, so the bytes survive `git worktree remove`:
+
+```text
+~/.local/share/ux-review/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/
+```
+
+[scripts/allocate-output.mjs](scripts/allocate-output.mjs) creates that symlink when it is missing, then captures `origin.json` and `plan-snapshot.md`. Override the location with `UX_REVIEW_STORE`. Repositories that still hold real directories are migrated by [scripts/migrate-store.mjs](scripts/migrate-store.mjs) (`--dry-run` first, then `--apply`).
+
+All manifest paths keep `pathBase: "repository-root"`; reject absolute paths and repository escapes. Use [scripts/allocate-output.mjs](scripts/allocate-output.mjs) to allocate scenario and pass directories atomically instead of choosing or reusing numbers manually.
 
 Scenario schema version 2 contains exactly one critical journey, at least one executable recovery journey, a fixed viewport and locale, a source-revision environment variable, and an explicit mutation policy. A different viewport or locale requires a separately approved scenario. Store credentials only in environment variables or ignored Playwright state.
 
@@ -37,19 +53,19 @@ Before evaluating a changed interface, build `consistency-baseline.md` from two 
 Read [references/scenario-workflow.md](references/scenario-workflow.md). Copy [assets/user-scenario.template.json](assets/user-scenario.template.json), replace every placeholder, and validate it:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/validate-scenario.mjs <scenario.json>
+node "$UX/scripts/validate-scenario.mjs" <scenario.json>
 ```
 
 For a UX review, show the complete scenario before Playwright actions. Role, outcome, environment, mutation policy, journey, and scope changes require reapproval. After explicit confirmation:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/approve-scenario.mjs <scenario.json> --by "<approver>"
+node "$UX/scripts/approve-scenario.mjs" <scenario.json> --by "<approver>"
 ```
 
 For an explicit guide-video request, validate the scenario and record the request without adding a separate review gate:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/record-guide-request.mjs \
+node "$UX/scripts/record-guide-request.mjs" \
   <scenario.json> \
   --requested-by "<requester>" \
   --request "<the user's guide-video request>"
@@ -70,7 +86,7 @@ Read [references/ux-evaluation.md](references/ux-evaluation.md). Evaluate the ap
 Copy [assets/review-decision.template.json](assets/review-decision.template.json) and present all finding dispositions and hard-gate statuses to the user. Only after explicit confirmation run:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/approve-review-decision.mjs \
+node "$UX/scripts/approve-review-decision.mjs" \
   <decision-draft.json> \
   --scenario <scenario.json> \
   --review-directory <review-NN> \
@@ -86,7 +102,7 @@ The script rejects unresolved hard gates, evidence-needed findings, deferred P0/
 For the reviewed route, create guide approval from the approved review decision:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/approve-guide.mjs \
+node "$UX/scripts/approve-guide.mjs" \
   <scenario.json> \
   --by "<approver>" \
   --review-decision <id-review-decision.json>
@@ -101,10 +117,22 @@ The action callback receives `(expectedStep, ui)`. Use `ui.fill(locator, value)`
 Read [references/artifact-contract.md](references/artifact-contract.md), then run:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/validate-artifacts.mjs <review-NN> --phase review
-node ~/.codex/skills/ux-review/scripts/validate-artifacts.mjs <guide-NN> --phase guide
+node "$UX/scripts/validate-artifacts.mjs" <review-NN> --phase review
+node "$UX/scripts/validate-artifacts.mjs" <guide-NN> --phase guide
 ```
 
 The validator checks semantic step/caption/evidence correspondence, recovery coverage, SRT and chapter timing, PNG/WebM validity, media metadata, environment/source consistency, mutation policy, and approval hashes. Inspect each final WebM at normal speed and verify first/middle/last frames and caption placement.
 
-Return direct absolute links to the validated role-specific WebM files. P0 blocks or makes work unsafe/inaccessible, P1 causes major primary-path friction, and P2 covers measurable consistency or polish issues.
+Start the viewer and return links that open in a browser instead of filesystem paths:
+
+```bash
+node "$UX/scripts/viewer.mjs" --ensure --host 0.0.0.0
+```
+
+`--ensure` reuses a running viewer and starts one only when none answers. It prints every reachable address (localhost, hostname `.local`, LAN interfaces, Tailscale when present); pick the one the reader can open. Deep-link the reviewed pass:
+
+```text
+http://<host>:7830/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
+```
+
+Also state the P-level counts. P0 blocks or makes work unsafe/inaccessible, P1 causes major primary-path friction, and P2 covers measurable consistency or polish issues.

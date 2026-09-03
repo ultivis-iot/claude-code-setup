@@ -25,15 +25,15 @@ The critical journey starts with orientation, contains an action, and ends with 
 Allocate a new scenario directory from any path inside the reviewed repository:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/allocate-output.mjs \
+node "$UX/scripts/allocate-output.mjs" \
   scenario <path-inside-repository> <scenario-id>
 ```
 
 Allocate passes without reusing or overwriting numbers:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/allocate-output.mjs pass <scenario-directory> review
-node ~/.codex/skills/ux-review/scripts/allocate-output.mjs pass <scenario-directory> guide
+node "$UX/scripts/allocate-output.mjs" pass <scenario-directory> review
+node "$UX/scripts/allocate-output.mjs" pass <scenario-directory> guide
 ```
 
 The allocator uses atomic directory creation so concurrent runs cannot claim the same number.
@@ -43,8 +43,8 @@ The allocator uses atomic directory creation so concurrent runs cannot claim the
 Validate, show the complete scenario to the user, and obtain explicit confirmation before writing or running Playwright actions:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/validate-scenario.mjs <scenario.json>
-node ~/.codex/skills/ux-review/scripts/approve-scenario.mjs <scenario.json> --by "<approver>"
+node "$UX/scripts/validate-scenario.mjs" <scenario.json>
+node "$UX/scripts/approve-scenario.mjs" <scenario.json> --by "<approver>"
 ```
 
 The approval binds the exact canonical scenario and its repository-relative path. Any scenario edit requires reapproval.
@@ -54,7 +54,7 @@ The approval binds the exact canonical scenario and its repository-relative path
 When the user explicitly asks for a guide, training, or demonstration video, the request itself authorizes production without a preceding UX review or readiness decision. Validate a best-fit scenario, stay within the requested scope and mutation policy, and record the request:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/record-guide-request.mjs \
+node "$UX/scripts/record-guide-request.mjs" \
   <scenario.json> \
   --requested-by "<requester>" \
   --request "<request summary>"
@@ -78,7 +78,7 @@ await recorder.finish({
 Present findings and all hard gates to the user. After their explicit decision, approve a completed copy of `review-decision.template.json`:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/approve-review-decision.mjs \
+node "$UX/scripts/approve-review-decision.mjs" \
   <decision-draft.json> \
   --scenario <scenario.json> \
   --review-directory <review-NN> \
@@ -96,7 +96,7 @@ The resulting decision hashes the baseline, complete review bundle, and UX revie
 Generate guide approval only from the approved decision:
 
 ```bash
-node ~/.codex/skills/ux-review/scripts/approve-guide.mjs \
+node "$UX/scripts/approve-guide.mjs" \
   <scenario.json> \
   --by "<approver>" \
   --review-decision <id-review-decision.json>
