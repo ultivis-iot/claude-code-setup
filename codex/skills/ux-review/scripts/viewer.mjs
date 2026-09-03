@@ -464,9 +464,34 @@ const PAGE = String.raw`<!doctype html>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ux-review</title>
 <style>
-/* 색상 토큰은 @ultivis-iot/react (ultivis-react-library) 의 dark 테마 값을 그대로 옮겼다.
+/* 색상 토큰은 @ultivis-iot/react (ultivis-react-library) 의 light/dark 값을 그대로 옮겼다.
  * 라이브러리를 의존성으로 들이지 않고 스타일만 맞춘다. */
 :root{
+  --background:0 0% 100%; --foreground:240 10% 3.9%;
+  --card:0 0% 100%; --card-foreground:240 10% 3.9%;
+  --popover:0 0% 100%; --popover-foreground:240 10% 3.9%;
+  --primary:240 5.9% 10%; --primary-foreground:0 0% 98%;
+  --secondary:240 4.8% 95.9%; --secondary-foreground:240 5.9% 10%;
+  --muted:240 4.8% 95.9%; --muted-foreground:240 3.8% 46.1%;
+  --accent:240 4.8% 95.9%; --accent-foreground:240 5.9% 10%;
+  --destructive:0 84.2% 60.2%; --destructive-foreground:0 0% 98%;
+  --border:240 5.9% 90%; --input:240 5.9% 90%; --ring:240 5.9% 10%;
+  --sidebar-background:0 0% 98%; --sidebar-foreground:240 5.3% 26.1%;
+  --sidebar-primary:240 5.9% 10%; --sidebar-primary-foreground:0 0% 98%;
+  --sidebar-accent:240 4.8% 95.9%; --sidebar-accent-foreground:240 5.9% 10%;
+  --sidebar-border:220 13% 91%;
+  --chart-1:12 76% 61%; --chart-2:173 58% 39%; --chart-3:197 37% 24%;
+  --chart-4:43 74% 66%; --chart-5:27 87% 67%;
+  --radius:0.5rem;
+  --radius-sm:calc(var(--radius) - 4px); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius);
+  --shadow-xs:0 1px 2px 0 rgb(0 0 0 / .05);
+  --shadow-sm:0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1);
+  --app-font-family:'SUIT-Regular',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;
+  /* 심각도와 링크는 chart 팔레트와 의미가 어긋나므로 테마별로 직접 잡는다 */
+  --sev-p0:0 72% 42%; --sev-p1:30 90% 36%; --sev-p2:217 80% 45%; --sev-ok:142 68% 29%;
+  --link:217 80% 45%;
+}
+.dark{
   --background:240 10% 3.9%; --foreground:0 0% 98%;
   --card:240 10% 3.9%; --card-foreground:0 0% 98%;
   --popover:240 10% 3.9%; --popover-foreground:0 0% 98%;
@@ -482,12 +507,8 @@ const PAGE = String.raw`<!doctype html>
   --sidebar-border:240 3.7% 15.9%;
   --chart-1:220 70% 50%; --chart-2:160 60% 45%; --chart-3:30 80% 55%;
   --chart-4:280 65% 60%; --chart-5:340 75% 55%;
-  --radius:0.5rem;
-  --radius-sm:calc(var(--radius) - 4px); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius);
-  --shadow-xs:0 1px 2px 0 rgb(0 0 0 / .05);
-  --shadow-sm:0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1);
-  --app-font-family:'SUIT-Regular',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;
-  --p0:hsl(var(--chart-5)); --p1:hsl(var(--chart-3)); --p2:hsl(var(--chart-1)); --ok:hsl(var(--chart-2));
+  --sev-p0:0 75% 66%; --sev-p1:38 92% 62%; --sev-p2:213 90% 70%; --sev-ok:142 60% 58%;
+  --link:213 90% 70%;
 }
 *{box-sizing:border-box}
 body{margin:0;background:hsl(var(--background));color:hsl(var(--foreground));
@@ -500,8 +521,11 @@ body{margin:0;background:hsl(var(--background));color:hsl(var(--foreground));
 #main{overflow-y:auto;padding:20px 24px;container-type:inline-size}
 .sh{flex-shrink:0;padding:14px 16px;border-bottom:1px solid hsl(var(--sidebar-border))}
 .sh b{font-size:13px;letter-spacing:.02em}
-.sf{flex-shrink:0;padding:9px 16px;border-top:1px solid hsl(var(--sidebar-border));
-  color:hsl(var(--muted-foreground));font-size:11.5px;line-height:1.5;word-break:break-all}
+.sf{flex-shrink:0;display:flex;align-items:center;gap:10px;
+  padding:8px 10px 8px 16px;border-top:1px solid hsl(var(--sidebar-border));
+  color:hsl(var(--muted-foreground));font-size:11.5px;line-height:1.5}
+.sf #meta{flex:1;min-width:0;word-break:break-all}
+.sf button{flex-shrink:0;height:26px;width:26px;padding:0;font-size:13px}
 a{color:inherit;text-decoration:none}
 
 /* 저장소 — 접이식 헤더 */
@@ -530,10 +554,10 @@ a{color:inherit;text-decoration:none}
 .sc .s{color:hsl(var(--muted-foreground));font-size:11px;margin-top:2px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 .pill{display:inline-flex;align-items:center;padding:1px 8px;border-radius:999px;
   font-size:10.5px;font-weight:600;line-height:1.5}
-.p0{background:hsl(var(--chart-5)/.18);color:var(--p0)}
-.p1{background:hsl(var(--chart-3)/.18);color:var(--p1)}
-.p2{background:hsl(var(--chart-1)/.2);color:var(--p2)}
-.ready{background:hsl(var(--chart-2)/.16);color:var(--ok)}
+.p0{background:hsl(var(--sev-p0)/.14);color:hsl(var(--sev-p0))}
+.p1{background:hsl(var(--sev-p1)/.14);color:hsl(var(--sev-p1))}
+.p2{background:hsl(var(--sev-p2)/.14);color:hsl(var(--sev-p2))}
+.ready{background:hsl(var(--sev-ok)/.14);color:hsl(var(--sev-ok))}
 
 h1{font-size:19px;margin:0;word-break:break-all}
 .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px;flex-wrap:wrap}
@@ -556,12 +580,12 @@ a.badge:hover{color:hsl(var(--foreground));background:hsl(var(--accent))}
 .pass:hover{background:hsl(var(--accent))}
 .pass.on{border-color:hsl(var(--sidebar-primary));background:hsl(var(--sidebar-primary)/.16)}
 .pass .k{color:hsl(var(--muted-foreground));font-size:10px;margin-left:5px}
-.pass.approved::after{content:"✓";color:var(--ok);margin-left:5px}
-.pass.failed{border-color:hsl(var(--destructive))}
-video{width:100%;max-height:min(70vh,560px);background:#000;border-radius:var(--radius-lg);object-fit:contain;box-shadow:var(--shadow-sm)}
+.pass.approved::after{content:"✓";color:hsl(var(--sev-ok));margin-left:5px}
+.pass.failed{border-color:hsl(var(--sev-p0)/.6)}
+video{width:100%;max-height:min(70vh,560px);background:#0b0b0d;border-radius:var(--radius-lg);object-fit:contain;box-shadow:var(--shadow-sm)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .grid img{width:100%;border:1px solid hsl(var(--border));border-radius:var(--radius-md);
-  cursor:zoom-in;background:#000}
+  cursor:zoom-in;background:hsl(var(--muted))}
 .doc{max-width:900px}
 /* 여정 선택 */
 .jsel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
@@ -584,7 +608,7 @@ video{width:100%;max-height:min(70vh,560px);background:#000;border-radius:var(--
 .vstep-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .vn{flex-shrink:0;width:20px;height:20px;border-radius:999px;background:hsl(var(--secondary));
   color:hsl(var(--muted-foreground));font-size:10.5px;display:flex;align-items:center;justify-content:center}
-.ts{margin-left:auto;font-size:11px;color:hsl(var(--chart-1));font-variant-numeric:tabular-nums}
+.ts{margin-left:auto;font-size:11px;color:hsl(var(--link));font-variant-numeric:tabular-nums}
 .vright .goal{font-size:13px;font-weight:500;margin:2px 0 4px}
 .vright .line{font-size:12px}
 .vright .cap{font-size:11.5px}
@@ -603,15 +627,15 @@ video{width:100%;max-height:min(70vh,560px);background:#000;border-radius:var(--
 .sec-t{font-size:12px;font-weight:600;letter-spacing:.04em;color:hsl(var(--muted-foreground));
   text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .jk{font-size:10px;padding:1px 7px;border-radius:999px;text-transform:none;letter-spacing:0}
-.jk.crit{background:hsl(var(--chart-5)/.18);color:var(--p0)}
-.jk.rec{background:hsl(var(--chart-2)/.16);color:var(--ok)}
+.jk.crit{background:hsl(var(--sev-p0)/.14);color:hsl(var(--sev-p0))}
+.jk.rec{background:hsl(var(--sev-ok)/.14);color:hsl(var(--sev-ok))}
 .kv{display:grid;grid-template-columns:74px 1fr;gap:6px 12px;font-size:13px}
 .kv .k{color:hsl(var(--muted-foreground));font-size:12px}
 .sec ul{margin:0;padding-left:20px;font-size:13px}
 .sec ul li{margin:3px 0}
 .sec ul.ck{list-style:none;padding-left:0}
 .sec ul.ck li{position:relative;padding-left:20px}
-.sec ul.ck li::before{content:"✓";position:absolute;left:2px;color:var(--ok)}
+.sec ul.ck li::before{content:"✓";position:absolute;left:2px;color:hsl(var(--sev-ok))}
 .step{display:flex;gap:12px;padding:10px 0;border-top:1px solid hsl(var(--border))}
 .step-n{flex-shrink:0;width:24px;height:24px;border-radius:999px;background:hsl(var(--secondary));
   color:hsl(var(--muted-foreground));font-size:11px;display:flex;align-items:center;justify-content:center}
@@ -621,7 +645,7 @@ video{width:100%;max-height:min(70vh,560px);background:#000;border-radius:var(--
 .goal{font-size:13.5px;font-weight:500;margin:3px 0 5px}
 .line{font-size:12.5px;color:hsl(var(--muted-foreground));margin:2px 0;display:flex;gap:8px}
 .line .lb{flex-shrink:0;width:26px;font-size:11px;opacity:.8}
-.cap{font-size:12px;color:hsl(var(--chart-1));margin-top:4px}
+.cap{font-size:12px;color:hsl(var(--link));margin-top:4px}
 .raw{margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid hsl(var(--border))}
 .raw summary{cursor:pointer;font-size:12px;color:hsl(var(--muted-foreground));user-select:none}
 .raw summary:hover{color:hsl(var(--foreground))}
@@ -632,7 +656,7 @@ video{width:100%;max-height:min(70vh,560px);background:#000;border-radius:var(--
 .doc code{background:hsl(var(--muted));padding:1px 5px;border-radius:var(--radius-sm);font-size:12.5px}
 .doc pre{background:hsl(var(--muted));padding:12px;border-radius:var(--radius-md);overflow-x:auto}
 .doc pre code{background:none;padding:0}
-.doc a{color:hsl(var(--chart-1))} .doc hr{border:0;border-top:1px solid hsl(var(--border));margin:18px 0}
+.doc a{color:hsl(var(--link))} .doc hr{border:0;border-top:1px solid hsl(var(--border));margin:18px 0}
 .doc li{margin:3px 0}
 .tw{overflow-x:auto} .doc table{border-collapse:collapse;width:100%;font-size:13px}
 .doc th,.doc td{border:1px solid hsl(var(--border));padding:6px 9px;text-align:left}
@@ -646,8 +670,7 @@ button{display:inline-flex;align-items:center;justify-content:center;gap:8px;whi
   transition:color .15s,background-color .15s,box-shadow .15s,border-color .15s}
 button:hover{background:hsl(var(--secondary)/.8)}
 button:focus-visible{outline:none;border-color:hsl(var(--ring));box-shadow:0 0 0 3px hsl(var(--ring)/.5)}
-button.danger:hover{background:hsl(var(--destructive)/.9);color:hsl(var(--destructive-foreground));
-  border-color:hsl(var(--destructive))}
+button.danger:hover{background:hsl(var(--sev-p0));color:#fff;border-color:hsl(var(--sev-p0))}
 .dim{color:hsl(var(--muted-foreground))}
 .empty{color:hsl(var(--muted-foreground));padding:40px 0;text-align:center}
 .find{border:1px solid hsl(var(--border));border-radius:var(--radius-lg);padding:12px 14px;
@@ -655,14 +678,14 @@ button.danger:hover{background:hsl(var(--destructive)/.9);color:hsl(var(--destru
 .find .h{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
 .find .id{font-weight:600;font-size:13px}
 .find .r{color:hsl(var(--muted-foreground));font-size:12.5px}
-#lb{position:fixed;inset:0;background:hsl(var(--background)/.94);display:none;align-items:center;
+#lb{position:fixed;inset:0;background:rgb(0 0 0 / .82);display:none;align-items:center;
   justify-content:center;z-index:9;padding:20px;cursor:zoom-out}
 #lb img{max-width:100%;max-height:100%;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
 @media(max-width:860px){#app{grid-template-columns:1fr;height:auto}
 #side{max-height:52vh;border-right:0;border-bottom:1px solid hsl(var(--sidebar-border))}}
 </style></head><body>
 <div id="app">
-  <div id="side"><div class="sh"><b>ux-review</b></div><div id="tree"></div><div class="sf" id="meta">불러오는 중…</div></div>
+  <div id="side"><div class="sh"><b>ux-review</b></div><div id="tree"></div><div class="sf"><span id="meta">불러오는 중…</span><button id="th" title="테마 전환" aria-label="테마 전환">◐</button></div></div>
   <div id="main"><div class="empty">왼쪽에서 시나리오를 선택하세요</div></div>
 </div>
 <div id="lb" onclick="this.style.display='none'"><img id="lbi"></div>
@@ -990,6 +1013,31 @@ document.addEventListener('click',e=>{
   const v=e.target.closest('[data-video]');
   if(v){e.preventDefault();const r=parseRoute();go(r.path,r.pass||defaultPass(),'video');}
 });
+// 테마: 저장값이 없으면 OS 설정을 따른다
+function prefersDark(){
+  try{ return window.matchMedia('(prefers-color-scheme: dark)').matches; }catch{ return true; }
+}
+function storedTheme(){
+  try{ return localStorage.getItem('ux-theme'); }catch{ return null; }
+}
+function applyTheme(t){
+  document.documentElement.classList.toggle('dark', t==='dark');
+  const b=$('#th'); if(b)b.textContent = t==='dark' ? '☾' : '☀';
+}
+function currentTheme(){ return storedTheme() || (prefersDark()?'dark':'light'); }
+applyTheme(currentTheme());
+try{
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{
+    if(!storedTheme()) applyTheme(e.matches?'dark':'light');
+  });
+}catch{}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#th'))return;
+  const next=currentTheme()==='dark'?'light':'dark';
+  try{ localStorage.setItem('ux-theme',next); }catch{}
+  applyTheme(next);
+});
+
 window.addEventListener('hashchange',route);
 (async()=>{ await loadIndex();
   if(!parseRoute().path){
