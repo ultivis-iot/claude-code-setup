@@ -393,6 +393,31 @@ const server = createServer(async (req, res) => {
       return serveFile(req, res, resolveInStore(pathname.slice('/download/'.length)), { download: true });
     }
 
+    // 시나리오의 pass 중 keep 에 없는 것만 지운다. 남길 대상을 호출자가 명시한다.
+    if (pathname === '/api/passes' && req.method === 'DELETE') {
+      if (READ_ONLY) return json(res, 403, { error: '읽기 전용 모드' });
+      const target = url.searchParams.get('path');
+      const keep = new Set((url.searchParams.get('keep') || '').split(',').map((s) => s.trim()).filter(Boolean));
+      if (!target) return json(res, 400, { error: 'path 필요' });
+      if (!keep.size) return json(res, 400, { error: '남길 pass 를 지정해야 합니다' });
+      const absolute = resolveInStore(target);
+      let entries;
+      try { entries = await readdir(absolute, { withFileTypes: true }); }
+      catch { return json(res, 404, { error: '없는 시나리오' }); }
+
+      const removed = [];
+      let freed = 0;
+      for (const entry of entries) {
+        if (!entry.isDirectory() || !/^(review|guide)-\d\d$/.test(entry.name)) continue;
+        if (keep.has(entry.name)) continue;
+        const passDirectory = path.join(absolute, entry.name);
+        freed += await directorySize(passDirectory);
+        await rm(passDirectory, { recursive: true, force: true });
+        removed.push(entry.name);
+      }
+      return json(res, 200, { removed, kept: [...keep], freed });
+    }
+
     if (pathname === '/api/entry' && req.method === 'DELETE') {
       if (READ_ONLY) return json(res, 403, { error: '읽기 전용 모드' });
       const target = url.searchParams.get('path');
@@ -570,6 +595,8 @@ a{color:inherit;text-decoration:none}
 h1{font-size:19px;margin:0;word-break:break-all}
 .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px;flex-wrap:wrap}
 .hdact{display:flex;gap:8px;flex-shrink:0}
+.hdact .cnt{background:hsl(var(--muted));color:hsl(var(--muted-foreground));
+  border-radius:999px;padding:0 6px;font-size:10.5px;margin-left:2px}
 .badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;
   line-height:1.4;padding:2px 10px;border-radius:var(--radius-md);
@@ -808,6 +835,35 @@ async function route(){
   renderDetail(r);
 }
 
+// 남길 pass: review 와 guide 각각의 마지막, 그리고 승인된 pass
+function keepers(){
+  const set=new Set();
+  for(const kind of ['review','guide']){
+    const list=SC.passes.filter(p=>p.kind===kind);
+    if(list.length)set.add(list[list.length-1].name);
+  }
+  SC.passes.filter(p=>p.approved).forEach(p=>set.add(p.name));
+  return set;
+}
+function prunable(){
+  const keep=keepers();
+  return SC.passes.filter(p=>!keep.has(p.name));
+}
+async function prune(){
+  const keep=[...keepers()], drop=prunable();
+  if(!drop.length){alert('지울 이전 pass 가 없습니다.');return;}
+  const freed=drop.reduce((n,p)=>n+(p.size||0),0);
+  const lines=drop.map(p=>'  · '+p.name+' ('+mb(p.size)+')').join('\n');
+  if(!confirm('이전 pass '+drop.length+'개를 삭제합니다. 되돌릴 수 없습니다.\n\n'
+    +lines+'\n\n남는 pass: '+keep.join(', ')+'\n확보 용량: '+mb(freed)))return;
+  const q='/api/passes?path='+encodeURIComponent(SC.path)+'&keep='+encodeURIComponent(keep.join(','));
+  const j=await (await fetch(q,{method:'DELETE'})).json();
+  if(j.error){alert('정리 실패: '+j.error);return;}
+  alert('pass '+j.removed.length+'개 삭제 · '+mb(j.freed)+' 확보');
+  delete CACHE[SC.path]; SC=null;
+  await loadIndex(); route();
+}
+
 function defaultPass(){
   if(!SC.passes.length)return null;
   return (SC.passes.slice().reverse().find(p=>p.approved)||SC.passes[SC.passes.length-1]).name;
@@ -825,7 +881,10 @@ function renderDetail(r){
   if(o.notionStoryUrl)b.push('<a class="badge" href="'+esc(o.notionStoryUrl)+'" target="_blank" rel="noreferrer">🔗 Notion Story</a>');
   if(SC.readiness)b.push('<span class="badge">'+esc(SC.readiness)+'</span>');
 
+  const drop=prunable();
   let h='<div class="hd"><h1>'+esc(SC.id)+'</h1><div class="hdact">'
+    +(drop.length?'<button id="prune" title="'+drop.map(p=>p.name).join(', ')+' 삭제">이전 pass 정리 '
+      +'<span class="cnt">'+drop.length+'</span></button>':'')
     +(pass?'<button class="danger" data-del="'+SC.path+'/'+pass.name+'" data-label="'+esc(pass.name)+'">'+esc(pass.name)+' 삭제</button>':'')
     +'<button class="danger" data-del="'+SC.path+'" data-label="'+esc(SC.id)+' 전체">시나리오 삭제</button>'
     +'</div></div><div class="badges">'+b.join('')+'</div>';
@@ -1052,6 +1111,7 @@ async function del(p,label){
 }
 
 document.addEventListener('click',e=>{
+  if(e.target.closest('#prune')){e.preventDefault();prune();return;}
   const d=e.target.closest('[data-del]');
   if(d){e.preventDefault();del(d.dataset.del,d.dataset.label);return;}
   const repo=e.target.closest('.repo');
