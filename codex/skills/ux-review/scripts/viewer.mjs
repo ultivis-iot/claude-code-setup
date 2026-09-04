@@ -5,10 +5,11 @@
 //   node viewer.mjs                 # 127.0.0.1:7830
 //   node viewer.mjs --host 0.0.0.0  # LAN 공개
 //   node viewer.mjs --ensure        # 이미 떠 있으면 주소만 출력하고 끝
+//   node viewer.mjs --restart       # 떠 있으면 끄고 다시 띄운다 (페이지 수정 반영)
 //   node viewer.mjs --read-only     # 삭제 API 비활성
 
 import { createServer } from 'node:http';
-import { createReadStream } from 'node:fs';
+import { createReadStream, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { readdir, readFile, stat, rm } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { execFile } from 'node:child_process';
@@ -31,6 +32,8 @@ const PORT = Number(option('--port', process.env.UX_REVIEW_PORT || 7830));
 const HOST = option('--host', '0.0.0.0');
 const READ_ONLY = flag('--read-only');
 const SIGNATURE = 'ux-review-viewer';
+// --restart 가 끌 대상을 정확히 집기 위한 PID 파일. 포트마다 따로 둔다.
+const PID_FILE = path.join(os.tmpdir(), `ux-review-viewer-${PORT}.pid`);
 
 const MIME = {
   '.webm': 'video/webm', '.mp4': 'video/mp4', '.png': 'image/png',
@@ -463,13 +466,47 @@ async function printBanner() {
   console.log('');
 }
 
-if (flag('--ensure')) {
+// 자기 PID 를 남기고, 어떻게 끝나든 자기 것일 때만 지운다.
+function claimPidFile() {
+  try { writeFileSync(PID_FILE, String(process.pid)); } catch { /* 못 남겨도 서빙은 계속한다 */ }
+  const release = () => {
+    try {
+      if (readFileSync(PID_FILE, 'utf8').trim() === String(process.pid)) unlinkSync(PID_FILE);
+    } catch { /* 이미 없거나 남의 것 */ }
+  };
+  process.on('exit', release);
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+    process.on(signal, () => { release(); process.exit(0); });
+  }
+}
+
+// 페이지는 프로세스 메모리에 상주하므로 파일을 고쳐도 재기동해야 반영된다.
+// PID 파일로 특정한 프로세스만 끈다. 패턴으로 찾으면 다른 포트의 뷰어까지 죽는다.
+async function stopRunning() {
+  if (!(await alreadyRunning())) return true;
+  let pid = 0;
+  try { pid = Number(readFileSync(PID_FILE, 'utf8').trim()); } catch { /* 아래에서 처리 */ }
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 'SIGTERM'); } catch { return false; }
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    if (!(await alreadyRunning())) return true;
+  }
+  return false;
+}
+
+if (flag('--ensure') || flag('--restart')) {
+  if (flag('--restart') && !(await stopRunning())) {
+    console.error(`포트 ${PORT} 의 뷰어를 멈추지 못했습니다.`);
+    console.error(`PID 파일(${PID_FILE})이 없는 예전 인스턴스일 수 있습니다. 직접 종료한 뒤 다시 실행하세요.`);
+    process.exit(1);
+  }
   if (await alreadyRunning()) {
     await printBanner();
     process.exit(0);
   }
   const self = fileURLToPath(import.meta.url);
-  const forwarded = argv.filter((a) => a !== '--ensure');
+  const forwarded = argv.filter((a) => a !== '--ensure' && a !== '--restart');
   const child = spawn(process.execPath, [self, ...forwarded], { detached: true, stdio: 'ignore' });
   child.unref();
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -480,7 +517,7 @@ if (flag('--ensure')) {
   process.exit(0);
 }
 
-server.listen(PORT, HOST, async () => { await printBanner(); });
+server.listen(PORT, HOST, async () => { claimPidFile(); await printBanner(); });
 server.on('error', (error) => {
   console.error(error.code === 'EADDRINUSE'
     ? `포트 ${PORT}가 이미 사용 중입니다. --port 로 다른 포트를 지정하세요.`
@@ -493,6 +530,8 @@ const PAGE = String.raw`<!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ux-review</title>
+<!-- 뷰어는 오프라인/단일 파일로 뜨므로 favicon 도 외부 파일 없이 data URI 로 심는다 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%3E%3Crect%20width=%2732%27%20height=%2732%27%20rx=%277%27%20fill=%27%23175DCF%27/%3E%3Ctext%20x=%2716%27%20y=%2722.5%27%20fill=%27%23fff%27%20font-family=%27sans-serif%27%20font-size=%2722%27%20font-weight=%27700%27%20letter-spacing=%27-0.5%27%20text-anchor=%27middle%27%3Eux%3C/text%3E%3C/svg%3E">
 <style>
 /* 색상 토큰은 @ultivis-iot/react (ultivis-react-library) 의 light/dark 값을 그대로 옮겼다.
  * 라이브러리를 의존성으로 들이지 않고 스타일만 맞춘다. */

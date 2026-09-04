@@ -131,7 +131,7 @@ Start the viewer and return links that open in a browser instead of filesystem p
 node "$UX/scripts/viewer.mjs" --ensure --host 0.0.0.0
 ```
 
-`--ensure` reuses a running viewer and starts one only when none answers. It prints every reachable address (localhost, hostname `.local`, LAN interfaces, Tailscale when present); pick the one the reader can open. Deep-link the reviewed pass:
+`--ensure` reuses a running viewer and starts one only when none answers. Use `--restart` instead after editing `viewer.mjs`: the page is held in the process, so a running instance keeps serving the old HTML and `--ensure` will not replace it. It prints every reachable address (localhost, hostname `.local`, LAN interfaces, Tailscale when present); pick the one the reader can open. Deep-link the reviewed pass:
 
 ```text
 http://<host>:7830/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
