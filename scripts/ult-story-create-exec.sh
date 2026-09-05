@@ -1,8 +1,14 @@
 #!/bin/bash
 # Plan 발행 실행기 — JSON 입력 받아 Notion Story + Tasks + Task Issues/branches 일괄 생성
 # Usage:
-#   ult-story-create-exec.sh <spec.json>
-#   echo '<json>' | ult-story-create-exec.sh -
+#   ult-story-create-exec.sh <spec.json> [--no-worktree] [--handoff-out <path>]
+#   echo '<json>' | ult-story-create-exec.sh - [--no-worktree] [--handoff-out <path>]
+#
+# 옵션:
+#   --no-worktree        Task별 worktree를 만들지 않는다(Notion Story/Task + GitHub Issue만
+#                        생성). 브랜치·워크트리를 자체 규약으로 관리하는 호출자(예: Hydra)용.
+#   --handoff-out <path> handoff JSON을 지정 경로에도 기록한다. worktree를 만들지 않으면
+#                        handoff가 임시 디렉터리와 함께 사라지므로 회수 경로로 쓴다.
 #
 # spec.json 형식:
 # {
@@ -37,13 +43,49 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 STORY_DB="338b9757-d10f-462f-92c9-4777cb747c78"
 
+# 인자 파싱 (spec 위치 인자 + 옵션은 순서 무관)
+SPEC_ARG=""
+NO_WORKTREE=0
+HANDOFF_OUT=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-worktree)
+            NO_WORKTREE=1
+            shift
+            ;;
+        --handoff-out)
+            [ -n "$2" ] || { echo "ERROR: --handoff-out 에 경로가 필요합니다" >&2; exit 1; }
+            HANDOFF_OUT="$2"
+            shift 2
+            ;;
+        --handoff-out=*)
+            HANDOFF_OUT="${1#--handoff-out=}"
+            [ -n "$HANDOFF_OUT" ] || { echo "ERROR: --handoff-out 에 경로가 필요합니다" >&2; exit 1; }
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 <spec.json> | - [--no-worktree] [--handoff-out <path>]" >&2
+            exit 0
+            ;;
+        --*)
+            echo "ERROR: 알 수 없는 옵션: $1" >&2
+            exit 1
+            ;;
+        *)
+            [ -z "$SPEC_ARG" ] || { echo "ERROR: spec 인자는 하나만 지정합니다" >&2; exit 1; }
+            SPEC_ARG="$1"
+            shift
+            ;;
+    esac
+done
+
 # 입력 로드
-if [ "$1" = "-" ]; then
+if [ "$SPEC_ARG" = "-" ]; then
     SPEC=$(cat)
-elif [ -n "$1" ] && [ -f "$1" ]; then
-    SPEC=$(cat "$1")
+elif [ -n "$SPEC_ARG" ] && [ -f "$SPEC_ARG" ]; then
+    SPEC=$(cat "$SPEC_ARG")
 else
-    echo "Usage: $0 <spec.json> | -" >&2
+    echo "Usage: $0 <spec.json> | - [--no-worktree] [--handoff-out <path>]" >&2
     exit 1
 fi
 
@@ -335,7 +377,11 @@ echo "$RESULTS" | jq -r '.[] | "  ✓ #\(.issue_num) [\(.topic)] \(.name)\n    \
 
 # ---- 3단계: Worktree 생성 (각 Task별, ult-wt-add.sh 위임) ----
 echo ""
-echo "▸ Worktree 생성 중..."
+if [ "$NO_WORKTREE" = "1" ]; then
+    echo "▸ Worktree 생략 (--no-worktree) — 브랜치는 호출자가 만듭니다"
+else
+    echo "▸ Worktree 생성 중..."
+fi
 
 FIRST_WT_PATH=""
 FIRST_ISSUE=""
@@ -463,6 +509,40 @@ while IFS= read -r task; do
 
     task_base=$(resolve_task_base_branch "$repo_path")
 
+    if [ "$NO_WORKTREE" = "1" ]; then
+        # 브랜치·워크트리는 호출자가 자체 규약으로 만든다. handoff에는 계산된
+        # 브랜치명과 base만 남기고 worktree는 비운다.
+        echo "| $name | $task_repo | $issue_url | $branch | $task_base | (skipped) | $parent_summary | Ready |" >> "$HANDOFF_PATH"
+        HANDOFF_JSON=$(printf '%s\n' "$HANDOFF_JSON" | jq -c \
+            --arg name "$name" \
+            --arg topic "$topic" \
+            --arg repo "$task_repo" \
+            --arg id "$task_id" \
+            --arg issue "$issue_url" \
+            --arg num "$issue_num" \
+            --arg branch "$branch" \
+            --arg base "$task_base" \
+            --argjson parent_ids "$parent_task_ids" \
+            --argjson parent_urls "$parent_issue_urls" \
+            '.tasks += [{
+                name: $name,
+                topic: $topic,
+                repo: $repo,
+                notion_task_id: $id,
+                issue_url: $issue,
+                issue_num: $num,
+                pr_url: "",
+                branch: $branch,
+                base_branch: $base,
+                worktree: "",
+                parent_task_ids: $parent_ids,
+                parent_issue_urls: $parent_urls,
+                status: "Ready"
+            }]')
+        echo "  ✓ #$issue_num (worktree 생략, branch: $branch)"
+        continue
+    fi
+
     wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch" --repo "$repo_path" --base "$task_base" --quiet 2>/dev/null) || {
         echo "  ⚠ #$issue_num worktree 생성 실패"
         echo "| $name | $task_repo | $issue_url | $branch | $task_base | (failed) | $parent_summary | Worktree Failed |" >> "$HANDOFF_PATH"
@@ -534,6 +614,16 @@ Notion Story: $STORY_URL" >/dev/null || true
 done < <(echo "$RESULTS" | jq -c '.[]')
 
 printf '%s\n' "$HANDOFF_JSON" | jq . > "$HANDOFF_JSON_PATH"
+if [ -n "$HANDOFF_OUT" ]; then
+    # WORKDIR 은 EXIT 에서 지워지므로, 호출자가 지정한 경로에 먼저 남긴다.
+    handoff_out_dir=$(dirname "$HANDOFF_OUT")
+    if mkdir -p "$handoff_out_dir" 2>/dev/null && cp "$HANDOFF_JSON_PATH" "$HANDOFF_OUT" 2>/dev/null; then
+        cp "$HANDOFF_PATH" "${HANDOFF_OUT%.json}.md" 2>/dev/null || true
+        echo "  ✓ handoff JSON: $HANDOFF_OUT"
+    else
+        echo "  ⚠ handoff JSON 기록 실패: $HANDOFF_OUT" >&2
+    fi
+fi
 {
     cat "$HANDOFF_PATH"
     echo ""
@@ -554,11 +644,23 @@ done < <(printf '%s\n' "$HANDOFF_JSON" | jq -r '.tasks[]?.worktree | select(. !=
 echo ""
 echo "✅ 발행 완료"
 echo "  Story: $STORY_URL"
-echo "  Task ${TASK_COUNT}개, Issue ${TASK_COUNT}개, Worktree ${TASK_COUNT}개"
-echo "  Handoff: 각 Task worktree의 tmp/story-handoff.md"
-echo "  Handoff JSON: 각 Task worktree의 tmp/story-handoff.json"
+if [ "$NO_WORKTREE" = "1" ]; then
+    echo "  Task ${TASK_COUNT}개, Issue ${TASK_COUNT}개, Worktree 생략"
+else
+    echo "  Task ${TASK_COUNT}개, Issue ${TASK_COUNT}개, Worktree ${TASK_COUNT}개"
+fi
+if [ -n "$HANDOFF_OUT" ]; then
+    echo "  Handoff JSON: $HANDOFF_OUT"
+    echo "  Handoff MD: ${HANDOFF_OUT%.json}.md"
+fi
+if [ "$NO_WORKTREE" != "1" ]; then
+    echo "  Handoff: 각 Task worktree의 tmp/story-handoff.md"
+    echo "  Handoff JSON: 각 Task worktree의 tmp/story-handoff.json"
+fi
 echo ""
-echo "  첫 Task로 이동:"
+if [ -n "$FIRST_WT_PATH" ]; then
+    echo "  첫 Task로 이동:"
+fi
 if [ -n "$FIRST_WT_PATH" ]; then
     FIRST_WT_NAME=$(basename "$FIRST_WT_PATH")
     echo "    cc $FIRST_WT_NAME    # tmux 세션 + Claude Code"
