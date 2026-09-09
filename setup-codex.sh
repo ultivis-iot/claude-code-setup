@@ -124,9 +124,11 @@ echo -e "${YELLOW}     Codex에서는 plugin이 ultivis-flow skill을 제공하�
 echo "5. Scripts 설치..."
 SCRIPTS_DEST="$CODEX_DIR/scripts"
 mkdir -p "$SCRIPTS_DEST"
-for file in "$SCRIPT_DIR/scripts"/*.sh; do
+for file in "$SCRIPT_DIR/scripts"/*.sh "$SCRIPT_DIR/scripts"/*.mjs; do
     if [ -f "$file" ]; then
         filename=$(basename "$file")
+        # test-*.mjs 는 저장소 전용 테스트라 설치하지 않는다
+        case "$filename" in test-*) continue ;; esac
         cp "$file" "$SCRIPTS_DEST/$filename"
         chmod +x "$SCRIPTS_DEST/$filename"
         echo -e "${GREEN}   ✓ ~/.codex/scripts/$filename${NC}"
@@ -209,7 +211,7 @@ echo "  ~/.codex/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
 echo "  ~/.codex/plugins/$PLUGIN_NAME/commands/*.md (legacy compatibility)"
 echo "  ~/.codex/plugins/$PLUGIN_NAME/skills/*/SKILL.md"
 echo "  ~/.agents/plugins/marketplace.json"
-echo "  ~/.codex/scripts/*.sh"
+echo "  ~/.codex/scripts/*.sh, *.mjs"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
 echo "  ~/.codex/dev-tools/.env"
 echo "  ~/.codex/notion-cache/ (Notion token 사용 가능 시 자동 준비)"

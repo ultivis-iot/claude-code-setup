@@ -127,9 +127,11 @@ done
 # Scripts 설치
 if [ -d "$SCRIPT_DIR/scripts" ]; then
     mkdir -p "$CLAUDE_DIR/scripts"
-    for file in "$SCRIPT_DIR/scripts"/*.sh; do
+    for file in "$SCRIPT_DIR/scripts"/*.sh "$SCRIPT_DIR/scripts"/*.mjs; do
         if [ -f "$file" ]; then
             filename=$(basename "$file")
+            # test-*.mjs 는 저장소 전용 테스트라 설치하지 않는다
+            case "$filename" in test-*) continue ;; esac
             cp "$file" "$CLAUDE_DIR/scripts/$filename"
             chmod +x "$CLAUDE_DIR/scripts/$filename"
             echo -e "${GREEN}   ✓ $filename${NC}"
@@ -438,7 +440,7 @@ echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
 echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
 echo "  ~/.claude/settings.json (hooks 설정 포함)"
-echo "  ~/.claude/scripts/*.sh (workflow 실행 스크립트)"
+echo "  ~/.claude/scripts/*.sh, *.mjs (workflow 실행 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
 echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
 echo "  ~/.claude/notion-cache/ (Notion token 사용 가능 시 자동 준비)"

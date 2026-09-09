@@ -121,7 +121,8 @@ $ScriptsSource = Join-Path $ScriptDir "scripts"
 $ScriptsDest = Join-Path $ClaudeDir "scripts"
 if (Test-Path $ScriptsSource) {
     New-Item -ItemType Directory -Force -Path $ScriptsDest | Out-Null
-    Get-ChildItem -Path $ScriptsSource -Filter "*.sh" | ForEach-Object {
+    Get-ChildItem -Path $ScriptsSource -Include "*.sh", "*.mjs" -File |
+        Where-Object { $_.Name -notlike "test-*" } | ForEach-Object {
         Copy-Item $_.FullName -Destination $ScriptsDest -Force
         Write-Host "   $($_.Name)" -ForegroundColor Green
     }
