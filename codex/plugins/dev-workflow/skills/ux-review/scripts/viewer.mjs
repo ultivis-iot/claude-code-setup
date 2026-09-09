@@ -2,11 +2,15 @@
 
 // ux-review 산출물 뷰어. 표준 라이브러리만 사용한다.
 //
-//   node viewer.mjs                 # 127.0.0.1:7830
-//   node viewer.mjs --host 0.0.0.0  # LAN 공개
-//   node viewer.mjs --ensure        # 이미 떠 있으면 주소만 출력하고 끝
-//   node viewer.mjs --restart       # 떠 있으면 끄고 다시 띄운다 (페이지 수정 반영)
-//   node viewer.mjs --read-only     # 삭제 API 비활성
+//   node viewer.mjs                   # 0.0.0.0:7830 — 기본이 LAN 공개다
+//   node viewer.mjs --host 127.0.0.1  # 이 기기에서만
+//   node viewer.mjs --ensure          # 이미 떠 있으면 주소만 출력하고 끝
+//   node viewer.mjs --restart         # 떠 있으면 끄고 다시 띄운다 (서버 코드 수정 반영)
+//   node viewer.mjs --read-only       # 삭제 API 비활성
+//
+// 기본이 0.0.0.0 인 것은 휴대폰에서 열어 보기 위해서다(PWA·모바일 레이아웃).
+// 인증이 없으므로 같은 망의 누구나 DELETE /api/entry·/api/passes 로 산출물을 지울 수 있다.
+// 믿을 수 없는 망에서는 --host 127.0.0.1 이나 --read-only 를 쓴다.
 
 import { createServer } from 'node:http';
 import { createReadStream, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -42,6 +46,9 @@ const MIME = {
   '.md': 'text/markdown; charset=utf-8', '.srt': 'text/plain; charset=utf-8',
   '.vtt': 'text/vtt; charset=utf-8', '.txt': 'text/plain; charset=utf-8',
   '.mjs': 'text/plain; charset=utf-8', '.js': 'text/plain; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.ico': 'image/x-icon',
 };
 
 // ── 경로 안전 ────────────────────────────────────────────────────────
@@ -49,6 +56,25 @@ function resolveInStore(relative) {
   const resolved = path.resolve(STORE, relative);
   const rel = path.relative(STORE, resolved);
   if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('저장 루트 밖 경로');
+  return resolved;
+}
+
+// 공통 UI 킷(assets/ui)은 저장소가 아니라 스킬 폴더에 있으므로 따로 연다.
+const ASSETS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets');
+const UI_DIR = path.join(ASSETS_DIR, 'ui');
+const ICONS_DIR = path.join(ASSETS_DIR, 'icons');
+// 페이지는 상수가 아니라 파일이다. 고친 뒤 새로고침만 하면 되고 재기동이 필요 없다.
+const PAGE_FILE = path.join(ASSETS_DIR, 'viewer-page.html');
+function resolveInUi(relative) {
+  const resolved = path.resolve(UI_DIR, relative);
+  const rel = path.relative(UI_DIR, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('UI 폴더 밖 경로');
+  return resolved;
+}
+function resolveInIcons(relative) {
+  const resolved = path.resolve(ICONS_DIR, relative);
+  const rel = path.relative(ICONS_DIR, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('아이콘 폴더 밖 경로');
   return resolved;
 }
 
@@ -128,9 +154,20 @@ async function buildIndex() {
           for (const finding of decision?.findings ?? []) {
             if (findings[finding.severity] !== undefined) findings[finding.severity] += 1;
           }
+          // 마지막으로 손댄 시각. 날짜 폴더 이름만으로는 같은 날 안에서 순서를 가릴 수 없고,
+          // 사흘 전 시나리오에 오늘 pass 를 하나 더 얹은 경우도 잡지 못한다. 항목의 mtime 중
+          // 가장 나중 것을 쓴다 — pass 디렉토리의 mtime 은 그 안의 마지막 파일이 쓰인 시각이다.
+          let activeAt = 0;
+          for (const name of files) {
+            try {
+              const info = await stat(path.join(absolute, name));
+              if (info.mtimeMs > activeAt) activeAt = info.mtimeMs;
+            } catch {}
+          }
           scenarios.push({
             path: path.relative(STORE, absolute),
             date,
+            activeAt: activeAt || null,
             id: scenarioDirectoryName.replace(/^\d{2}\./, ''),
             readiness: decision?.readiness ?? null,
             findings,
@@ -389,6 +426,29 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { html: renderMarkdown(source, baseUrl) });
     }
 
+    if (pathname === '/manifest.webmanifest') {
+      return serveFile(req, res, path.join(ASSETS_DIR, 'manifest.webmanifest'));
+    }
+    if (pathname === '/sw.js') {
+      // 스코프는 내려준 경로가 정한다. 루트여야 앱 전체를 덮는다.
+      // MIME 표의 .js 는 산출물을 소스로 보여주려고 text/plain 이라 여기서 직접 지정한다.
+      // 서비스 워커는 자바스크립트 MIME 이 아니면 등록이 거부된다.
+      let code;
+      try { code = await readFile(path.join(ASSETS_DIR, 'sw.js'), 'utf8'); }
+      catch { return json(res, 404, { error: '없는 파일' }); }
+      res.writeHead(200, {
+        'content-type': 'text/javascript; charset=utf-8',
+        'cache-control': 'no-cache',
+        'service-worker-allowed': '/',
+      });
+      return res.end(code);
+    }
+    if (pathname.startsWith('/icons/')) {
+      return serveFile(req, res, resolveInIcons(pathname.slice('/icons/'.length)));
+    }
+    if (pathname.startsWith('/ui/')) {
+      return serveFile(req, res, resolveInUi(pathname.slice('/ui/'.length)));
+    }
     if (pathname.startsWith('/files/')) {
       return serveFile(req, res, resolveInStore(pathname.slice('/files/'.length)));
     }
@@ -436,8 +496,11 @@ const server = createServer(async (req, res) => {
     }
 
     if (pathname === '/' || pathname === '/index.html') {
+      let page;
+      try { page = await readFile(PAGE_FILE, 'utf8'); }
+      catch { return json(res, 500, { error: '페이지 파일을 읽지 못했습니다: ' + PAGE_FILE }); }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      return res.end(PAGE);
+      return res.end(page);
     }
     return json(res, 404, { error: '없는 경로' });
   } catch (error) {
@@ -525,680 +588,3 @@ server.on('error', (error) => {
   process.exit(1);
 });
 
-// ── 단일 페이지 ──────────────────────────────────────────────────────
-const PAGE = String.raw`<!doctype html>
-<html lang="ko"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ux-review</title>
-<!-- 뷰어는 오프라인/단일 파일로 뜨므로 favicon 도 외부 파일 없이 data URI 로 심는다 -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2032%2032%27%3E%3Crect%20width=%2732%27%20height=%2732%27%20rx=%277%27%20fill=%27%23175DCF%27/%3E%3Ctext%20x=%2716%27%20y=%2722.5%27%20fill=%27%23fff%27%20font-family=%27sans-serif%27%20font-size=%2722%27%20font-weight=%27700%27%20letter-spacing=%27-0.5%27%20text-anchor=%27middle%27%3Eux%3C/text%3E%3C/svg%3E">
-<style>
-/* 색상 토큰은 @ultivis-iot/react (ultivis-react-library) 의 light/dark 값을 그대로 옮겼다.
- * 라이브러리를 의존성으로 들이지 않고 스타일만 맞춘다. */
-:root{
-  --background:0 0% 100%; --foreground:240 10% 3.9%;
-  --card:0 0% 100%; --card-foreground:240 10% 3.9%;
-  --popover:0 0% 100%; --popover-foreground:240 10% 3.9%;
-  --primary:240 5.9% 10%; --primary-foreground:0 0% 98%;
-  --secondary:240 4.8% 95.9%; --secondary-foreground:240 5.9% 10%;
-  --muted:240 4.8% 95.9%; --muted-foreground:240 3.8% 46.1%;
-  --accent:240 4.8% 95.9%; --accent-foreground:240 5.9% 10%;
-  --destructive:0 84.2% 60.2%; --destructive-foreground:0 0% 98%;
-  --border:240 5.9% 90%; --input:240 5.9% 90%; --ring:240 5.9% 10%;
-  --sidebar-background:0 0% 98%; --sidebar-foreground:240 5.3% 26.1%;
-  --sidebar-primary:240 5.9% 10%; --sidebar-primary-foreground:0 0% 98%;
-  --sidebar-accent:240 4.8% 95.9%; --sidebar-accent-foreground:240 5.9% 10%;
-  --sidebar-border:220 13% 91%;
-  --chart-1:12 76% 61%; --chart-2:173 58% 39%; --chart-3:197 37% 24%;
-  --chart-4:43 74% 66%; --chart-5:27 87% 67%;
-  --radius:0.5rem;
-  --radius-sm:calc(var(--radius) - 4px); --radius-md:calc(var(--radius) - 2px); --radius-lg:var(--radius);
-  --shadow-xs:0 1px 2px 0 rgb(0 0 0 / .05);
-  --shadow-sm:0 1px 3px 0 rgb(0 0 0 / .1), 0 1px 2px -1px rgb(0 0 0 / .1);
-  --app-font-family:'SUIT-Regular',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans KR',sans-serif;
-  /* 심각도와 링크는 chart 팔레트와 의미가 어긋나므로 테마별로 직접 잡는다 */
-  --sev-p0:0 72% 42%; --sev-p1:30 90% 36%; --sev-p2:217 80% 45%; --sev-ok:142 68% 29%;
-  --link:217 80% 45%;
-}
-.dark{
-  --background:240 10% 3.9%; --foreground:0 0% 98%;
-  --card:240 10% 3.9%; --card-foreground:0 0% 98%;
-  --popover:240 10% 3.9%; --popover-foreground:0 0% 98%;
-  --primary:0 0% 98%; --primary-foreground:240 5.9% 10%;
-  --secondary:240 3.7% 15.9%; --secondary-foreground:0 0% 98%;
-  --muted:240 3.7% 15.9%; --muted-foreground:240 5% 64.9%;
-  --accent:240 3.7% 15.9%; --accent-foreground:0 0% 98%;
-  --destructive:0 62.8% 30.6%; --destructive-foreground:0 0% 98%;
-  --border:240 3.7% 15.9%; --input:240 3.7% 15.9%; --ring:240 4.9% 83.9%;
-  --sidebar-background:240 5.9% 10%; --sidebar-foreground:240 4.8% 95.9%;
-  --sidebar-primary:224.3 76.3% 48%; --sidebar-primary-foreground:0 0% 100%;
-  --sidebar-accent:240 3.7% 15.9%; --sidebar-accent-foreground:240 4.8% 95.9%;
-  --sidebar-border:240 3.7% 15.9%;
-  --chart-1:220 70% 50%; --chart-2:160 60% 45%; --chart-3:30 80% 55%;
-  --chart-4:280 65% 60%; --chart-5:340 75% 55%;
-  --sev-p0:0 75% 66%; --sev-p1:38 92% 62%; --sev-p2:213 90% 70%; --sev-ok:142 60% 58%;
-  --link:213 90% 70%;
-}
-*{box-sizing:border-box}
-body{margin:0;background:hsl(var(--background));color:hsl(var(--foreground));
-  font:14px/1.6 var(--app-font-family)}
-#app{display:grid;grid-template-columns:340px 1fr;height:100vh}
-#side{display:flex;flex-direction:column;min-height:0;
-  border-right:1px solid hsl(var(--sidebar-border));
-  background:hsl(var(--sidebar-background));color:hsl(var(--sidebar-foreground))}
-#tree{flex:1;min-height:0;overflow-y:auto}
-#main{overflow-y:auto;padding:20px 24px;container-type:inline-size}
-.sh{flex-shrink:0;padding:14px 16px;border-bottom:1px solid hsl(var(--sidebar-border))}
-.sh b{font-size:13px;letter-spacing:.02em}
-.sf{flex-shrink:0;display:flex;align-items:center;gap:10px;
-  padding:8px 10px 8px 16px;border-top:1px solid hsl(var(--sidebar-border));
-  color:hsl(var(--muted-foreground));font-size:11.5px;line-height:1.5}
-.sf #meta{flex:1;min-width:0;word-break:break-all}
-.sf button{flex-shrink:0;height:26px;width:26px;padding:0;
-  color:hsl(var(--muted-foreground))}
-.sf button:hover{color:hsl(var(--foreground))}
-.sf button svg{display:block}
-a{color:inherit;text-decoration:none}
-
-/* 저장소 — 접이식 헤더 */
-.repo{display:flex;align-items:center;gap:7px;padding:9px 14px;margin-top:6px;cursor:pointer;
-  background:hsl(var(--sidebar-accent));border-top:1px solid hsl(var(--sidebar-border));
-  border-bottom:1px solid hsl(var(--sidebar-border));user-select:none}
-.repo:hover{background:hsl(var(--accent))}
-.repo .caret{width:10px;font-size:10px;color:hsl(var(--muted-foreground));transition:transform .12s}
-.repo.collapsed .caret{transform:rotate(-90deg)}
-.repo .nm{font-size:12px;font-weight:600;letter-spacing:.03em;color:hsl(var(--sidebar-accent-foreground));
-  flex:1;word-break:break-all}
-.repo .ct{font-size:10.5px;color:hsl(var(--muted-foreground));background:hsl(var(--background));
-  padding:1px 7px;border-radius:999px}
-
-/* worktree — 저장소 안의 갈래 */
-.wtbox{border-left:2px solid hsl(var(--sidebar-border));margin-left:14px}
-.wt{display:flex;align-items:center;gap:6px;padding:7px 12px 5px;color:hsl(var(--muted-foreground));
-  font-size:11.5px}
-.wt::before{content:"⑂";font-size:11px;opacity:.75}
-.wt .nm{word-break:break-all}
-
-.sc{display:block;padding:8px 14px 8px 22px;border-left:2px solid transparent;margin-left:-2px}
-.sc:hover{background:hsl(var(--accent))}
-.sc.on{background:hsl(var(--accent));border-left-color:hsl(var(--sidebar-primary))}
-.sc .t{font-size:13px;word-break:break-all}
-.sc .s{color:hsl(var(--muted-foreground));font-size:11px;margin-top:2px;display:flex;gap:7px;flex-wrap:wrap;align-items:center}
-.pill{display:inline-flex;align-items:center;padding:1px 8px;border-radius:999px;
-  font-size:10.5px;font-weight:600;line-height:1.5}
-.p0{background:hsl(var(--sev-p0)/.14);color:hsl(var(--sev-p0))}
-.p1{background:hsl(var(--sev-p1)/.14);color:hsl(var(--sev-p1))}
-.p2{background:hsl(var(--sev-p2)/.14);color:hsl(var(--sev-p2))}
-.ready{background:hsl(var(--sev-ok)/.14);color:hsl(var(--sev-ok))}
-
-h1{font-size:19px;margin:0;word-break:break-all}
-.hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:8px;flex-wrap:wrap}
-.hdact{display:flex;gap:8px;flex-shrink:0}
-.hdact .cnt{background:hsl(var(--muted));color:hsl(var(--muted-foreground));
-  border-radius:999px;padding:0 6px;font-size:10.5px;margin-left:2px}
-.badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;
-  line-height:1.4;padding:2px 10px;border-radius:var(--radius-md);
-  color:hsl(var(--muted-foreground));background:hsl(var(--card));
-  border:1px solid hsl(var(--border));transition:color .15s,background-color .15s,border-color .15s}
-a.badge:hover{color:hsl(var(--foreground));background:hsl(var(--accent))}
-.tabs{display:flex;gap:2px;border-bottom:1px solid hsl(var(--border));margin-bottom:16px;flex-wrap:wrap}
-.tab{padding:8px 14px;color:hsl(var(--muted-foreground));border-bottom:2px solid transparent;font-size:13px}
-.tab.on{color:hsl(var(--foreground));border-bottom-color:hsl(var(--sidebar-primary))}
-.tab:hover{color:hsl(var(--foreground))}
-.passes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.pass{display:inline-flex;align-items:center;height:32px;padding:0 12px;
-  border:1px solid hsl(var(--border));border-radius:var(--radius-md);font-size:12px;font-weight:500;
-  background:hsl(var(--secondary));box-shadow:var(--shadow-xs);
-  transition:background-color .15s,border-color .15s}
-.pass:hover{background:hsl(var(--accent))}
-.pass.on{border-color:hsl(var(--sidebar-primary));background:hsl(var(--sidebar-primary)/.16)}
-.pass .k{color:hsl(var(--muted-foreground));font-size:10px;margin-left:5px}
-.pass.approved::after{content:"✓";color:hsl(var(--sev-ok));margin-left:5px}
-.pass.failed{border-color:hsl(var(--sev-p0)/.6)}
-video{width:100%;max-height:min(70vh,560px);background:#0b0b0d;border-radius:var(--radius-lg);object-fit:contain;box-shadow:var(--shadow-sm)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
-.grid img{width:100%;border:1px solid hsl(var(--border));border-radius:var(--radius-md);
-  cursor:zoom-in;background:hsl(var(--muted))}
-.doc{max-width:900px}
-/* 여정 선택 */
-.jsel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.jbtn{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;
-  border:1px solid hsl(var(--border));border-radius:var(--radius-md);font-size:12px;font-weight:500;
-  background:hsl(var(--secondary));box-shadow:var(--shadow-xs);
-  transition:background-color .15s,border-color .15s}
-.jbtn:hover{background:hsl(var(--accent))}
-.jbtn.on{border-color:hsl(var(--sidebar-primary));background:hsl(var(--sidebar-primary)/.16)}
-.jbtn .k{color:hsl(var(--muted-foreground));font-size:10.5px}
-/* 영상 + 단계 좌우 배치 */
-.vsplit{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:16px;align-items:start}
-.vsplit.portrait{grid-template-columns:minmax(0,0.72fr) minmax(320px,1.28fr)}
-.vleft{position:sticky;top:0}
-.vright{max-height:calc(100vh - 190px);overflow-y:auto;padding-right:4px}
-.vstep{border:1px solid transparent;border-left:2px solid hsl(var(--border));
-  padding:9px 11px;margin-bottom:6px;border-radius:var(--radius-md);background:hsl(var(--card))}
-.vstep.seekable{cursor:pointer}
-.vstep.seekable:hover{background:hsl(var(--accent));border-left-color:hsl(var(--muted-foreground))}
-.vstep.now{border-left-color:hsl(var(--sidebar-primary));background:hsl(var(--sidebar-primary)/.12)}
-.vstep-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.vn{flex-shrink:0;width:20px;height:20px;border-radius:999px;background:hsl(var(--secondary));
-  color:hsl(var(--muted-foreground));font-size:10.5px;display:flex;align-items:center;justify-content:center}
-.ts{margin-left:auto;font-size:11px;color:hsl(var(--link));font-variant-numeric:tabular-nums}
-.vright .goal{font-size:13px;font-weight:500;margin:2px 0 4px}
-.vright .line{font-size:12px}
-.vright .cap{font-size:11.5px}
-/* 사이드바를 뺀 실제 본문 폭 기준으로 접는다 */
-@container (max-width:700px){.vsplit{grid-template-columns:1fr}
-.vleft{position:static}.vright{max-height:none}}
-.scen{max-width:900px}
-.scen-hd{margin-bottom:16px}
-.scen-title{font-size:16px;font-weight:600;margin-bottom:8px}
-.chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;font-size:12px;font-weight:500;line-height:1.4;
-  padding:2px 10px;border-radius:var(--radius-md);
-  background:hsl(var(--secondary));color:hsl(var(--secondary-foreground));
-  border:1px solid transparent}
-.sec{margin-bottom:20px}
-.sec-t{font-size:12px;font-weight:600;letter-spacing:.04em;color:hsl(var(--muted-foreground));
-  text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
-.jk{font-size:10px;padding:1px 7px;border-radius:999px;text-transform:none;letter-spacing:0}
-.jk.crit{background:hsl(var(--sev-p0)/.14);color:hsl(var(--sev-p0))}
-.jk.rec{background:hsl(var(--sev-ok)/.14);color:hsl(var(--sev-ok))}
-.kv{display:grid;grid-template-columns:74px 1fr;gap:6px 12px;font-size:13px}
-.kv .k{color:hsl(var(--muted-foreground));font-size:12px}
-.sec ul{margin:0;padding-left:20px;font-size:13px}
-.sec ul li{margin:3px 0}
-.sec ul.ck{list-style:none;padding-left:0}
-.sec ul.ck li{position:relative;padding-left:20px}
-.sec ul.ck li::before{content:"✓";position:absolute;left:2px;color:hsl(var(--sev-ok))}
-.step{display:flex;gap:12px;padding:10px 0;border-top:1px solid hsl(var(--border))}
-.step-n{flex-shrink:0;width:24px;height:24px;border-radius:999px;background:hsl(var(--secondary));
-  color:hsl(var(--muted-foreground));font-size:11px;display:flex;align-items:center;justify-content:center}
-.step-b{flex:1;min-width:0}
-.goal{font-size:13.5px;font-weight:500;margin:3px 0 5px}
-.line{font-size:12.5px;color:hsl(var(--muted-foreground));margin:2px 0;display:flex;gap:8px}
-.line .lb{flex-shrink:0;width:26px;font-size:11px;opacity:.8}
-.cap{font-size:12px;color:hsl(var(--link));margin-top:4px}
-.raw{margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid hsl(var(--border))}
-.raw summary{cursor:pointer;font-size:12px;color:hsl(var(--muted-foreground));user-select:none}
-.raw summary:hover{color:hsl(var(--foreground))}
-.raw pre{background:hsl(var(--muted));padding:12px;border-radius:var(--radius-md);overflow-x:auto;
-  font-size:12px;margin-top:10px}
-.doc h1{font-size:20px;margin:22px 0 10px} .doc h2{font-size:17px;margin:20px 0 8px}
-.doc h3{font-size:15px;margin:18px 0 6px;color:hsl(var(--muted-foreground))}
-.doc code{background:hsl(var(--muted));padding:1px 5px;border-radius:var(--radius-sm);font-size:12.5px}
-.doc pre{background:hsl(var(--muted));padding:12px;border-radius:var(--radius-md);overflow-x:auto}
-.doc pre code{background:none;padding:0}
-.doc a{color:hsl(var(--link))} .doc hr{border:0;border-top:1px solid hsl(var(--border));margin:18px 0}
-.doc li{margin:3px 0}
-.tw{overflow-x:auto} .doc table{border-collapse:collapse;width:100%;font-size:13px}
-.doc th,.doc td{border:1px solid hsl(var(--border));padding:6px 9px;text-align:left}
-.doc th{background:hsl(var(--muted))}
-.actions{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap;align-items:center}
-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap;
-  height:32px;padding:0 12px;border-radius:var(--radius-md);font-size:12px;font-weight:500;
-  font-family:inherit;cursor:pointer;
-  background:hsl(var(--secondary));color:hsl(var(--secondary-foreground));
-  border:1px solid hsl(var(--border));box-shadow:var(--shadow-xs);
-  transition:color .15s,background-color .15s,box-shadow .15s,border-color .15s}
-button:hover{background:hsl(var(--secondary)/.8)}
-button:focus-visible{outline:none;border-color:hsl(var(--ring));box-shadow:0 0 0 3px hsl(var(--ring)/.5)}
-button.danger:hover{background:hsl(var(--sev-p0));color:#fff;border-color:hsl(var(--sev-p0))}
-.dim{color:hsl(var(--muted-foreground))}
-.empty{color:hsl(var(--muted-foreground));padding:40px 0;text-align:center}
-.find{border:1px solid hsl(var(--border));border-radius:var(--radius-lg);padding:12px 14px;
-  margin-bottom:8px;background:hsl(var(--card));box-shadow:var(--shadow-xs)}
-.find .h{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
-.find .id{font-weight:600;font-size:13px}
-.find .r{color:hsl(var(--muted-foreground));font-size:12.5px}
-#lb{position:fixed;inset:0;background:rgb(0 0 0 / .82);display:none;align-items:center;
-  justify-content:center;z-index:9;padding:20px;cursor:zoom-out}
-#lb img{max-width:100%;max-height:100%;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
-@media(max-width:860px){#app{grid-template-columns:1fr;height:auto}
-#side{max-height:52vh;border-right:0;border-bottom:1px solid hsl(var(--sidebar-border))}}
-</style></head><body>
-<div id="app">
-  <div id="side"><div class="sh"><b>ux-review</b></div><div id="tree"></div><div class="sf"><span id="meta">불러오는 중…</span><button id="th" title="테마 전환" aria-label="테마 전환"></button></div></div>
-  <div id="main"><div class="empty">왼쪽에서 시나리오를 선택하세요</div></div>
-</div>
-<div id="lb" onclick="this.style.display='none'"><img id="lbi"></div>
-<script>
-// 라우팅:  #/<repo>/<worktree>/<date>/<scenario>[/<pass>[/<tab>]]
-let INDEX=null, SC=null, CACHE={}, LOADING=false;
-const TABS=[['video','영상'],['plan','Plan'],['review','리뷰 결과'],['scenario','시나리오'],['shots','스크린샷'],['findings','발견사항']];
-const $=s=>document.querySelector(s);
-const mb=b=>b==null?'':b>=1048576?(b/1048576).toFixed(1)+'MB':(b/1024).toFixed(0)+'KB';
-const dur=ms=>ms==null?'':(ms/1000).toFixed(1)+'초';
-const fmt=sec=>{const m=Math.floor(sec/60),x=sec-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1);};
-const enc=p=>p.split('/').map(encodeURIComponent).join('/');
-const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-function parseRoute(){
-  const raw=decodeURIComponent(location.hash.replace(/^#\/?/,''));
-  if(!raw) return {};
-  const seg=raw.split('/').filter(Boolean);
-  if(seg.length<4) return {};
-  return {path:seg.slice(0,4).join('/'), pass:seg[4]||null, tab:seg[5]||null, jn:seg[6]||null};
-}
-function go(path,pass,tab,jn){
-  const parts=[path]; if(pass)parts.push(pass); if(pass&&tab)parts.push(tab);
-  if(pass&&tab&&jn)parts.push(jn);
-  const next='#/'+parts.join('/');
-  if(location.hash===next) route(); else location.hash=next;
-}
-
-async function loadIndex(){
-  const r=await fetch('/api/index'); INDEX=await r.json();
-  const n=INDEX.repositories.flatMap(x=>x.worktrees).flatMap(w=>w.scenarios).length;
-  $('#meta').textContent=INDEX.store.replace(/^\/home\/[^/]+/,'~')+' · 시나리오 '+n+'개';
-  renderTree();
-}
-// 저장소 접기 상태는 이 브라우저에만 남는 편의값이다.
-function collapsedSet(){
-  try{ return new Set(JSON.parse(localStorage.getItem('ux-collapsed')||'[]')); }
-  catch{ return new Set(); }
-}
-function saveCollapsed(set){
-  try{ localStorage.setItem('ux-collapsed',JSON.stringify([...set])); }catch{}
-}
-function toggleRepo(name){
-  const set=collapsedSet();
-  if(set.has(name))set.delete(name); else set.add(name);
-  saveCollapsed(set); renderTree();
-}
-function renderTree(){
-  const cur=parseRoute().path, collapsed=collapsedSet();
-  let h='';
-  for(const repo of INDEX.repositories){
-    const count=repo.worktrees.reduce((n,w)=>n+w.scenarios.length,0);
-    const show=!collapsed.has(repo.name);
-    h+='<div class="repo'+(show?'':' collapsed')+'" data-repo="'+esc(repo.name)+'">'
-      +'<span class="caret">▼</span><span class="nm">'+esc(repo.name)+'</span>'
-      +'<span class="ct">'+count+'</span></div>';
-    if(!show)continue;
-    for(const wt of repo.worktrees){
-      let inner='';
-      const byDate={};
-      for(const s of wt.scenarios)(byDate[s.date]=byDate[s.date]||[]).push(s);
-      for(const d of Object.keys(byDate).sort().reverse())for(const s of byDate[d]){
-        const f=s.findings,pills=[];
-        if(f.P0)pills.push('<span class="pill p0">P0 '+f.P0+'</span>');
-        if(f.P1)pills.push('<span class="pill p1">P1 '+f.P1+'</span>');
-        if(f.P2)pills.push('<span class="pill p2">P2 '+f.P2+'</span>');
-        if(s.readiness==='ready'&&!pills.length)pills.push('<span class="pill ready">ready</span>');
-        inner+='<a class="sc'+(cur===s.path?' on':'')+'" href="#/'+enc(s.path)+'">'
-          +'<div class="t">'+esc(s.id)+'</div><div class="s"><span>'+s.date+'</span>'
-          +'<span>'+s.passCount+' pass</span>'+pills.join('')+'</div></a>';
-      }
-      // worktree 이름이 저장소와 같으면(일반 저장소) 갈래 표시를 생략한다
-      h+= wt.name===repo.name ? '<div class="wtbox">'+inner+'</div>'
-        : '<div class="wtbox"><div class="wt"><span class="nm">'+esc(wt.name)+'</span></div>'+inner+'</div>';
-    }
-  }
-  $('#tree').innerHTML=h;
-}
-
-async function route(){
-  const r=parseRoute();
-  renderTree();
-  if(!r.path){
-    SC=null;
-    $('#main').innerHTML='<div class="empty">왼쪽에서 시나리오를 선택하세요</div>';
-    return;
-  }
-  if(!SC||SC.path!==r.path){
-    // 목록에 없는 경로는 조회하지 않는다. 정리된 링크를 여는 건 정상적인 일이라
-    // 404 를 오류로 남기지 않는다.
-    const known=INDEX&&INDEX.repositories.flatMap(x=>x.worktrees)
-      .flatMap(w=>w.scenarios).some(x=>x.path===r.path);
-    if(!known){
-      SC=null;
-      $('#main').innerHTML='<div class="empty">이 리뷰는 목록에 없습니다.'
-        +'<br><span style="font-size:12px">정리되었거나 다른 저장 위치의 링크일 수 있습니다. 왼쪽에서 다시 선택하세요.</span></div>';
-      return;
-    }
-    if(LOADING)return;
-    LOADING=true;
-    $('#main').innerHTML='<div class="empty">불러오는 중…</div>';
-    try{
-      if(!CACHE[r.path]){
-        const res=await fetch('/api/scenario?path='+encodeURIComponent(r.path));
-        if(!res.ok){$('#main').innerHTML='<div class="empty">시나리오를 읽지 못했습니다</div>';LOADING=false;return;}
-        CACHE[r.path]=await res.json();
-      }
-      SC=CACHE[r.path];
-    } finally { LOADING=false; }
-  }
-  renderDetail(r);
-}
-
-// 남길 pass: review 와 guide 각각의 마지막, 그리고 승인된 pass
-function keepers(){
-  const set=new Set();
-  for(const kind of ['review','guide']){
-    const list=SC.passes.filter(p=>p.kind===kind);
-    if(list.length)set.add(list[list.length-1].name);
-  }
-  SC.passes.filter(p=>p.approved).forEach(p=>set.add(p.name));
-  return set;
-}
-function prunable(){
-  const keep=keepers();
-  return SC.passes.filter(p=>!keep.has(p.name));
-}
-async function prune(){
-  const keep=[...keepers()], drop=prunable();
-  if(!drop.length){alert('지울 이전 pass 가 없습니다.');return;}
-  const freed=drop.reduce((n,p)=>n+(p.size||0),0);
-  const lines=drop.map(p=>'  · '+p.name+' ('+mb(p.size)+')').join('\n');
-  if(!confirm('이전 pass '+drop.length+'개를 삭제합니다. 되돌릴 수 없습니다.\n\n'
-    +lines+'\n\n남는 pass: '+keep.join(', ')+'\n확보 용량: '+mb(freed)))return;
-  const q='/api/passes?path='+encodeURIComponent(SC.path)+'&keep='+encodeURIComponent(keep.join(','));
-  const j=await (await fetch(q,{method:'DELETE'})).json();
-  if(j.error){alert('정리 실패: '+j.error);return;}
-  alert('pass '+j.removed.length+'개 삭제 · '+mb(j.freed)+' 확보');
-  delete CACHE[SC.path]; SC=null;
-  await loadIndex(); route();
-}
-
-function defaultPass(){
-  if(!SC.passes.length)return null;
-  return (SC.passes.slice().reverse().find(p=>p.approved)||SC.passes[SC.passes.length-1]).name;
-}
-function renderDetail(r){
-  const passName=r.pass&&SC.passes.some(p=>p.name===r.pass)?r.pass:defaultPass();
-  const tab=r.tab&&TABS.some(t=>t[0]===r.tab)?r.tab:'video';
-  const pass=SC.passes.find(p=>p.name===passName)||null;
-  const o=SC.origin||{},b=[];
-  b.push('<span class="badge">'+esc(SC.path.split('/').slice(0,2).join(' / '))+'</span>');
-  b.push('<span class="badge">'+esc(SC.date)+'</span>');
-  if(o.branch)b.push('<span class="badge">🌿 '+esc(o.branch)+'</span>');
-  if(o.issueUrl)b.push('<a class="badge" href="'+esc(o.issueUrl)+'" target="_blank" rel="noreferrer">🔗 Issue'+(o.issue?' #'+esc(o.issue):'')+'</a>');
-  if(o.notionTaskUrl)b.push('<a class="badge" href="'+esc(o.notionTaskUrl)+'" target="_blank" rel="noreferrer">🔗 Notion Task</a>');
-  if(o.notionStoryUrl)b.push('<a class="badge" href="'+esc(o.notionStoryUrl)+'" target="_blank" rel="noreferrer">🔗 Notion Story</a>');
-  if(SC.readiness)b.push('<span class="badge">'+esc(SC.readiness)+'</span>');
-
-  const drop=prunable();
-  let h='<div class="hd"><h1>'+esc(SC.id)+'</h1><div class="hdact">'
-    +(drop.length?'<button id="prune" title="'+drop.map(p=>p.name).join(', ')+' 삭제">이전 pass 정리 '
-      +'<span class="cnt">'+drop.length+'</span></button>':'')
-    +(pass?'<button class="danger" data-del="'+SC.path+'/'+pass.name+'" data-label="'+esc(pass.name)+'">'+esc(pass.name)+' 삭제</button>':'')
-    +'<button class="danger" data-del="'+SC.path+'" data-label="'+esc(SC.id)+' 전체">시나리오 삭제</button>'
-    +'</div></div><div class="badges">'+b.join('')+'</div>';
-  h+='<div class="passes">'+SC.passes.map(p=>{
-    const meta=[mb(p.size),p.durationMs?dur(p.durationMs):null].filter(Boolean).join(', ');
-    const label=[p.name,meta,p.approved?'승인됨':null,
-      p.status&&p.status!=='completed'?p.status:null].filter(Boolean).join(', ');
-    return '<a class="pass'+(p.name===passName?' on':'')
-      +(p.approved?' approved':'')+(p.status&&p.status!=='completed'?' failed':'')
-      +'" aria-label="'+label+'"'+(p.name===passName?' aria-current="true"':'')
-      +' href="#/'+enc(SC.path)+'/'+p.name+'/'+tab+'">'+p.name
-      +'<span class="k" aria-hidden="true">'+mb(p.size)+(p.durationMs?' · '+dur(p.durationMs):'')+'</span></a>';
-  }).join('')
-    +(SC.passes.length?'':'<span class="dim">pass 없음</span>')+'</div>';
-  h+='<div class="tabs">'+TABS.map(t=>'<a class="tab'+(tab===t[0]?' on':'')+'" href="#/'
-    +enc(SC.path)+'/'+(passName||'-')+'/'+t[0]+'">'+t[1]+'</a>').join('')+'</div><div id="body"></div>';
-  $('#main').innerHTML=h;
-  renderBody(tab,pass);
-}
-
-function list(items,cls){
-  if(!items||!items.length)return '';
-  return '<ul class="'+(cls||'')+'">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
-}
-function section(title,body){
-  return body ? '<div class="sec"><div class="sec-t">'+esc(title)+'</div>'+body+'</div>' : '';
-}
-function renderScenario(d){
-  const a=d.audience||{}, job=d.job||{}, env=d.environment||{}, vp=env.viewport||{}, mp=d.mutationPolicy||{};
-  let h='<div class="scen">';
-
-  h+='<div class="scen-hd"><div class="scen-title">'+esc(d.title||d.id||'')+'</div><div class="chips">';
-  if(d.product)h+='<span class="chip">'+esc(d.product)+'</span>';
-  if(a.role)h+='<span class="chip">'+esc(a.role)+'</span>';
-  if(a.experience)h+='<span class="chip">'+esc(a.experience)+'</span>';
-  h+='</div></div>';
-
-  if(job.trigger||job.outcome){
-    h+='<div class="sec"><div class="kv">';
-    if(job.trigger)h+='<div class="k">상황</div><div class="v">'+esc(job.trigger)+'</div>';
-    if(job.outcome)h+='<div class="k">목표</div><div class="v">'+esc(job.outcome)+'</div>';
-    h+='</div></div>';
-  }
-
-  h+=section('성공 기준',list(job.successCriteria,'ck'));
-
-  const envRows=[];
-  if(vp.width)envRows.push(['뷰포트',vp.width+' × '+vp.height]);
-  if(env.locale)envRows.push(['로케일',env.locale]);
-  if(mp.mode)envRows.push(['변경 정책',mp.mode]);
-  if(env.baseUrlEnvironmentVariable)envRows.push(['base URL','$'+env.baseUrlEnvironmentVariable]);
-  if(envRows.length){
-    h+=section('환경','<div class="kv">'+envRows.map(r=>'<div class="k">'+esc(r[0])
-      +'</div><div class="v"><code>'+esc(r[1])+'</code></div>').join('')+'</div>');
-  }
-
-  h+=section('전제 조건',list(d.prerequisites));
-  h+=section('데이터 준비',list(d.dataSetup));
-  h+=section('변경 허용',list(mp.allowed));
-  h+=section('정리 절차',list(mp.cleanup));
-
-  for(const jn of (d.journeys||[])){
-    const steps=jn.steps||[];
-    h+='<div class="sec"><div class="sec-t">여정 · '+esc(jn.id||'')
-      +'<span class="jk '+(jn.kind==='critical'?'crit':'rec')+'">'+esc(jn.kind||'')+'</span>'
-      +'<span class="dim" style="font-weight:400"> '+steps.length+'단계</span></div>';
-    for(const st of steps){
-      h+='<div class="step"><div class="step-n">'+esc(st.step)+'</div><div class="step-b">'
-        +'<div class="goal">'+esc(st.goal||'')+'</div>'
-        +(st.startingState?'<div class="line"><span class="lb">시작</span>'+esc(st.startingState)+'</div>':'')
-        +(st.action?'<div class="line"><span class="lb">행동</span>'+esc(st.action)+'</div>':'')
-        +(st.expected?'<div class="line"><span class="lb">기대</span>'+esc(st.expected)+'</div>':'')
-        +(st.caption?'<div class="cap">“'+esc(st.caption)+'”</div>':'')
-        +'</div></div>';
-    }
-    h+='</div>';
-  }
-
-  h+=section('제외 범위',list(d.exclusions));
-  return h+'</div>';
-}
-
-async function renderBody(tab,pass){
-  const el=$('#body'); if(!el)return;
-  const base=SC.path+(pass?'/'+pass.name:'');
-
-  if(tab==='video'){
-    if(!pass||!pass.journeys.length){
-      el.innerHTML='<div class="empty">'+(pass&&pass.recording&&pass.recording.length
-        ? '영상을 기록하는 중입니다 · '+pass.recording.length+'개<br><span style="font-size:12px">녹화가 끝난 뒤 새로고침하면 보입니다.</span>'
-        : '이 pass에 영상이 없습니다')+'</div>';
-      return;
-    }
-    const r=parseRoute();
-    const jn=pass.journeys.find(x=>x.journeyId===r.jn)
-      ||pass.journeys.find(x=>x.journeyKind==='critical')||pass.journeys[0];
-    const base=SC.path+'/'+pass.name;
-    const def=(SC.journeyDefs||[]).find(d=>d.id===jn.journeyId);
-
-    // 여정 선택
-    let h=(pass.recording&&pass.recording.length
-      ? '<div class="dim" style="font-size:12px;margin-bottom:10px">기록 중인 영상 '+pass.recording.length+'개는 아직 표시되지 않습니다</div>'
-      : '');
-    h+='<div class="jsel">'+pass.journeys.map(x=>{
-      const name=x.journeyId||x.base;
-      const label=[name,x.journeyKind,x.durationMs?dur(x.durationMs):null].filter(Boolean).join(', ');
-      return '<a class="jbtn'+(x===jn?' on':'')+'" aria-label="'+esc(label)+'"'
-        +(x===jn?' aria-current="true"':'')
-        +' href="#/'+enc(SC.path)+'/'+pass.name+'/video/'+encodeURIComponent(name)+'">'
-        +esc(name)
-        +'<span class="jk '+(x.journeyKind==='critical'?'crit':'rec')+'" aria-hidden="true">'+esc(x.journeyKind||'')+'</span>'
-        +'<span class="k" aria-hidden="true">'+(x.durationMs?dur(x.durationMs):'')+'</span></a>';
-    }).join('')+'</div>';
-
-    // 좌: 영상 / 우: 단계
-    h+='<div class="vsplit"><div class="vleft">'
-      +'<video id="vp" controls preload="metadata" src="/files/'+enc(base+'/'+jn.video)+'"'
-      +(jn.srt?' crossorigin="anonymous"':'')+'></video>'
-      +'<div class="actions"><a class="badge" href="/download/'+enc(base+'/'+jn.video)+'">다운로드</a>'
-      +(jn.srt?'<a class="badge" href="/files/'+enc(base+'/'+jn.srt)+'" target="_blank">자막(srt)</a>':'')
-      +'<span class="dim" style="font-size:12px">'+esc(jn.video)+'</span></div>'
-      +(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'')
-      +'</div><div class="vright">';
-
-    const rows=jn.steps.length?jn.steps:jn.cues.map((c,i)=>({step:i+1,sequence:i+1}));
-    if(!rows.length){
-      h+='<div class="dim" style="font-size:12.5px">단계 정보가 없습니다</div>';
-    } else {
-      h+=rows.map((st,i)=>{
-        const spec=(def&&def.steps||[]).find(x=>x.step===st.step)||{};
-        const cue=jn.cues[i];
-        const t=cue&&cue.start!=null?cue.start:null;
-        return '<div class="vstep'+(t!=null?' seekable':'')+'"'+(t!=null?' data-seek="'+t+'"':'')+'>'
-          +'<div class="vstep-h"><span class="vn">'+esc(st.step??i+1)+'</span>'
-          +(t!=null?'<span class="ts">'+fmt(t)+'</span>':'')+'</div>'
-          +(spec.goal?'<div class="goal">'+esc(spec.goal)+'</div>':'')
-          +(spec.action?'<div class="line"><span class="lb">행동</span>'+esc(spec.action)+'</div>':'')
-          +(spec.expected?'<div class="line"><span class="lb">기대</span>'+esc(spec.expected)+'</div>':'')
-          +(cue&&cue.text?'<div class="cap">“'+esc(cue.text)+'”</div>':'')
-          +'</div>';
-      }).join('');
-    }
-    h+='</div></div>';
-    el.innerHTML=h;
-
-    // 세로 영상은 폭을 다 쓰지 못하므로 읽을 쪽에 공간을 넘긴다
-    const video=el.querySelector('#vp');
-    if(video){
-      const fit=()=>{
-        if(!video.videoWidth)return;
-        el.querySelector('.vsplit')?.classList.toggle('portrait', video.videoHeight>video.videoWidth);
-      };
-      video.addEventListener('loadedmetadata',fit);
-      fit();
-    }
-
-    // 단계 클릭 → 해당 시점으로 이동
-    el.querySelectorAll('[data-seek]').forEach(node=>node.onclick=()=>{
-      if(!video)return;
-      video.currentTime=Number(node.dataset.seek);
-      video.play().catch(()=>{});
-      el.querySelectorAll('.vstep').forEach(n=>n.classList.remove('now'));
-      node.classList.add('now');
-    });
-    // 재생 위치에 맞춰 현재 단계를 표시
-    if(video&&jn.cues.length){
-      video.ontimeupdate=()=>{
-        let idx=-1;
-        for(let i=0;i<jn.cues.length;i++){ if(video.currentTime>=(jn.cues[i].start??0)) idx=i; }
-        const nodes=el.querySelectorAll('.vstep');
-        nodes.forEach((n,i)=>n.classList.toggle('now',i===idx));
-      };
-    }
-    return;
-  }
-  if(tab==='shots'){
-    if(!pass||!pass.screenshots.length){el.innerHTML='<div class="empty">스크린샷이 없습니다</div>';return;}
-    el.innerHTML='<div class="dim" style="margin-bottom:10px">'+pass.screenshots.length+'장</div><div class="grid">'
-      +pass.screenshots.map(f=>'<figure style="margin:0"><img loading="lazy" src="/files/'+enc(base+'/'+f)
-      +'" data-image="/files/'+enc(base+'/'+f)+'"><figcaption class="dim" style="font-size:11px;margin-top:4px;word-break:break-all">'
-      +esc(f.replace(/^.*?-(\d\d-)/,'$1'))+'</figcaption></figure>').join('')+'</div>';
-    return;
-  }
-  if(tab==='findings'){
-    if(!SC.findingList.length){el.innerHTML='<div class="empty">기록된 발견사항이 없습니다</div>';return;}
-    el.innerHTML=SC.findingList.map(f=>'<div class="find"><div class="h"><span class="id">'+esc(f.id)+'</span>'
-      +'<span class="pill '+esc((f.severity||'').toLowerCase())+'">'+esc(f.severity)+'</span>'
-      +'<span class="dim">'+esc(f.disposition||'')+'</span></div><div class="r">'+esc(f.rationale||'')+'</div></div>').join('');
-    return;
-  }
-
-  let target=null;
-  if(tab==='plan')     target=SC.hasPlan?SC.path+'/plan-snapshot.md':null;
-  if(tab==='review')   target=pass&&pass.reviewDoc?base+'/'+pass.reviewDoc:null;
-  if(tab==='scenario') target=SC.scenarioFile?SC.path+'/'+SC.scenarioFile:null;
-  if(!target){
-    el.innerHTML='<div class="empty">'+(tab==='plan'
-      ?'Plan 스냅샷이 없습니다 · 저장 시점에 캡처된 시나리오에만 표시됩니다'
-      :'문서가 없습니다')+'</div>';
-    return;
-  }
-  if(target.endsWith('.json')){
-    const j=await (await fetch('/files/'+enc(target))).json();
-    const raw='<details class="raw"><summary>원본 JSON</summary><pre><code>'
-      +esc(JSON.stringify(j,null,2))+'</code></pre></details>';
-    el.innerHTML=tab==='scenario' ? raw+renderScenario(j) : raw;
-    return;
-  }
-  const j=await (await fetch('/api/markdown?path='+encodeURIComponent(target))).json();
-  el.innerHTML='<div class="doc">'+(j.html||'<div class="empty">문서를 읽지 못했습니다</div>')+'</div>';
-}
-
-async function del(p,label){
-  if(!confirm(label+' 을(를) 삭제합니다. 되돌릴 수 없습니다.\n\n'+p))return;
-  const j=await (await fetch('/api/entry?path='+encodeURIComponent(p),{method:'DELETE'})).json();
-  if(j.error){alert('삭제 실패: '+j.error);return;}
-  alert('삭제됨 · '+mb(j.freed)+' 확보');
-  delete CACHE[SC.path];
-  if(p===SC.path){SC=null;location.hash='#/';}
-  else{SC=null;}
-  await loadIndex(); route();
-}
-
-document.addEventListener('click',e=>{
-  if(e.target.closest('#prune')){e.preventDefault();prune();return;}
-  const d=e.target.closest('[data-del]');
-  if(d){e.preventDefault();del(d.dataset.del,d.dataset.label);return;}
-  const repo=e.target.closest('.repo');
-  if(repo){e.preventDefault();toggleRepo(repo.dataset.repo);return;}
-  const img=e.target.closest('[data-image]');
-  if(img){e.preventDefault();$('#lbi').src=img.dataset.image;$('#lb').style.display='flex';return;}
-  const v=e.target.closest('[data-video]');
-  if(v){e.preventDefault();const r=parseRoute();go(r.path,r.pass||defaultPass(),'video');}
-});
-// 테마: 저장값이 없으면 OS 설정을 따른다
-function prefersDark(){
-  try{ return window.matchMedia('(prefers-color-scheme: dark)').matches; }catch{ return true; }
-}
-function storedTheme(){
-  try{ return localStorage.getItem('ux-theme'); }catch{ return null; }
-}
-// lucide-react 의 sun / moon 과 같은 아이콘 (라이브러리가 쓰는 아이콘 셋)
-const ICON_SUN='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
-  +' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-  +'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="m19.07 4.93-1.41 1.41"/>'
-  +'<path d="M20 12h2"/><path d="m19.07 19.07-1.41-1.41"/><path d="M12 20v2"/>'
-  +'<path d="m4.93 19.07 1.41-1.41"/><path d="M2 12h2"/><path d="m4.93 4.93 1.41 1.41"/></svg>';
-const ICON_MOON='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"'
-  +' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-  +'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
-function applyTheme(t){
-  document.documentElement.classList.toggle('dark', t==='dark');
-  const b=$('#th'); if(b)b.innerHTML = t==='dark' ? ICON_MOON : ICON_SUN;
-}
-function currentTheme(){ return storedTheme() || (prefersDark()?'dark':'light'); }
-applyTheme(currentTheme());
-try{
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{
-    if(!storedTheme()) applyTheme(e.matches?'dark':'light');
-  });
-}catch{}
-document.addEventListener('click',e=>{
-  if(!e.target.closest('#th'))return;
-  const next=currentTheme()==='dark'?'light':'dark';
-  try{ localStorage.setItem('ux-theme',next); }catch{}
-  applyTheme(next);
-});
-
-window.addEventListener('hashchange',route);
-(async()=>{ await loadIndex();
-  if(!parseRoute().path){
-    const all=INDEX.repositories.flatMap(x=>x.worktrees).flatMap(w=>w.scenarios)
-      .filter(s=>s.passCount>0)
-      .sort((a,b)=>b.date.localeCompare(a.date));
-    if(all.length){location.hash='#/'+enc(all[0].path);return;}
-  }
-  route();
-})();
-// 자동 갱신 없음. 목록을 다시 읽으려면 브라우저 새로고침(F5).
-</script></body></html>`;

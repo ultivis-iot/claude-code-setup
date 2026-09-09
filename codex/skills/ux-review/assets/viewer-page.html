@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UX review</title>
+<!-- 뷰어는 오프라인으로 뜨므로 favicon 은 외부 파일 없이 data URI 로 심는다 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2064%2064%27%3E%3Crect%20width=%2764%27%20height=%2764%27%20rx=%2712%27%20fill=%27%231a0710%27/%3E%3Cpath%20d=%27M17%2030C12%2021%2012%206%2020%206c7%200%209%2013%209%2022a13%2013%200%200%201%206%200c0-9%202-22%209-22%208%200%208%2015%203%2024%207%205%208%2014%204%2021-4%206-11%208-19%208s-15-2-19-8c-4-7-3-16%204-21Z%27%20fill=%27none%27%20stroke=%27%23ff9ecf%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%20stroke-width=%273%27/%3E%3Cg%20fill=%27none%27%20stroke=%27%23ff9ecf%27%20stroke-width=%273%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27M19.6%2038.4v5a5%205%200%200%200%2010%200v-5%27/%3E%3Cpath%20d=%27M33.8%2038.4%2043.6%2049M43.6%2038.4l-9.8%2010.6%27/%3E%3C/g%3E%3C/svg%3E">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0d1014">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="UX review">
+<link rel="apple-touch-icon" href="/icons/ux-180.png">
+<link rel="stylesheet" href="/ui/ui.css">
+<style>
+/* ── 브랜드 색 ───────────────────────────────────────────────────────
+ * 공통 킷의 민트 대신 ux-review 는 핑크를 쓴다. 킷을 고치지 않고
+ * 뒤에서 변수만 덮어쓰는 방식(킷 README 권장)이라 원본 갱신에 영향이 없다. */
+:root{
+  --accent:#ff9ecf; --accent-hover:#ffb8dc; --accent-ink:#2e0619;
+  --selected-border:#54394a; --selected-surface:#23161d;
+  --online-glow:rgb(255 158 207 / 48%);
+  --scrollbar-thumb:#9e4e7a; --scrollbar-thumb-hover:#cb72a0;
+  --scrollbar-thumb-active:#ff9ecf;
+  --scrollbar-track:rgb(255 158 207 / 8%);
+  --scrollbar-thumb-outline:rgb(255 158 207 / 24%);
+}
+:root[data-theme="light"]{
+  --accent:#b01e5f; --accent-hover:#97164f; --accent-ink:#ffffff;
+  --body-glow:rgb(214 132 170 / 20%);
+  --selected-border:#c98fae; --selected-surface:#f7e4ee;
+  --online-glow:rgb(176 30 95 / 28%);
+  --scrollbar-thumb:#c186a5; --scrollbar-thumb-hover:#a34f7c;
+  --scrollbar-thumb-active:#b01e5f;
+  --scrollbar-track:rgb(176 30 95 / 10%);
+  --scrollbar-thumb-outline:rgb(176 30 95 / 22%);
+}
+
+/* ── 레이아웃 ─────────────────────────────────────────────────────── */
+/* 페이지 자체는 스크롤하지 않는다. 목록과 본문이 각자 스크롤한다.
+ * (공통 킷의 base.css 는 body 높이를 정하지 않으므로 여기서 잡는다) */
+html,body{height:100%;overflow:hidden}
+#app{display:grid;grid-template-columns:340px minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);height:100vh;height:100dvh;overflow:hidden}
+/* 사이드바 폭은 그리드가 정한다. 공통 킷의 고정폭·전환은 여기서 쓰지 않는다 */
+#side{width:auto;min-height:0;transition:none}
+/* 항목마다 자기 작업 메뉴를 단다 */
+.navrow{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 26px;
+  align-items:center;gap:2px}
+.navrow .ui-menu{flex:none}
+.navrow .ui-menu>summary{width:26px;min-width:26px;height:26px;font-size:15px;
+  border-color:transparent;background:transparent;color:var(--muted);opacity:.45;
+  transition:opacity 120ms ease}
+.navrow:hover .ui-menu>summary,.navrow .ui-menu[open]>summary,
+.navrow .ui-menu>summary:focus-visible{opacity:1}
+.navrow .ui-menu>summary:hover{border-color:var(--line);background:var(--surface-raised);
+  color:var(--text)}
+.ui-menu>summary{list-style:none}
+.ui-menu>summary .dots{width:16px;height:16px;fill:currentColor;display:block}
+.ui-menu>summary::-webkit-details-marker{display:none}
+.ui-menu-panel{width:180px}
+/* 손가락으로는 hover 가 없으니 항상 보인다 */
+@media(hover:none){.navrow .ui-menu>summary{opacity:1}}
+/* 글자 대신 토끼 마크. 이름은 aria-label 로만 남긴다 */
+.brand{display:inline-grid;place-items:center;flex:0 0 auto;
+  border:0;padding:0;background:transparent;color:var(--accent);cursor:pointer}
+.brand-mark{width:26px;height:34px;display:block;overflow:visible}
+.brand-mark path{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.brand-mark>path{stroke-width:3;transition:fill 150ms ease}
+.brand-mark .eyes path{stroke-width:3;transition:stroke 150ms ease}
+/* 채우면 글자가 몸통에 묻히므로 눈은 배경색으로 파낸다 */
+.brand:hover .brand-mark>path,.brand:focus-visible .brand-mark>path{fill:currentColor}
+.brand:hover .brand-mark .eyes path,
+.brand:focus-visible .brand-mark .eyes path{stroke:var(--page)}
+#tree{padding:6px 10px 18px}
+#main{min-height:0;overflow:hidden;display:grid;
+  grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
+  container-type:inline-size}
+/* 제목·배지·pass·탭은 머무르고, 그 아래 내용만 흐른다 */
+.mainhead{min-width:0;padding:20px 24px 0}
+#body{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:16px 24px 24px}
+#main>.empty{padding:40px 24px}
+#tree,#main,.vright{scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);scrollbar-width:thin}
+a{color:inherit;text-decoration:none}
+.dim{color:var(--muted)}
+.empty{color:var(--muted);padding:40px 0;text-align:center}
+
+/* ── 사이드바 푸터 ───────────────────────────────────────────────── */
+.ui-sidebar-footer{font-size:11.5px;line-height:1.5;color:var(--muted)}
+#meta{flex:1;min-width:0;word-break:break-all;font-family:var(--mono);font-size:10px}
+#th{flex:0 0 34px;font-size:15px}
+#th svg{display:block}
+
+/* ── 저장소 · 갈래 ───────────────────────────────────────────────── */
+.repo{display:flex;align-items:center;gap:7px;margin:12px 0 4px;padding:3px 4px;
+  cursor:pointer;user-select:none;color:var(--muted)}
+.repo .caret{width:9px;font-size:9px;transition:transform .12s}
+.repo.collapsed .caret{transform:rotate(-90deg)}
+.repo .nm{flex:1;min-width:0;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--workspace-heading);word-break:break-all}
+.repo .ct{font-family:var(--mono);font-size:10px}
+.repo:hover .nm{color:var(--text)}
+.wt{display:flex;align-items:center;gap:6px;padding:6px 10px 3px;
+  color:var(--muted);font-family:var(--mono);font-size:10px}
+.wt::before{content:"\2442";opacity:.75}
+.wt .nm{min-width:0;word-break:break-all}
+
+/* ── 시나리오 항목 (공통 킷의 ui-nav-item) ───────────────────────── */
+#tree .ui-nav-item{margin-bottom:0}
+#tree .navrow{margin-bottom:2px}
+/* 가장 최근 날짜의 시나리오. 강조는 브랜드색으로 통일한다 */
+#tree .ui-nav-item.latest{border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 12%,transparent);
+  box-shadow:0 0 14px color-mix(in srgb,var(--accent) 20%,transparent)}
+#tree .ui-nav-item.latest:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+#tree .ui-nav-item.latest .ui-nav-copy strong{color:var(--accent)}
+#tree .ui-nav-item.latest .ui-status{color:var(--accent);font-size:11px}
+#tree .ui-nav-copy{flex-wrap:wrap;align-items:center;row-gap:4px}
+#tree .ui-nav-copy strong{flex:1 1 100%}
+#tree .ui-nav-copy small{white-space:nowrap}
+
+/* ── 심각도 ──────────────────────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;
+  font-family:var(--mono);font-size:9.5px;font-weight:700;line-height:1.7;letter-spacing:.02em}
+.p0{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
+.p1{background:color-mix(in srgb,var(--warning) 16%,transparent);color:var(--warning)}
+.p2{background:var(--surface-raised);color:var(--muted)}
+.ready{background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)}
+
+/* ── 본문 머리 ───────────────────────────────────────────────────── */
+h1{font-size:19px;margin:0;word-break:break-all;letter-spacing:-.02em}
+.hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  margin-bottom:10px;flex-wrap:wrap}
+.hdact{display:flex;gap:8px;flex-shrink:0}
+.hdact .cnt{background:var(--surface-raised);color:var(--muted);border-radius:999px;
+  padding:0 6px;font-family:var(--mono);font-size:10px;margin-left:2px}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:1.4;
+  padding:3px 10px;border-radius:var(--radius-sm);color:var(--muted);
+  background:var(--surface-raised);border:1px solid var(--line);
+  transition:color 140ms ease,border-color 140ms ease}
+a.badge:hover{color:var(--text);border-color:var(--hover-line)}
+.danger-button{border-color:color-mix(in srgb,var(--danger) 45%,var(--line));color:var(--danger)}
+.danger-button:hover{border-color:var(--danger);
+  background:color-mix(in srgb,var(--danger) 12%,transparent)}
+
+/* 선택 강조는 공통 킷의 어법(aria-pressed)을 따른다 */
+.ghost-button[aria-pressed="true"]{border-color:var(--selected-border);
+  background:var(--selected-surface);color:var(--accent)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:0;
+  padding-bottom:12px;border-bottom:1px solid var(--line)}
+.passes,.jsel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.pass .k,.jbtn .k{color:var(--muted);font-family:var(--mono);font-size:10px;margin-left:5px}
+.pass.approved::after{content:"\2713";color:var(--done);font-weight:700;margin-left:5px}
+.pass.failed{border-color:color-mix(in srgb,var(--danger) 55%,var(--line));color:var(--danger)}
+.actions{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap;align-items:center}
+
+/* ── 영상 ────────────────────────────────────────────────────────── */
+video{width:100%;max-height:min(70vh,560px);background:var(--terminal-bg);
+  border:1px solid var(--line);border-radius:var(--radius-panel);object-fit:contain}
+.vsplit{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);
+  gap:16px;align-items:start}
+.vsplit.portrait{grid-template-columns:minmax(0,0.72fr) minmax(320px,1.28fr)}
+.vleft{position:sticky;top:0}
+.vright{min-width:0}
+.vstep{border:1px solid var(--line);border-left:2px solid var(--line);
+  padding:9px 11px;margin-bottom:6px;border-radius:var(--radius-control);background:var(--surface)}
+.vstep.seekable{cursor:pointer}
+.vstep.seekable:hover{background:var(--hover-surface);border-left-color:var(--hover-line)}
+.vstep.now{border-left-color:var(--accent);background:var(--selected-surface)}
+.vstep-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.vn{flex-shrink:0;width:20px;height:20px;border-radius:999px;background:var(--surface-raised);
+  color:var(--muted);font-family:var(--mono);font-size:10px;
+  display:flex;align-items:center;justify-content:center}
+.ts{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent);
+  font-variant-numeric:tabular-nums}
+.vright .goal{font-size:13px;font-weight:500;margin:2px 0 4px}
+.vright .line{font-size:12px}
+.vright .cap{font-size:11.5px}
+/* 사이드바를 뺀 실제 본문 폭 기준으로 접는다 */
+@container (max-width:700px){.vsplit{grid-template-columns:1fr}
+.vleft{position:static}}
+
+/* ── 스크린샷 ────────────────────────────────────────────────────── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.grid img{width:100%;border:1px solid var(--line);border-radius:var(--radius-control);
+  cursor:zoom-in;background:var(--surface-raised)}
+
+/* ── 발견사항 ────────────────────────────────────────────────────── */
+.find{border:1px solid var(--line);border-radius:var(--radius-card);padding:12px 14px;
+  margin-bottom:8px;background:var(--surface)}
+.find .h{display:flex;gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
+.find .id{font-family:var(--mono);font-weight:600;font-size:12.5px}
+.find .r{color:var(--muted);font-size:12.5px}
+
+/* ── 시나리오 ────────────────────────────────────────────────────── */
+.scen{max-width:900px}
+.scen-hd{margin-bottom:16px}
+.scen-title{font-size:16px;font-weight:600;margin-bottom:8px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;font-size:12px;line-height:1.4;
+  padding:3px 10px;border-radius:var(--radius-sm);
+  background:var(--surface-raised);color:var(--control-text);border:1px solid var(--line)}
+.sec{margin-bottom:20px}
+.sec-t{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;
+  color:var(--muted);text-transform:uppercase;margin-bottom:8px;
+  display:flex;align-items:center;gap:8px}
+.jk{font-family:var(--mono);font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:999px;
+  text-transform:none;letter-spacing:.02em}
+.jk.crit{background:color-mix(in srgb,var(--danger) 16%,transparent);color:var(--danger)}
+.jk.rec{background:color-mix(in srgb,var(--done) 16%,transparent);color:var(--done)}
+.kv{display:grid;grid-template-columns:74px 1fr;gap:6px 12px;font-size:13px}
+.kv .k{color:var(--muted);font-size:12px}
+.sec ul{margin:0;padding-left:20px;font-size:13px}
+.sec ul li{margin:3px 0}
+.sec ul.ck{list-style:none;padding-left:0}
+.sec ul.ck li{position:relative;padding-left:20px}
+.sec ul.ck li::before{content:"\2713";position:absolute;left:2px;color:var(--done)}
+.step{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.step-n{flex-shrink:0;width:24px;height:24px;border-radius:999px;background:var(--surface-raised);
+  color:var(--muted);font-family:var(--mono);font-size:10.5px;
+  display:flex;align-items:center;justify-content:center}
+.step-b{flex:1;min-width:0}
+.goal{font-size:13.5px;font-weight:500;margin:3px 0 5px}
+.line{font-size:12.5px;color:var(--muted);margin:2px 0;display:flex;gap:8px}
+.line .lb{flex-shrink:0;width:26px;font-family:var(--mono);font-size:10px;opacity:.8}
+.cap{font-size:12px;color:var(--accent);margin-top:4px}
+
+/* ── 문서 ────────────────────────────────────────────────────────── */
+.doc{max-width:900px}
+.raw{margin:0 0 18px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.raw summary{cursor:pointer;font-size:12px;color:var(--muted);user-select:none}
+.raw summary:hover{color:var(--text)}
+.raw pre{background:var(--surface-raised);padding:12px;border-radius:var(--radius-control);
+  overflow-x:auto;font-family:var(--mono);font-size:11.5px;margin-top:10px}
+.doc h1{font-size:20px;margin:22px 0 10px} .doc h2{font-size:17px;margin:20px 0 8px}
+.doc h3{font-size:15px;margin:18px 0 6px;color:var(--muted)}
+.doc code{background:var(--surface-raised);padding:1px 5px;border-radius:var(--radius-sm);
+  font-family:var(--mono);font-size:12px}
+.doc pre{background:var(--surface-raised);padding:12px;border-radius:var(--radius-control);
+  overflow-x:auto;font-family:var(--mono);font-size:12px}
+.doc pre code{background:none;padding:0}
+.doc a{color:var(--accent)}
+.doc hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.doc li{margin:3px 0}
+.tw{overflow-x:auto} .doc table{border-collapse:collapse;width:100%;font-size:13px}
+.doc th,.doc td{border:1px solid var(--line);padding:6px 9px;text-align:left}
+.doc th{background:var(--surface-raised)}
+
+/* ── 확대 보기 ───────────────────────────────────────────────────── */
+#lb{position:fixed;inset:0;background:var(--scrim);backdrop-filter:blur(3px);display:none;
+  align-items:center;justify-content:center;z-index:9;padding:20px;cursor:zoom-out}
+#lb img{max-width:100%;max-height:100%;border-radius:var(--radius-panel)}
+
+/* 중간 폭에서는 목록 칸만 좁힌다 */
+@media(max-width:1100px){#app{grid-template-columns:270px minmax(0,1fr)}
+.mainhead{padding:18px 20px 0} #body{padding:14px 20px 20px}}
+/* 넓은 화면에서는 드로어 장치를 쓰지 않는다 */
+#navopen,#navclose,#scrim{display:none}
+/* 목록 접기(PC). 토끼 마크를 눌러 본문을 넓게 쓴다. */
+#app{transition:grid-template-columns var(--sidebar-motion) var(--sidebar-ease)}
+body.rail #app{grid-template-columns:0 minmax(0,1fr)}
+body.rail #side{transform:translateX(-100%);border-right:0}
+body.rail #navopen{display:inline-grid;position:fixed;top:10px;left:12px;z-index:25}
+body.rail .mainhead{padding-left:60px}
+body.rail .hd{min-height:34px;align-items:center}
+
+@media(prefers-reduced-motion:reduce){#app{transition:none}}
+
+/* 좁은 화면: 목록을 화면 밖에 두고 밀어서 연다 (HerdRabbit 과 같은 방식) */
+@media(max-width:760px){
+  #app{display:block;height:100vh;height:100dvh;overflow:hidden}
+  #side{position:fixed;inset:0 auto 0 0;z-index:30;width:min(86vw,310px);
+    border-right:1px solid var(--line);box-shadow:18px 0 50px var(--mobile-shadow);
+    transform:translateX(-102%);will-change:transform;
+    transition:transform var(--sidebar-motion) var(--sidebar-ease)}
+  body.nav-open #side{transform:translateX(0)}
+  #scrim{display:block;position:fixed;inset:0;z-index:20;border:0;padding:0;
+    background:var(--scrim);visibility:hidden;opacity:0;pointer-events:none;
+    transition:opacity 220ms ease,visibility 0s linear var(--sidebar-motion)}
+  body.nav-open #scrim{visibility:visible;opacity:1;pointer-events:auto;transition-delay:0s}
+  #navopen{display:inline-grid;position:fixed;top:10px;left:12px;z-index:25}
+  #navclose{display:inline-grid}
+  #main{height:100vh;height:100dvh}
+  /* 떠 있는 열기 버튼과 겹치지 않게 자리를 비우고, 제목 줄을 버튼 중심에 맞춘다 */
+  .mainhead{padding:10px 16px 0 60px} #body{padding:12px 16px 18px}
+  .hd{min-height:34px;align-items:center;margin-bottom:12px}
+  /* 머리가 화면 절반을 먹지 않게 각 줄을 한 줄로 눕히고 옆으로 굴린다.
+   * 색과 모양은 그대로 두는 편이 상태를 읽기 쉽다. */
+  .badges,.passes,.tabs,.jsel{
+    flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;
+    scrollbar-width:none;-ms-overflow-style:none}
+  .badges::-webkit-scrollbar,.passes::-webkit-scrollbar,
+  .tabs::-webkit-scrollbar,.jsel::-webkit-scrollbar{display:none}
+  .badges>*,.passes>*,.tabs>*,.jsel>*{flex:0 0 auto}
+  .badges,.passes{margin-bottom:10px}
+  .tabs{padding-bottom:10px;margin-bottom:0}
+  #main>.empty{padding:60px 16px 40px}
+}
+@media(max-width:560px){
+  .mainhead{padding:10px 12px 0 56px} #body{padding:10px 12px 14px}
+  h1{font-size:17px}
+  .hd{gap:10px}
+  .tabs{gap:4px;padding-bottom:10px;margin-bottom:14px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .kv{grid-template-columns:60px 1fr}
+}
+</style></head><body>
+<div id="app">
+  <button id="navopen" class="brand" type="button" aria-label="목록 열기"
+    aria-controls="side" aria-expanded="false">
+    <svg class="brand-mark" viewBox="9 2 46 60" aria-hidden="true" focusable="false">
+      <path d="M17 30C12 21 12 6 20 6c7 0 9 13 9 22a13 13 0 0 1 6 0c0-9 2-22 9-22 8 0 8 15 3 24 7 5 8 14 4 21-4 6-11 8-19 8s-15-2-19-8c-4-7-3-16 4-21Z"/>
+      <g class="eyes"><path d="M19.6 38.4v5a5 5 0 0 0 10 0v-5"/><path d="M33.8 38.4 43.6 49M43.6 38.4l-9.8 10.6"/></g>
+    </svg>
+  </button>
+  <aside id="side" class="ui-sidebar">
+    <div class="ui-sidebar-heading">
+      <button id="railtoggle" class="brand" type="button" aria-label="목록 접기"
+        title="목록 접기" aria-expanded="true">
+        <svg class="brand-mark" viewBox="9 2 46 60" aria-hidden="true" focusable="false">
+          <path d="M17 30C12 21 12 6 20 6c7 0 9 13 9 22a13 13 0 0 1 6 0c0-9 2-22 9-22 8 0 8 15 3 24 7 5 8 14 4 21-4 6-11 8-19 8s-15-2-19-8c-4-7-3-16 4-21Z"/>
+          <g class="eyes"><path d="M19.6 38.4v5a5 5 0 0 0 10 0v-5"/><path d="M33.8 38.4 43.6 49M43.6 38.4l-9.8 10.6"/></g>
+        </svg>
+      </button>
+      <button id="navclose" class="icon-button" type="button" aria-label="목록 닫기">&times;</button>
+    </div>
+    <div id="tree" class="ui-sidebar-content"></div>
+    <div class="ui-sidebar-footer">
+      <span id="meta">불러오는 중…</span>
+      <button id="th" class="icon-button" type="button" title="테마 전환" aria-label="테마 전환"></button>
+    </div>
+  </aside>
+  <main id="main"><div class="empty">왼쪽에서 시나리오를 선택하세요</div></main>
+</div>
+<button id="scrim" type="button" tabindex="-1" aria-hidden="true"></button>
+<div id="lb" onclick="this.style.display='none'"><img id="lbi" alt=""></div>
+<script>
+// 라우팅:  #/<repo>/<worktree>/<date>/<scenario>[/<pass>[/<tab>]]
+let INDEX=null, SC=null, CACHE={}, LOADING=false;
+const TABS=[['video','영상'],['plan','Plan'],['review','리뷰 결과'],['scenario','시나리오'],['shots','스크린샷'],['findings','발견사항']];
+const $=s=>document.querySelector(s);
+const mb=b=>b==null?'':b>=1048576?(b/1048576).toFixed(1)+'MB':(b/1024).toFixed(0)+'KB';
+const dur=ms=>ms==null?'':(ms/1000).toFixed(1)+'초';
+// 마지막으로 손댄 시각을 상대 표기로. 오늘·어제는 시각까지 보여야 순서가 읽힌다.
+const hhmm=at=>String(at.getHours()).padStart(2,'0')+':'+String(at.getMinutes()).padStart(2,'0');
+function rel(ms,date){
+  if(!ms)return date;
+  const at=new Date(ms);
+  if(isNaN(at))return date;
+  const day=new Date(at); day.setHours(0,0,0,0);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const days=Math.round((today-day)/86400000);
+  if(days<=0)return '오늘 '+hhmm(at);
+  if(days===1)return '어제 '+hhmm(at);
+  if(days<7)return days+'일 전';
+  return date;
+}
+// 정확한 시각은 마우스를 올렸을 때 보여준다
+function stamp(ms,date){
+  if(!ms)return date;
+  const at=new Date(ms);
+  return isNaN(at)?date:at.toLocaleString('ko-KR',{dateStyle:'medium',timeStyle:'short'});
+}
+const fmt=sec=>{const m=Math.floor(sec/60),x=sec-m*60;return m+':'+(x<10?'0':'')+x.toFixed(1);};
+const enc=p=>p.split('/').map(encodeURIComponent).join('/');
+const esc=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function parseRoute(){
+  // 세그먼트마다 따로 푼다. 통째로 풀면 이름 안의 %2F 가 구분자로 되살아난다.
+  const raw=location.hash.replace(/^#\/?/,'');
+  if(!raw) return {};
+  const dec=s=>{ try{ return decodeURIComponent(s); }catch{ return s; } };
+  const seg=raw.split('/').filter(Boolean).map(dec);
+  if(seg.length<4) return {};
+  return {path:seg.slice(0,4).join('/'), pass:seg[4]||null, tab:seg[5]||null, jn:seg[6]||null};
+}
+function go(path,pass,tab,jn){
+  const parts=[enc(path)]; if(pass)parts.push(encodeURIComponent(pass));
+  if(pass&&tab)parts.push(encodeURIComponent(tab));
+  if(pass&&tab&&jn)parts.push(encodeURIComponent(jn));
+  const next='#/'+parts.join('/');
+  if(location.hash===next) route(); else location.hash=next;
+}
+
+async function loadIndex(){
+  const r=await fetch('/api/index'); INDEX=await r.json();
+  const n=INDEX.repositories.flatMap(x=>x.worktrees).flatMap(w=>w.scenarios).length;
+  $('#meta').textContent=INDEX.store.replace(/^\/home\/[^/]+/,'~')+' · 시나리오 '+n+'개';
+  renderTree();
+}
+// 저장소 접기 상태는 이 브라우저에만 남는 편의값이다.
+function collapsedSet(){
+  try{ return new Set(JSON.parse(localStorage.getItem('ux-collapsed')||'[]')); }
+  catch{ return new Set(); }
+}
+function saveCollapsed(set){
+  try{ localStorage.setItem('ux-collapsed',JSON.stringify([...set])); }catch{}
+}
+function toggleRepo(name){
+  const set=collapsedSet();
+  if(set.has(name))set.delete(name); else set.add(name);
+  saveCollapsed(set); renderTree();
+}
+// 그 묶음에서 가장 나중 활동 시각. 정렬과 최신 표시의 기준이다.
+function newest(scenarios){ return scenarios.reduce((m,s)=>Math.max(m,s.activeAt||0),0); }
+function renderTree(){
+  if(!INDEX)return;
+  const cur=parseRoute().path, collapsed=collapsedSet();
+  const repos=INDEX.repositories.slice().sort((a,b)=>
+    newest(b.worktrees.flatMap(w=>w.scenarios))-newest(a.worktrees.flatMap(w=>w.scenarios)));
+  let h='';
+  for(const repo of repos){
+    const count=repo.worktrees.reduce((n,w)=>n+w.scenarios.length,0);
+    // 강조 기준은 저장소마다 따로 잡는다. 다른 저장소에서 최근에 작업했다는
+    // 이유로 이 저장소의 최근 것이 묻히면 목록을 훑는 뜻이 없다.
+    const maxActive=newest(repo.worktrees.flatMap(w=>w.scenarios));
+    const show=!collapsed.has(repo.name);
+    h+='<div class="repo'+(show?'':' collapsed')+'" data-repo="'+esc(repo.name)+'">'
+      +'<span class="caret">▼</span><span class="nm">'+esc(repo.name)+'</span>'
+      +'<span class="ct">'+count+'</span></div>';
+    if(!show)continue;
+    const worktrees=repo.worktrees.slice().sort((a,b)=>
+      newest(b.scenarios)-newest(a.scenarios));
+    for(const wt of worktrees){
+      let inner='';
+      const ordered=wt.scenarios.slice().sort((a,b)=>(b.activeAt||0)-(a.activeAt||0));
+      for(const s of ordered){
+        const f=s.findings,pills=[],sev=[];
+        if(f.P0){pills.push('<span class="pill p0">P0 '+f.P0+'</span>');sev.push('P0 '+f.P0+'건');}
+        if(f.P1){pills.push('<span class="pill p1">P1 '+f.P1+'</span>');sev.push('P1 '+f.P1+'건');}
+        if(f.P2){pills.push('<span class="pill p2">P2 '+f.P2+'</span>');sev.push('P2 '+f.P2+'건');}
+        if(s.readiness==='ready'&&!pills.length){
+          pills.push('<span class="pill ready">ready</span>');sev.push('ready');}
+        // 마커는 이 저장소에서 가장 나중에 손댄 하나만 알린다. 심각도는 옆의 pill 이 맡는다.
+        const isNew=!!s.activeAt&&s.activeAt===maxActive;
+        const when=rel(s.activeAt,s.date);
+        // aria-label 은 자식 텍스트를 통째로 덮으므로 pill 이 읽어 주는 값까지 담는다
+        const label=[s.id,when,s.passCount+' pass',...sev,isNew?'최신':null]
+          .filter(Boolean).join(', ');
+        inner+='<div class="navrow">'
+          +'<a class="ui-nav-item'+(isNew?' latest':'')+'"'
+          +' aria-pressed="'+(cur===s.path?'true':'false')+'"'
+          +' aria-label="'+esc(label)+'" title="'+esc(stamp(s.activeAt,s.date))+'"'
+          +' href="#/'+enc(s.path)+'">'
+          +'<span class="ui-status" aria-hidden="true">'+(isNew?'\u25cf':'')+'</span>'
+          +'<span class="ui-nav-copy"><strong>'+esc(s.id)+'</strong>'
+          +'<small>'+when+' · '+s.passCount+' pass</small>'+pills.join('')+'</span></a>'
+          +'<details class="ui-menu" data-menu="'+esc(s.path)+'"><summary class="icon-button" role="button"'
+          +' aria-label="'+esc(s.id)+' 작업" title="작업"><svg class="dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></summary>'
+          +'<div class="ui-menu-panel"><button class="ui-menu-item is-danger" type="button"'
+          +' data-del="'+esc(s.path)+'" data-label="'+esc(s.id)+' 전체">'+ICON_TRASH
+          +'<span>시나리오 삭제</span></button></div></details></div>';
+      }
+      // worktree 이름이 저장소와 같으면(일반 저장소) 갈래 표시를 생략한다
+      h+= wt.name===repo.name ? '<div class="wtbox">'+inner+'</div>'
+        : '<div class="wtbox"><div class="wt"><span class="nm">'+esc(wt.name)+'</span></div>'+inner+'</div>';
+    }
+  }
+  $('#tree').innerHTML=h;
+}
+
+async function route(){
+  const r=parseRoute();
+  renderTree();
+  if(!r.path){
+    SC=null;
+    $('#main').innerHTML='<div class="empty">왼쪽에서 시나리오를 선택하세요</div>';
+    return;
+  }
+  if(!SC||SC.path!==r.path){
+    // 목록에 없는 경로는 조회하지 않는다. 정리된 링크를 여는 건 정상적인 일이라
+    // 404 를 오류로 남기지 않는다.
+    const known=INDEX&&INDEX.repositories.flatMap(x=>x.worktrees)
+      .flatMap(w=>w.scenarios).some(x=>x.path===r.path);
+    if(!known){
+      SC=null;
+      $('#main').innerHTML='<div class="empty">이 리뷰는 목록에 없습니다.'
+        +'<br><span style="font-size:12px">정리되었거나 다른 저장 위치의 링크일 수 있습니다. 왼쪽에서 다시 선택하세요.</span></div>';
+      return;
+    }
+    if(LOADING)return;
+    LOADING=true;
+    $('#main').innerHTML='<div class="empty">불러오는 중…</div>';
+    try{
+      if(!CACHE[r.path]){
+        const res=await fetch('/api/scenario?path='+encodeURIComponent(r.path));
+        if(!res.ok){$('#main').innerHTML='<div class="empty">시나리오를 읽지 못했습니다</div>';LOADING=false;return;}
+        CACHE[r.path]=await res.json();
+      }
+      SC=CACHE[r.path];
+    } finally { LOADING=false; }
+  }
+  renderDetail(r);
+}
+
+const ICON_TRASH='<svg viewBox="0 0 24 24" aria-hidden="true">'
+  +'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>';
+const ICON_PRUNE='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h6"/></svg>';
+
+// 남길 pass: review 와 guide 각각의 마지막, 그리고 승인된 pass
+function keepers(data){
+  const set=new Set();
+  for(const kind of ['review','guide']){
+    const list=data.passes.filter(p=>p.kind===kind);
+    if(list.length)set.add(list[list.length-1].name);
+  }
+  data.passes.filter(p=>p.approved).forEach(p=>set.add(p.name));
+  return set;
+}
+function prunable(data){
+  const keep=keepers(data);
+  return data.passes.filter(p=>!keep.has(p.name));
+}
+async function prune(path){
+  const data=CACHE[path];
+  if(!data)return;
+  const keep=[...keepers(data)], drop=prunable(data);
+  if(!drop.length){alert('지울 이전 pass 가 없습니다.');return;}
+  const freed=drop.reduce((n,p)=>n+(p.size||0),0);
+  const lines=drop.map(p=>'  · '+p.name+' ('+mb(p.size)+')').join('\n');
+  if(!confirm('이전 pass '+drop.length+'개를 삭제합니다. 되돌릴 수 없습니다.\n\n'
+    +lines+'\n\n남는 pass: '+keep.join(', ')+'\n확보 용량: '+mb(freed)))return;
+  const q='/api/passes?path='+encodeURIComponent(path)+'&keep='+encodeURIComponent(keep.join(','));
+  const j=await (await fetch(q,{method:'DELETE'})).json();
+  if(j.error){alert('정리 실패: '+j.error);return;}
+  alert('pass '+j.removed.length+'개 삭제 · '+mb(j.freed)+' 확보');
+  delete CACHE[path];
+  if(SC&&SC.path===path)SC=null;
+  await loadIndex(); route();
+}
+
+// pass 항목은 목록 인덱스에 없는 값(크기·승인 여부)이 필요하므로 메뉴를 열 때 읽어 채운다.
+async function fillPassItems(menu){
+  if(menu.dataset.filled)return;
+  menu.dataset.filled='1';
+  const path=menu.dataset.menu;
+  let data=CACHE[path];
+  if(!data){
+    try{
+      const r=await fetch('/api/scenario?path='+encodeURIComponent(path));
+      if(r.ok)data=CACHE[path]=await r.json();
+    }catch{}
+  }
+  const panel=menu.querySelector('.ui-menu-panel');
+  if(!data||!data.passes.length||!panel)return;
+  const drop=prunable(data), items=[];
+  if(drop.length){
+    items.push('<button class="ui-menu-item" type="button" data-prune="'+esc(path)+'" title="'
+      +esc(drop.map(p=>p.name).join(', ')+' 삭제')+'">'+ICON_PRUNE
+      +'<span>이전 pass 정리 ('+drop.length+')</span></button>');
+  }
+  // 개별 pass 삭제는 대상이 정해져야 한다. 지금 보고 있는 시나리오에만 붙인다.
+  const now=SC&&SC.path===path?currentPassName():null;
+  if(now){
+    items.push('<button class="ui-menu-item is-danger" type="button" data-del="'
+      +esc(path+'/'+now)+'" data-label="'+esc(now)+'">'+ICON_TRASH
+      +'<span>'+esc(now)+' 삭제</span></button>');
+  }
+  if(items.length)panel.insertAdjacentHTML('afterbegin',items.join(''));
+}
+function defaultPass(){
+  if(!SC.passes.length)return null;
+  return (SC.passes.slice().reverse().find(p=>p.approved)||SC.passes[SC.passes.length-1]).name;
+}
+// 지금 보고 있는 pass. 본문과 목록 메뉴가 같은 값을 봐야 한다.
+function currentPassName(){
+  if(!SC||!SC.passes.length)return null;
+  const r=parseRoute();
+  return r.pass&&SC.passes.some(p=>p.name===r.pass)?r.pass:defaultPass();
+}
+function renderDetail(r){
+  const passName=currentPassName();
+  const tab=r.tab&&TABS.some(t=>t[0]===r.tab)?r.tab:'video';
+  const pass=SC.passes.find(p=>p.name===passName)||null;
+  const o=SC.origin||{},b=[];
+  b.push('<span class="badge">'+esc(SC.path.split('/').slice(0,2).join(' / '))+'</span>');
+  b.push('<span class="badge">'+esc(SC.date)+'</span>');
+  if(o.branch)b.push('<span class="badge">🌿 '+esc(o.branch)+'</span>');
+  if(o.issueUrl)b.push('<a class="badge" href="'+esc(o.issueUrl)+'" target="_blank" rel="noreferrer">🔗 Issue'+(o.issue?' #'+esc(o.issue):'')+'</a>');
+  if(o.notionTaskUrl)b.push('<a class="badge" href="'+esc(o.notionTaskUrl)+'" target="_blank" rel="noreferrer">🔗 Notion Task</a>');
+  if(o.notionStoryUrl)b.push('<a class="badge" href="'+esc(o.notionStoryUrl)+'" target="_blank" rel="noreferrer">🔗 Notion Story</a>');
+  if(SC.readiness)b.push('<span class="badge">'+esc(SC.readiness)+'</span>');
+
+  let h='<div class="mainhead"><div class="hd"><h1>'+esc(SC.id)+'</h1></div>'
+    +'<div class="badges">'+b.join('')+'</div>';
+  h+='<div class="passes">'+SC.passes.map(p=>{
+    const meta=[mb(p.size),p.durationMs?dur(p.durationMs):null].filter(Boolean).join(', ');
+    const label=[p.name,meta,p.approved?'승인됨':null,
+      p.status&&p.status!=='completed'?p.status:null].filter(Boolean).join(', ');
+    return '<a class="ghost-button pass'
+      +(p.approved?' approved':'')+(p.status&&p.status!=='completed'?' failed':'')
+      +'" aria-label="'+label+'" aria-pressed="'+(p.name===passName?'true':'false')+'"'
+      +(p.name===passName?' aria-current="true"':'')
+      +' href="#/'+enc(SC.path)+'/'+p.name+'/'+tab+'">'+p.name
+      +'<span class="k" aria-hidden="true">'+mb(p.size)+(p.durationMs?' · '+dur(p.durationMs):'')+'</span></a>';
+  }).join('')
+    +(SC.passes.length?'':'<span class="dim">pass 없음</span>')+'</div>';
+  h+='<div class="tabs">'+TABS.map(t=>'<a class="ghost-button" aria-pressed="'+(tab===t[0]?'true':'false')
+    +'" href="#/'+enc(SC.path)+'/'+(passName||'-')+'/'+t[0]+'">'+t[1]+'</a>').join('')
+    +'</div></div><div id="body"></div>';
+  $('#main').innerHTML=h;
+  renderBody(tab,pass);
+  revealSelected();
+}
+
+function list(items,cls){
+  if(!items||!items.length)return '';
+  return '<ul class="'+(cls||'')+'">'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';
+}
+function section(title,body){
+  return body ? '<div class="sec"><div class="sec-t">'+esc(title)+'</div>'+body+'</div>' : '';
+}
+function renderScenario(d){
+  const a=d.audience||{}, job=d.job||{}, env=d.environment||{}, vp=env.viewport||{}, mp=d.mutationPolicy||{};
+  let h='<div class="scen">';
+
+  h+='<div class="scen-hd"><div class="scen-title">'+esc(d.title||d.id||'')+'</div><div class="chips">';
+  if(d.product)h+='<span class="chip">'+esc(d.product)+'</span>';
+  if(a.role)h+='<span class="chip">'+esc(a.role)+'</span>';
+  if(a.experience)h+='<span class="chip">'+esc(a.experience)+'</span>';
+  h+='</div></div>';
+
+  if(job.trigger||job.outcome){
+    h+='<div class="sec"><div class="kv">';
+    if(job.trigger)h+='<div class="k">상황</div><div class="v">'+esc(job.trigger)+'</div>';
+    if(job.outcome)h+='<div class="k">목표</div><div class="v">'+esc(job.outcome)+'</div>';
+    h+='</div></div>';
+  }
+
+  h+=section('성공 기준',list(job.successCriteria,'ck'));
+
+  const envRows=[];
+  if(vp.width)envRows.push(['뷰포트',vp.width+' × '+vp.height]);
+  if(env.locale)envRows.push(['로케일',env.locale]);
+  if(mp.mode)envRows.push(['변경 정책',mp.mode]);
+  if(env.baseUrlEnvironmentVariable)envRows.push(['base URL','$'+env.baseUrlEnvironmentVariable]);
+  if(envRows.length){
+    h+=section('환경','<div class="kv">'+envRows.map(r=>'<div class="k">'+esc(r[0])
+      +'</div><div class="v"><code>'+esc(r[1])+'</code></div>').join('')+'</div>');
+  }
+
+  h+=section('전제 조건',list(d.prerequisites));
+  h+=section('데이터 준비',list(d.dataSetup));
+  h+=section('변경 허용',list(mp.allowed));
+  h+=section('정리 절차',list(mp.cleanup));
+
+  for(const jn of (d.journeys||[])){
+    const steps=jn.steps||[];
+    h+='<div class="sec"><div class="sec-t">여정 · '+esc(jn.id||'')
+      +'<span class="jk '+(jn.kind==='critical'?'crit':'rec')+'">'+esc(jn.kind||'')+'</span>'
+      +'<span class="dim" style="font-weight:400"> '+steps.length+'단계</span></div>';
+    for(const st of steps){
+      h+='<div class="step"><div class="step-n">'+esc(st.step)+'</div><div class="step-b">'
+        +'<div class="goal">'+esc(st.goal||'')+'</div>'
+        +(st.startingState?'<div class="line"><span class="lb">시작</span>'+esc(st.startingState)+'</div>':'')
+        +(st.action?'<div class="line"><span class="lb">행동</span>'+esc(st.action)+'</div>':'')
+        +(st.expected?'<div class="line"><span class="lb">기대</span>'+esc(st.expected)+'</div>':'')
+        +(st.caption?'<div class="cap">“'+esc(st.caption)+'”</div>':'')
+        +'</div></div>';
+    }
+    h+='</div>';
+  }
+
+  h+=section('제외 범위',list(d.exclusions));
+  return h+'</div>';
+}
+
+async function renderBody(tab,pass){
+  const el=$('#body'); if(!el)return;
+  const base=SC.path+(pass?'/'+pass.name:'');
+
+  if(tab==='video'){
+    if(!pass||!pass.journeys.length){
+      el.innerHTML='<div class="empty">'+(pass&&pass.recording&&pass.recording.length
+        ? '영상을 기록하는 중입니다 · '+pass.recording.length+'개<br><span style="font-size:12px">녹화가 끝난 뒤 새로고침하면 보입니다.</span>'
+        : '이 pass에 영상이 없습니다')+'</div>';
+      return;
+    }
+    const r=parseRoute();
+    const jn=pass.journeys.find(x=>x.journeyId===r.jn)
+      ||pass.journeys.find(x=>x.journeyKind==='critical')||pass.journeys[0];
+    const def=(SC.journeyDefs||[]).find(d=>d.id===jn.journeyId);
+
+    // 여정 선택
+    let h=(pass.recording&&pass.recording.length
+      ? '<div class="dim" style="font-size:12px;margin-bottom:10px">기록 중인 영상 '+pass.recording.length+'개는 아직 표시되지 않습니다</div>'
+      : '');
+    h+='<div class="jsel">'+pass.journeys.map(x=>{
+      const name=x.journeyId||x.base;
+      const label=[name,x.journeyKind,x.durationMs?dur(x.durationMs):null].filter(Boolean).join(', ');
+      return '<a class="ghost-button jbtn" aria-label="'+esc(label)+'"'
+        +' aria-pressed="'+(x===jn?'true':'false')+'"'+(x===jn?' aria-current="true"':'')
+        +' href="#/'+enc(SC.path)+'/'+pass.name+'/video/'+encodeURIComponent(name)+'">'
+        +esc(name)
+        +'<span class="jk '+(x.journeyKind==='critical'?'crit':'rec')+'" aria-hidden="true">'+esc(x.journeyKind||'')+'</span>'
+        +'<span class="k" aria-hidden="true">'+(x.durationMs?dur(x.durationMs):'')+'</span></a>';
+    }).join('')+'</div>';
+
+    // 좌: 영상 / 우: 단계
+    h+='<div class="vsplit"><div class="vleft">'
+      +'<video id="vp" controls preload="metadata" src="/files/'+enc(base+'/'+jn.video)+'"'
+      +'></video>'
+      +'<div class="actions"><a class="badge" href="/download/'+enc(base+'/'+jn.video)+'">다운로드</a>'
+      +(jn.srt?'<a class="badge" href="/files/'+enc(base+'/'+jn.srt)+'" target="_blank">자막(srt)</a>':'')
+      +'<span class="dim" style="font-size:12px">'+esc(jn.video)+'</span></div>'
+      +(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'')
+      +'</div><div class="vright">';
+
+    const rows=jn.steps.length?jn.steps:jn.cues.map((c,i)=>({step:i+1,sequence:i+1}));
+    if(!rows.length){
+      h+='<div class="dim" style="font-size:12.5px">단계 정보가 없습니다</div>';
+    } else {
+      h+=rows.map((st,i)=>{
+        const spec=(def&&def.steps||[]).find(x=>x.step===st.step)||{};
+        const cue=jn.cues[i];
+        const t=cue&&cue.start!=null?cue.start:null;
+        return '<div class="vstep'+(t!=null?' seekable':'')+'"'+(t!=null?' data-seek="'+t+'"':'')+'>'
+          +'<div class="vstep-h"><span class="vn">'+esc(st.step??i+1)+'</span>'
+          +(t!=null?'<span class="ts">'+fmt(t)+'</span>':'')+'</div>'
+          +(spec.goal?'<div class="goal">'+esc(spec.goal)+'</div>':'')
+          +(spec.action?'<div class="line"><span class="lb">행동</span>'+esc(spec.action)+'</div>':'')
+          +(spec.expected?'<div class="line"><span class="lb">기대</span>'+esc(spec.expected)+'</div>':'')
+          +(cue&&cue.text?'<div class="cap">“'+esc(cue.text)+'”</div>':'')
+          +'</div>';
+      }).join('');
+    }
+    h+='</div></div>';
+    el.innerHTML=h;
+
+    revealSelected();
+
+    // 세로 영상은 폭을 다 쓰지 못하므로 읽을 쪽에 공간을 넘긴다
+    const video=el.querySelector('#vp');
+    if(video){
+      const fit=()=>{
+        if(!video.videoWidth)return;
+        el.querySelector('.vsplit')?.classList.toggle('portrait', video.videoHeight>video.videoWidth);
+      };
+      video.addEventListener('loadedmetadata',fit);
+      fit();
+    }
+
+    // 단계 클릭 → 해당 시점으로 이동
+    el.querySelectorAll('[data-seek]').forEach(node=>node.onclick=()=>{
+      if(!video)return;
+      video.currentTime=Number(node.dataset.seek);
+      video.play().catch(()=>{});
+      el.querySelectorAll('.vstep').forEach(n=>n.classList.remove('now'));
+      node.classList.add('now');
+    });
+    // 재생 위치에 맞춰 현재 단계를 표시
+    if(video&&jn.cues.length){
+      video.ontimeupdate=()=>{
+        let idx=-1;
+        for(let i=0;i<jn.cues.length;i++){ if(video.currentTime>=(jn.cues[i].start??0)) idx=i; }
+        const nodes=el.querySelectorAll('.vstep');
+        nodes.forEach((n,i)=>n.classList.toggle('now',i===idx));
+      };
+    }
+    return;
+  }
+  if(tab==='shots'){
+    if(!pass||!pass.screenshots.length){el.innerHTML='<div class="empty">스크린샷이 없습니다</div>';return;}
+    el.innerHTML='<div class="dim" style="margin-bottom:10px">'+pass.screenshots.length+'장</div><div class="grid">'
+      +pass.screenshots.map(f=>'<figure style="margin:0"><img alt="" loading="lazy" src="/files/'+enc(base+'/'+f)
+      +'" data-image="/files/'+enc(base+'/'+f)+'"><figcaption class="dim" style="font-size:11px;margin-top:4px;word-break:break-all">'
+      +esc(f.replace(/^.*?-(\d\d-)/,'$1'))+'</figcaption></figure>').join('')+'</div>';
+    return;
+  }
+  if(tab==='findings'){
+    if(!SC.findingList.length){el.innerHTML='<div class="empty">기록된 발견사항이 없습니다</div>';return;}
+    el.innerHTML=SC.findingList.map(f=>'<div class="find"><div class="h"><span class="id">'+esc(f.id)+'</span>'
+      +'<span class="pill '+esc((f.severity||'').toLowerCase())+'">'+esc(f.severity)+'</span>'
+      +'<span class="dim">'+esc(f.disposition||'')+'</span></div><div class="r">'+esc(f.rationale||'')+'</div></div>').join('');
+    return;
+  }
+
+  let target=null;
+  if(tab==='plan')     target=SC.hasPlan?SC.path+'/plan-snapshot.md':null;
+  if(tab==='review')   target=pass&&pass.reviewDoc?base+'/'+pass.reviewDoc:null;
+  if(tab==='scenario') target=SC.scenarioFile?SC.path+'/'+SC.scenarioFile:null;
+  if(!target){
+    el.innerHTML='<div class="empty">'+(tab==='plan'
+      ?'Plan 스냅샷이 없습니다 · 저장 시점에 캡처된 시나리오에만 표시됩니다'
+      :'문서가 없습니다')+'</div>';
+    return;
+  }
+  if(target.endsWith('.json')){
+    const j=await (await fetch('/files/'+enc(target))).json();
+    const raw='<details class="raw"><summary>원본 JSON</summary><pre><code>'
+      +esc(JSON.stringify(j,null,2))+'</code></pre></details>';
+    el.innerHTML=tab==='scenario' ? raw+renderScenario(j) : raw;
+    return;
+  }
+  const j=await (await fetch('/api/markdown?path='+encodeURIComponent(target))).json();
+  el.innerHTML='<div class="doc">'+(j.html||'<div class="empty">문서를 읽지 못했습니다</div>')+'</div>';
+}
+
+async function del(p,label){
+  if(!confirm(label+' 을(를) 삭제합니다. 되돌릴 수 없습니다.\n\n'+p))return;
+  const j=await (await fetch('/api/entry?path='+encodeURIComponent(p),{method:'DELETE'})).json();
+  if(j.error){alert('삭제 실패: '+j.error);return;}
+  alert('삭제됨 · '+mb(j.freed)+' 확보');
+  // 목록에서 바로 지우면 열어 둔 시나리오가 없을 수 있다
+  delete CACHE[p];
+  if(SC){
+    delete CACHE[SC.path];
+    const wasOpen=p===SC.path;
+    SC=null;
+    if(wasOpen)location.hash='#/';
+  }
+  await loadIndex(); route();
+}
+
+const NARROW=window.matchMedia('(max-width:760px)');
+// 한 줄로 눕힌 줄에서 현재 선택이 안 보이면 곤란하다. 가로만 움직인다.
+function revealSelected(){
+  if(!NARROW.matches)return;
+  document.querySelectorAll('.passes,.tabs,.jsel').forEach(row=>{
+    const on=row.querySelector('[aria-pressed="true"]');
+    if(!on)return;
+    const r=row.getBoundingClientRect(), o=on.getBoundingClientRect();
+    row.scrollLeft += (o.left-r.left)-(r.width-o.width)/2;
+  });
+}
+function setNav(open){
+  document.body.classList.toggle('nav-open',open);
+  const b=$('#navopen'); if(b)b.setAttribute('aria-expanded',open?'true':'false');
+}
+// 넓어지면 열린 상태를 남기지 않는다
+try{ NARROW.addEventListener('change',e=>{ if(!e.matches) setNav(false); }); }catch{}
+// 접힘은 이 브라우저에만 남는 편의값이다.
+function setRail(on){
+  document.body.classList.toggle('rail',on);
+  const b=$('#railtoggle');
+  if(b){b.setAttribute('aria-expanded',on?'false':'true');
+    b.setAttribute('aria-label',on?'목록 펼치기':'목록 접기');
+    b.title=on?'목록 펼치기':'목록 접기';}
+  try{ localStorage.setItem('ux-rail',on?'1':'0'); }catch{}
+}
+try{ if(localStorage.getItem('ux-rail')==='1') setRail(true); }catch{}
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  // 확대 보기가 떠 있으면 그것부터 닫는다
+  const lb=$('#lb');
+  if(lb&&lb.style.display==='flex'){lb.style.display='none';return;}
+  if(document.body.classList.contains('nav-open'))setNav(false);
+});
+
+document.addEventListener('click',e=>{
+  const inMenu=e.target.closest('.ui-menu');
+  document.querySelectorAll('.ui-menu[open]').forEach(m=>{ if(m!==inMenu)m.open=false; });
+  if(e.target.closest('.ui-menu-item')&&inMenu)inMenu.open=false;
+  // 열리는 순간에 pass 항목을 채운다 (닫힐 때는 건드리지 않는다)
+  const summary=e.target.closest('.ui-menu>summary');
+  if(summary&&!summary.parentElement.open&&summary.parentElement.dataset.menu){
+    fillPassItems(summary.parentElement);
+  }
+  if(e.target.closest('#railtoggle')){
+    if(NARROW.matches)setNav(false); else setRail(true);
+    return;
+  }
+  if(e.target.closest('#navopen')){
+    if(NARROW.matches)setNav(true); else setRail(false);
+    return;
+  }
+  if(e.target.closest('#navclose')||e.target.closest('#scrim')){setNav(false);return;}
+  // 목록에서 시나리오를 고르면 본문을 보여줘야 하므로 닫는다
+  if(NARROW.matches&&e.target.closest('#tree a')){setNav(false);}
+  const pr=e.target.closest('[data-prune]');
+  if(pr){e.preventDefault();prune(pr.dataset.prune);return;}
+  const d=e.target.closest('[data-del]');
+  if(d){e.preventDefault();del(d.dataset.del,d.dataset.label);return;}
+  const repo=e.target.closest('.repo');
+  if(repo){e.preventDefault();toggleRepo(repo.dataset.repo);return;}
+  const img=e.target.closest('[data-image]');
+  if(img){e.preventDefault();$('#lbi').src=img.dataset.image;$('#lb').style.display='flex';return;}
+  const v=e.target.closest('[data-video]');
+  if(v){e.preventDefault();const r=parseRoute();go(r.path,r.pass||defaultPass(),'video');}
+});
+// 테마: 저장값이 없으면 OS 설정을 따른다
+function prefersDark(){
+  try{ return window.matchMedia('(prefers-color-scheme: dark)').matches; }catch{ return true; }
+}
+function storedTheme(){
+  try{ return localStorage.getItem('ux-theme'); }catch{ return null; }
+}
+// HerdRabbit 의 theme-icon 과 같은 도형을 쓴다.
+const ICON_SUN='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"'
+  +' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+  +'<circle cx="12" cy="12" r="3.5"/>'
+  +'<path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2'
+  +'M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const ICON_MOON='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"'
+  +' stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+  +'<path d="M20.2 15.1A8.5 8.5 0 0 1 8.9 3.8 8.5 8.5 0 1 0 20.2 15.1Z"/></svg>';
+function applyTheme(t){
+  // 공통 UI 킷은 data-theme 로 밝기를 정한다. 속성이 없으면 dark 로 본다.
+  document.documentElement.dataset.theme = t;
+  const b=$('#th'); if(!b)return;
+  // 현재 상태가 아니라 '누르면 될 테마'를 보여준다(HerdRabbit 과 같은 규칙).
+  const next = t==='dark' ? 'light' : 'dark';
+  b.dataset.nextTheme = next;
+  b.innerHTML = next==='light' ? ICON_SUN : ICON_MOON;
+  const label = next==='light' ? '밝은 화면으로 전환' : '어두운 화면으로 전환';
+  b.setAttribute('aria-label',label); b.title=label;
+}
+function currentTheme(){ return storedTheme() || (prefersDark()?'dark':'light'); }
+applyTheme(currentTheme());
+try{
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{
+    if(!storedTheme()) applyTheme(e.matches?'dark':'light');
+  });
+}catch{}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#th'))return;
+  const next=currentTheme()==='dark'?'light':'dark';
+  try{ localStorage.setItem('ux-theme',next); }catch{}
+  applyTheme(next);
+});
+
+window.addEventListener('hashchange',route);
+(async()=>{
+  try{ await loadIndex(); }
+  catch(err){
+    $('#meta').textContent='목록을 읽지 못했습니다';
+    $('#main').innerHTML='<div class="empty">목록을 읽지 못했습니다'
+      +'<br><span style="font-size:12px">'+esc(String(err&&err.message||err))
+      +' · 뷰어가 살아 있는지 확인하고 새로고침하세요.</span></div>';
+    return;
+  }
+  if(!parseRoute().path){
+    const all=INDEX.repositories.flatMap(x=>x.worktrees).flatMap(w=>w.scenarios)
+      .filter(s=>s.passCount>0)
+      .sort((a,b)=>(b.activeAt||0)-(a.activeAt||0));
+    if(all.length){location.hash='#/'+enc(all[0].path);return;}
+  }
+  route();
+})();
+// PWA: HTTPS(또는 localhost)에서만 등록된다. 평문 HTTP 면 아무 일도 하지 않는다.
+if(navigator.serviceWorker){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
+// 자동 갱신 없음. 목록을 다시 읽으려면 브라우저 새로고침(F5).
+</script></body></html>
