@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(${HOME}/.claude/scripts/ult-task-status.sh:*), Read, AskUserQuestion
+description: Notion Task 상태를 수동으로 전이. n8n이 자동 처리하지 못하는 비정형 전이에만 사용
+argument-hint: [status] [--reason <사유>]
+---
+
 # Task 상태 변경
 
 n8n이 자동 처리하지 못하는 비정형 상태 전이를 수동으로 적용합니다.

@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(${HOME}/.claude/scripts/ult-my-tasks.sh:*), Read
+description: 나에게 할당된 Notion Task 목록을 조회하고, 선택한 Task의 브랜치를 체크아웃하거나 생성
+argument-hint: [--week | --all]
+---
+
 # 내 Task 목록
 
 현재 사용자에게 할당된 Notion Task를 조회하고, 선택 시 브랜치를 자동 체크아웃/생성합니다.

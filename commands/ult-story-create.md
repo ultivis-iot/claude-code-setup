@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.claude/scripts/ult-story-create-exec.sh:*), Read, Grep, Glob, Write, AskUserQuestion
+description: 승인된 Plan을 Story 1개 + Task N개 + Issue N개로 발행. 사용자가 명시적으로 승인했을 때만 실행하는 발행 명령
+argument-hint: [--dry-run]
+---
+
 # Story 생성 (Plan 발행)
 
 본문만으로 기본 발행은 가능하고, 아래 문서는 spec이나 모델이 헷갈릴 때만 연다:

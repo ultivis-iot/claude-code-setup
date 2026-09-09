@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(${HOME}/.claude/scripts/ult-task-note.sh:*), Read
+description: 작업 중 발견한 사항이나 결정사항을 현재 브랜치의 Notion Task에 코멘트로 추가
+argument-hint: <메모 내용>
+---
+
 # 현재 Task에 메모/결정사항 추가
 
 작업 중 발견한 사항을 현재 브랜치의 Notion Task에 코멘트로 추가합니다.

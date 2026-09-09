@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.claude/scripts/ult-task-create.sh:*), Read, AskUserQuestion
+description: 기존 Story에 Task 1개와 GitHub Issue 1개를 추가하고 브랜치/worktree까지 생성. 사용자가 명시적으로 Task 추가를 승인했을 때만 실행
+argument-hint: [story-title-or-url] [--name <task>] [--topic <topic>]
+---
+
 # 기존 Story에 Task 추가
 
 기존 Story에 Task 1개, GitHub Issue 1개, Issue URL 연결, 브랜치/worktree 생성을 한 번에 처리합니다.

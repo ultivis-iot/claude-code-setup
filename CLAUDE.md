@@ -38,17 +38,22 @@ Claude Code와 Codex 개발 플로우 설정 도구 저장소입니다.
 | **MINOR** | 새 기능 추가 (하위 호환) | 새 agent/command/hook 추가 |
 | **PATCH** | 버그 수정, 개선, 문서 수정 | hook 수정, 오타 수정, 기능 개선 |
 
-**커밋 시 필수 작업:**
+**릴리스 시 필수 작업:**
 1. VERSION 파일 버전 증가
-2. CHANGELOG.md에 변경 내역 추가
+2. CHANGELOG.md의 `## Unreleased` 항목을 해당 버전 절로 확정
 3. 커밋 후 태그 생성
+
+커밋마다 버전을 올리지 않는다. 커밋은 CHANGELOG의 `## Unreleased`에 쌓고, 푸시해서 내보낼 때 한 번만 번호를 정한다. 릴리스 단위와 버전이 1:1이어야 태그가 의미를 갖는다.
 
 **예시:**
 ```bash
-# 1. VERSION 수정: 0.1.0 → 0.1.1
-# 2. CHANGELOG.md 업데이트
-# 3. 커밋 & 태그
+# 커밋할 때 — 버전은 건드리지 않고 CHANGELOG 의 ## Unreleased 에만 적는다
 git add . && git commit -m "fix: 변경 내용"
+
+# 내보낼 때 — 쌓인 커밋을 한 버전으로 확정한다
+# 1. VERSION 수정: 0.1.0 → 0.1.1
+# 2. CHANGELOG.md 의 ## Unreleased 를 ## v0.1.1 (날짜) 로 확정
+git add . && git commit -m "chore: v0.1.1"
 git tag -a v0.1.1 -m "v0.1.1: 변경 요약"
 git push origin master --tags
 ```

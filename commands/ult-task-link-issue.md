@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.claude/scripts/ult-task-link-issue.sh:*), Read
+description: Notion Task의 비어 있는 Issue URL에 GitHub Issue를 연결. Task를 찾지 못하는 다른 명령을 복구할 때 사용
+argument-hint: [issue_num|issue_url] [--task <notion_task_url>]
+---
+
 # Task에 GitHub Issue 연결
 
 GitHub Issue는 있지만 Notion Task의 `Issue URL`이 비어 있어 `/issue`, `/ult-task-note`, `/ult-task-status`가 Task를 찾지 못할 때 사용합니다.

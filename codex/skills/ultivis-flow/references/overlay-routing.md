@@ -27,9 +27,12 @@
 | Transfer of unfinished context to another session | `handoff` |
 | A dedicated, stateful learning workspace | `teach` |
 | Role-based user journey, UI/UX audit, Playwright WebM evidence, captions, or training guide | `ux-review` |
+| Frontend routes changed and need a regression sweep — console, network, DOM, responsive | `visual-qa` |
 | Authoring or revising a reusable skill | `writing-great-skills` |
 
 `grill-me` is the explicit shortcut for starting `grilling`; the router normally selects `grilling` directly.
+
+`visual-qa` and `ux-review` both open a browser and are easy to confuse. `visual-qa` asks whether the change broke a route — it sweeps routes with no scenario and no approval, and it is the gate `commit-and-verify` offers when frontend files change. `ux-review` asks whether an approved journey meets its intent, and it requires a scenario the user approved before Playwright runs. Reach for `visual-qa` for regression, `ux-review` for judgment. `visual-qa` is a Claude command and is not installed for Codex.
 
 ## Normal transitions
 

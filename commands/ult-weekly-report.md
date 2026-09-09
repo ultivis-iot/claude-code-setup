@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.claude/scripts/ult-weekly-collect.sh:*), Bash(${HOME}/.claude/scripts/ult-weekly-publish.sh:*), Read, Write, AskUserQuestion
+description: Notion Week 기간의 작업을 집계해 Weekly Review 초안을 만들고 발행 여부를 확인받음
+argument-hint: [week] [--publish]
+---
+
 # 주간 작업 정리
 
 본문만으로 기본 요약은 가능하고, 아래 문서는 출력 형식이 막막할 때만 연다:
