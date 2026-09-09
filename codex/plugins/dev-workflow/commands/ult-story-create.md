@@ -1,8 +1,14 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.codex/scripts/ult-story-create-exec.sh:*), Read, Grep, Glob, Write, AskUserQuestion
+description: 승인된 Plan을 Story 1개 + Task N개 + Issue N개로 발행. 사용자가 명시적으로 승인했을 때만 실행하는 발행 명령
+argument-hint: [--dry-run]
+---
+
 # Story 생성 (Plan 발행)
 
-본문만으로 기본 발행은 가능하고, 아래 문서는 spec이나 모델이 헷갈릴 때만 연다:
+발행 입력 spec을 만들기 전에 아래 계약을 읽는다:
 
-- `docs/references/task-publishing-model.md`
+- `~/.codex/docs/references/task-publishing-model.md`
   - Story/Task/Issue 관계를 다시 확인할 때
   - exec 스크립트에 넘길 JSON spec을 확인할 때
 
@@ -17,7 +23,7 @@
 ## 책임 분리
 
 - LLM: Plan 분석, Story/Task 구조화, Project 선택, spec 확정
-- 스크립트: `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-story-create-exec.sh`가 Story/Task/Issue/브랜치 생성 실행
+- 스크립트: `scripts/ult-story-create-exec.sh`가 Story/Task/Issue/브랜치 생성 실행
 
 ## 수행 절차
 
@@ -43,7 +49,7 @@
    - `story`
    - `tasks`
    - 실행 전 최소 확정값은 Project, Story title, priority, Task 목록이다
-9. `--dry-run`이 아니면 확정된 spec을 `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-story-create-exec.sh`에 전달한다
+9. `--dry-run`이 아니면 확정된 spec을 `scripts/ult-story-create-exec.sh`에 전달한다
 10. Story URL, 생성된 Task/Issue 목록, worktree 결과를 요약해 출력한다
 
 ## 출력 규칙
@@ -90,9 +96,7 @@ Story/Task/Issue 생성은 Plan 승인과 발행 미리보기 확인 이후에�
 
 ## 관련 명령
 
-- 기존 Story에 Task 1개 추가: `/ult:ult-task-create`
-- 현재 Task 메모 추가: `/ult:ult-task-note`
+- 기존 Story에 Task 1개 추가: `/ult-task-create`
+- 현재 Task 메모 추가: `/ult-task-note`
 
-reference를 안 열어도 되는 경우:
-
-- 새 Story가 필요하고 Task를 몇 개로 나눌지만 결정하면 되는 일반 케이스
+실행할 때 사용하는 스크립트와 같은 설치본의 계약을 읽는다. 설정 저장소에서 직접 실행하면 저장소의 대응 문서를 사용한다.

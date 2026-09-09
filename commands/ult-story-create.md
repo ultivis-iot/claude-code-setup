@@ -6,9 +6,9 @@ argument-hint: [--dry-run]
 
 # Story 생성 (Plan 발행)
 
-본문만으로 기본 발행은 가능하고, 아래 문서는 spec이나 모델이 헷갈릴 때만 연다:
+발행 입력 spec을 만들기 전에 아래 계약을 읽는다:
 
-- `docs/references/task-publishing-model.md`
+- `~/.claude/docs/references/task-publishing-model.md`
   - Story/Task/Issue 관계를 다시 확인할 때
   - exec 스크립트에 넘길 JSON spec을 확인할 때
 
@@ -99,6 +99,4 @@ Story/Task/Issue 생성은 Plan 승인과 발행 미리보기 확인 이후에�
 - 기존 Story에 Task 1개 추가: `/ult-task-create`
 - 현재 Task 메모 추가: `/ult-task-note`
 
-reference를 안 열어도 되는 경우:
-
-- 새 Story가 필요하고 Task를 몇 개로 나눌지만 결정하면 되는 일반 케이스
+실행할 때 사용하는 스크립트와 같은 설치본의 계약을 읽는다. 설정 저장소에서 직접 실행하면 저장소의 대응 문서를 사용한다.

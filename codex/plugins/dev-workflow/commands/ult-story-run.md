@@ -1,3 +1,9 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.codex/scripts/ult-story-run.sh:*), Read, Write
+description: Story handoff를 읽어 dependency 기준으로 Ready/Blocked를 판정하고 서브에이전트에 넘길 실행 프롬프트를 생성
+argument-hint: [task-issue|handoff-json|notion-story-url] [--publish]
+---
+
 # Story 실행 준비
 
 Story handoff를 읽고, dependency 기준으로 Ready/Blocked를 판정한 뒤 서브에이전트에 넘길 실행 프롬프트를 생성합니다.
@@ -5,7 +11,13 @@ Story handoff를 읽고, dependency 기준으로 Ready/Blocked를 판정한 뒤 
 ## 실행
 
 ```bash
-${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-story-run.sh [task-issue|handoff-json|notion-story-url]
+~/.codex/scripts/ult-story-run.sh [task-issue|handoff-json|notion-story-url]
+```
+
+Codex에서는:
+
+```bash
+~/.codex/scripts/ult-story-run.sh [task-issue|handoff-json|notion-story-url]
 ```
 
 ## 동작

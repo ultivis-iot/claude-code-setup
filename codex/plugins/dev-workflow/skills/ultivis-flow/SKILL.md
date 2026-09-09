@@ -5,7 +5,7 @@ description: Baseline workflow and query router for repositories using this setu
 
 # Development Workflow
 
-This is the always-on baseline for repositories using this setup. It owns lifecycle and tracking; focused skills are temporary overlays and never replace this workflow.
+This is the lifecycle baseline when selected or required by repository instructions. Its description enables discovery; installing a skill alone does not enforce execution. The shared validation runner and optional Git pre-push hook enforce the publication checks. Focused skills supply the working method.
 
 ## Default behavior
 

@@ -8,7 +8,7 @@ argument-hint: [PR번호] [--once]
 
 본문만으로 기본 흐름은 수행 가능하고, 아래 문서는 판단이 애매할 때만 연다:
 
-- `docs/references/review-cycle-playbook.md`
+- `~/.claude/docs/references/review-cycle-playbook.md`
   - 리뷰 분류 기준을 다시 보고 싶을 때
   - 완료 판단이나 중복 방지 규칙이 헷갈릴 때
 

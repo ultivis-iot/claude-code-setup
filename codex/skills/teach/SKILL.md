@@ -1,6 +1,6 @@
 ---
 name: teach
-description: Teach the user a new skill or concept, within this workspace.
+description: Build a multi-session learning course in a dedicated teaching workspace. Use for guided lessons and learning records, not a one-off explanation in a software repository.
 ---
 
 The user has asked you to teach them something. This is a stateful request - they intend to learn the topic over multiple sessions.

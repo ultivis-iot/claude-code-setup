@@ -1,0 +1,6 @@
+#!/bin/bash
+# Ultivis validation pre-push gate. Installed with its runtime under workflow/.
+set -euo pipefail
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO=$(git rev-parse --show-toplevel)
+exec node "$HOOK_DIR/workflow/scripts/validation-gate.mjs" pre-push "$REPO/tmp/validation-status.json" --repo "$REPO"

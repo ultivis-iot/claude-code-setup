@@ -116,6 +116,9 @@ if (Test-Path $SchemasSource) {
 }
 
 # Scripts 설치
+New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "docs/references"), (Join-Path $ClaudeDir "templates") | Out-Null
+Copy-Item (Join-Path $ScriptDir "docs/references/*.md") -Destination (Join-Path $ClaudeDir "docs/references") -Force
+Copy-Item (Join-Path $ScriptDir "templates/cli-sync.json") -Destination (Join-Path $ClaudeDir "templates") -Force
 Write-Host "6. Scripts 설치..."
 $ScriptsSource = Join-Path $ScriptDir "scripts"
 $ScriptsDest = Join-Path $ClaudeDir "scripts"

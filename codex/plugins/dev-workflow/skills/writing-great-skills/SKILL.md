@@ -14,11 +14,17 @@ In this cross-platform setup, keep `SKILL.md` frontmatter to `name` and `descrip
 Two choices, trading different costs:
 
 - A **model-invoked** skill keeps a **description**, so the agent can fire it autonomously _and_ other skills can reach it (you can still type its name too). It contributes to **context load** — the description sits in the window every turn. Mechanics: omit `disable-model-invocation`, and write a model-facing description with rich trigger phrasing ("Use when the user wants…, mentions…").
-- A **user-invoked** skill strips the description from the agent's reach: only you, typing its name, can invoke it — and no other skill can. Zero context load, but it spends **cognitive load**: _you_ are the index that must remember it exists. Mechanics: set `disable-model-invocation: true`; the `description` becomes human-facing — a one-line summary, trigger lists stripped.
+- An **explicit-only** skill retains its required description and disables automatic selection through the host's invocation policy. In Codex use `agents/openai.yaml` with `policy.allow_implicit_invocation: false`; Claude uses `disable-model-invocation: true`. Keep the existing invocation policy unless the user requests a change. Discovery/context behavior is host-specific; do not promise zero cost across platforms.
 
-Pick model-invocation only when the agent must reach the skill on its own, or another skill must. If it only ever fires by hand, make it user-invoked and pay no context load.
+Use clear trigger boundaries for automatic discovery. Explicit-only invocation is a user preference, not a substitute for authorization checks before external writes.
 
 When user-invoked skills multiply past what you can remember, that piled-up cognitive load is cured by a **router skill**: one user-invoked skill that names the others and when to reach for each.
+
+## Execution contracts and evaluation
+
+Use code for repeatable state checks, schema validation, result aggregation, and external operations that need recovery. A prompt saying "must verify" does not enforce verification. Name the executable, inputs, failure exit, and evidence that permit the next step. Keep shared contracts in one installed, discoverable location.
+
+Keep judgment in the skill: interpreting user intent, evaluating evidence, and explaining tradeoffs. Strong words and concise prose are hypotheses about behavior, not evidence that behavior improved. Evaluate realistic trigger and non-trigger requests, required tool calls, stale/missing artifacts, unnecessary questions, completion decisions, and cost across repeated runs. Report what was tested; structural validation alone does not prove skill effectiveness.
 
 ## Writing the description
 

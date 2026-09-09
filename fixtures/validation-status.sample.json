@@ -1,13 +1,18 @@
 {
-  "timestamp": "2026-04-20T12:34:56Z",
-  "branch": "feature/123-add-login",
-  "base_branch": "main",
-  "commits": [
-    {
-      "hash": "abc1234",
-      "message": "feat: add login validation"
-    }
-  ],
+  "schema_version": 2,
+  "timestamp": "2026-09-09T00:00:00Z",
+  "snapshot": {
+    "schema_version": 2,
+    "started_at": "2026-09-09T00:00:00Z",
+    "repository": "/example/repo/.git",
+    "branch": "feature/123-add-login",
+    "base_branch": "origin/main",
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "plan_sha256": null,
+    "cli_config_sha256": null,
+    "cli_required": false
+  },
   "results": {
     "intent-validator": "PASS",
     "doc-validator": "WARN",
@@ -17,9 +22,30 @@
     "cli-validator": "SKIP",
     "visual-qa": "PENDING"
   },
+  "evidence": {
+    "intent-validator": [
+      "Fixture evidence for intent-validator; not a live validation result."
+    ],
+    "doc-validator": [
+      "Fixture evidence for doc-validator; not a live validation result."
+    ],
+    "security-validator": [
+      "Fixture evidence for security-validator; not a live validation result."
+    ],
+    "code-simplifier": [
+      "Fixture evidence for code-simplifier; not a live validation result."
+    ],
+    "test-validator": [
+      "Fixture evidence for test-validator; not a live validation result."
+    ],
+    "cli-validator": [
+      "Fixture evidence for cli-validator; not a live validation result."
+    ],
+    "visual-qa": [
+      "Fixture evidence for visual-qa; not a live validation result."
+    ]
+  },
   "overall": "WARN",
-  "warnings": [
-    "Documentation update recommended"
-  ],
+  "warnings": [],
   "errors": []
 }

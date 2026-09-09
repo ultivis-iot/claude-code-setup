@@ -65,7 +65,7 @@ Plan이 크거나 애매하면 바로 Story/Task를 만들지 말고, 먼저 사
 3. Build 중에는 Plan을 수정하지 않음 (원본 의도 보존)
 
 ### Plan 승인 후 분류 + 확인
-Plan 승인 직후 (hook이 `tmp/current-plan.md`를 저장한 직후), Build 시작 전에 Plan 성격을 분류하고 다음 단계 1개를 제안한다.
+Plan 승인 후 현재 대화의 정확한 Plan을 `tmp/current-plan.md`에 저장한다. Hook에 명시 경로가 없으면 메인 에이전트가 저장하며 전역 최신 파일을 추측하지 않는다. Build 시작 전에 Plan 성격을 분류하고 이미 승인된 범위는 이어서 수행한다.
 
 | Plan 성격 | 기본 제안 |
 |---|---|

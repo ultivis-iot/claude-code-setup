@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## v1.0.0 (2026-09-09)
+
+- 호환성 변경: 공통 검증에 Node.js가 필요하며 기존 v1 검증 결과는 재사용하지 않는다. 업데이트 후 검증을 다시 실행하고, 선택적 Git hook을 이미 사용하는 저장소는 hook 설치기도 다시 실행한다.
+- 검증 결과 v2와 공통 `validation-gate.mjs` 추가: 검증 시작 스냅샷, 결과 집계, 근거 필수화, HEAD/base/Plan/CLI 설정 변경 및 필수 검증 생략 차단. 기존 결과는 재검증 필요.
+- 커밋 전 검증을 요구하던 구형 hook을 staged diff 검사와 pre-push 검증 게이트로 분리. worktree/custom hooks 경로 지원, 기존 hook 백업 및 사용자 hook 보존. 실제 임시 Git 원격으로 회귀 테스트 추가.
+- 커밋/PR 절차를 공통 계약 문서로 통합하고 세 설치기에 참조·템플릿·스키마 배포 추가. 자동 PR target도 `--base`로 명시. 원본에서 배포본을 생성하는 동기화 도구와 검사 추가.
+- 전역 최신 Plan 자동 선택 제거, TDD 리팩터링 주체와 테스트 평가 기준 정리, 보안 검증의 재귀 command 의존 제거, 스킬 호출 정책 설명 및 자동 적용 범위 정정. 설치/실행 변경은 저장소에 반영하며 사용자 전역 설치본은 자동 변경하지 않음.
+
 - 커맨드 9개(`issue`, `ult-my-tasks`, `ult-story-create`, `ult-story-run`, `ult-task-create`, `ult-task-link-issue`, `ult-task-note`, `ult-task-status`, `ult-weekly-report`)에 frontmatter 추가. `description` 이 비어 있어 저장소 규칙을 어겼고, 스킬 목록에 이름만 뜨는 탓에 라우터가 이 커맨드들을 고를 근거가 없었음. 기존 커맨드 규약대로 `allowed-tools`·`description`·`argument-hint` 를 쓰고(`name` 키는 이 저장소가 쓰지 않음), `allowed-tools` 는 각 커맨드가 실제로 부르는 스크립트로 좁힘. 발행 명령인 `ult-story-create`·`ult-task-create` 는 description 에 "사용자가 명시적으로 승인했을 때만 실행"을 넣어 라우터가 임의로 부르지 않게 함.
 - `overlay-routing.md` 에 `visual-qa` 행 추가. 라우팅 표에는 `ux-review` 만 있어 라우터가 `visual-qa` 를 스스로 고를 수 없었음. 둘 다 브라우저를 열어 헷갈리므로 경계도 적음 — `visual-qa` 는 시나리오도 승인도 없이 라우트를 훑어 "이 변경이 깨뜨렸나"를 묻는 `commit-and-verify` 의 게이트이고, `ux-review` 는 승인된 시나리오가 있어야 Playwright 가 도는 의도 판정임. `visual-qa` 가 Claude 커맨드라 Codex 에는 설치되지 않는다는 점도 명시.
 - 버전 정책을 커밋 단위에서 릴리스 단위로 변경. 문서는 "커밋 시 필수 작업: VERSION 증가"라고 적혀 있었지만 실제 이력은 커밋 88개에 태그 17개였고, `16f4fa1`~`3457055` 처럼 여섯 커밋이 버전 없이 이어지다 `f99e24a` 가 한꺼번에 정리한 사례가 있었음. 규칙을 곧이곧대로 따르면 커밋마다 번호가 붙어 `1c6a166`("앞 커밋의 버전을 0.10.0 에서 0.9.2 로 정정") 같은 사고가 남. 이제 커밋은 `## Unreleased` 에 쌓고 내보낼 때 한 번만 번호를 정한다. 규칙과 어긋나 있던 아래 예시 블록도 커밋용·릴리스용 두 단계로 고침.

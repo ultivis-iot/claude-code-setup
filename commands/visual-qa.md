@@ -8,7 +8,7 @@ argument-hint: [routes...] [--all] [--url <dev-server-url>]
 
 본문만으로 기본 흐름은 가능하고, 아래 문서는 세부 테스트 규칙이 필요할 때만 연다:
 
-- `docs/references/visual-qa-playbook.md`
+- `~/.claude/docs/references/visual-qa-playbook.md`
   - 수집 항목의 의미나 판정 기준을 다시 볼 때
   - 로그인이 필요한 라우트를 다룰 때
   - 실패 처리 기준이 헷갈릴 때

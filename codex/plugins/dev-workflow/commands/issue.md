@@ -1,3 +1,8 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.codex/scripts/issue.sh:*), Read
+description: 현재 브랜치의 작업 컨텍스트 확인. 브랜치에서 이슈 번호를 뽑아 GitHub Issue와 Notion Task/Story/Project를 함께 보여줌
+---
+
 # 현재 브랜치의 작업 컨텍스트 확인
 
 현재 git 브랜치에서 이슈 번호를 추출하고, **GitHub 이슈 + Notion Task/Story/Project** 정보를 함께 보여줍니다.
@@ -12,7 +17,7 @@
 ## 실행
 
 ```bash
-${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/issue.sh
+~/.codex/scripts/issue.sh
 ```
 
 스크립트가 처리하는 것:

@@ -83,6 +83,7 @@ model: sonnet
 ```json
 {
   "status": "PASS" | "WARN" | "FAIL",
+  "evidence": ["검토한 표준/코드 경로와 판정 근거"],
   "findings": [
     {
       "type": "standards" | "duplication" | "dead_code" | "code_smell" | "style",

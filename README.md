@@ -43,7 +43,7 @@ Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니�
 |-----|------|
 | **Plan 모드 가이드** | 사용자 의도를 명확하게 문서화 |
 | **질의 기반 스킬 라우터** | `ultivis-flow`를 기반으로 요청에 맞는 독립 overlay를 자동 선택 |
-| **Plan 자동 저장** | Plan 승인 시 `tmp/current-plan.md`로 자동 복사 |
+| **Plan 보존** | 현재 대화에서 승인한 정확한 Plan을 `tmp/current-plan.md`로 저장 |
 | **자동 검증** | 커밋 후 의도 검증 + 품질 검증 자동 실행 |
 | **작업 중심 진입점** | `ult-start-task`, `ult-finish-task`, `ult-sync-task` 명령으로 세부 명령 추상화 |
 | **CLI 동기화 검증** | 서버 API 변경 시 CLI 커맨드 동기화 + Help 품질 자동 검증 |
@@ -156,7 +156,7 @@ git pull
 ├── schemas/
 │   └── validation-status.schema.json  # 검증 결과 표준 스키마
 ├── hooks/
-│   └── copy-plan-on-accept.sh  # Plan 승인 시 자동 복사
+│   └── copy-plan-on-accept.sh  # 명시적으로 연결된 승인 Plan만 복사
 ├── plugins/
 │   └── security-guidance/      # 실시간 보안 검사 Plugin
 ├── scripts/
@@ -236,8 +236,8 @@ Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고
 
 Plan 작성 시 반드시 **의도(Intent)** 섹션을 포함하여 사용자 의도를 명문화합니다.
 
-**Plan 승인 시 자동 동작**:
-- 사용자가 Plan을 승인하면 `tmp/current-plan.md`로 자동 복사됩니다
+**Plan 승인 후 저장**:
+- 현재 대화에서 승인된 정확한 Plan을 `tmp/current-plan.md`에 저장합니다. Hook은 `WORKFLOW_APPROVED_PLAN`에 정확한 경로가 있을 때만 자동 복사하고, 없으면 저장을 안내합니다.
 - 이 Plan은 검증 단계에서 의도 검증의 기준이 됩니다
 
 ### 2. Plan 승인 후 확인
@@ -346,31 +346,29 @@ mkdir -p tmp
 ```
 
 **자동 생성되는 파일**:
-- `tmp/current-plan.md` - Plan 승인 시 자동 복사 (PostToolUse hook)
+- `tmp/current-plan.md` - 현재 대화에서 승인된 Plan
+- `tmp/validation-snapshot.json` - 검증 시작 시 코드·base·Plan의 식별값
 - `tmp/validation-status.json` - 검증 결과 기록
 - `tmp/last-review-id-{PR}.txt` - 리뷰 사이클 상태 (`.gitignore` 권장)
 - `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
 
 ### Git Hook 설치 (선택)
 
-검증 없이 커밋하는 것을 방지하려면 pre-commit hook을 설치하세요:
+커밋 후 검증하는 흐름에 맞춰, 검증되지 않은 push를 차단하는 hook을 설치할 수 있습니다. Node.js가 필요합니다:
 
 ```bash
 # 프로젝트 루트에서 실행
 /path/to/claude-code-setup/hooks/install-hooks.sh
 ```
 
-또는 수동으로:
-
-```bash
-cp /path/to/claude-code-setup/hooks/pre-commit .git/hooks/
-chmod +x .git/hooks/pre-commit
-```
+설치기는 실행기와 스키마를 hook 옆에 함께 설치하며 worktree와 `core.hooksPath`를 지원합니다. 기존 사용자 hook은 기본적으로 보존합니다. `--replace`를 명시하면 백업 후 교체합니다. 기존 워크플로우 hook도 백업하고 새 계약으로 교체합니다.
 
 **Hook 동작**:
-- 커밋 시 `tmp/validation-status.json` 확인
-- 검증 미통과 시 커밋 차단
-- `git commit --no-verify`로 우회 가능
+- pre-commit은 staged diff를 검사하며 검증 결과가 없어도 커밋할 수 있습니다.
+- pre-push는 현재 브랜치/HEAD/base/Plan/CLI 설정과 검증 스냅샷이 같은지 확인합니다. 필수 검증 미실행·실패·dirty 상태는 차단합니다.
+- 현재 검증된 브랜치와 그 커밋의 태그만 게시할 수 있습니다. 다른 브랜치나 삭제 작업은 별도 흐름으로 처리합니다.
+- 로컬 hook은 `git push --no-verify`로 우회할 수 있습니다. 서버 측 강제가 필요하면 보호 브랜치/CI를 별도로 구성해야 합니다.
+- v1 결과는 자동 승격하지 않습니다. 업데이트 후 검증을 다시 실행합니다. 이미 선택적 hook을 사용하는 저장소만 hook 설치기도 다시 실행하세요.
 
 ## 보안 검증
 
@@ -412,7 +410,13 @@ chmod +x .git/hooks/pre-commit
 
 포함 항목:
 - 주요 셸 스크립트 문법 검사
-- `fixtures/validation-status.sample.json` 계약 검사
+- v2 결과 스키마와 집계 검사
+- 임시 저장소에서 상태 변경·검증 생략·실제 push 차단 회귀 테스트
+- 스킬 및 커맨드의 배포본 동기화 검사
+
+스킬/커맨드 원본을 수정한 뒤 `node scripts/sync-workflow.mjs --write`로 배포본을 생성합니다. 검증은 `--check`로 차이를 탐지하며 파일을 바꾸지 않습니다. UX 계약 테스트는 별도로 `node scripts/test-ux-review-skill.mjs`를 실행합니다.
+
+커밋·PR 절차의 공통 원본은 `docs/references/validation-contract.md`와 `create-pr-contract.md`입니다. 세 설치기가 문서·스키마·템플릿을 함께 배포합니다. 구조 검사와 hook 테스트는 모델의 스킬 선택 정확도나 리뷰 품질을 측정하는 평가를 대신하지 않습니다.
 
 ### 환경 변수 (.env)
 

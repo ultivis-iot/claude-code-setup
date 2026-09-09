@@ -1,102 +1,171 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "validation-status.schema.json",
-  "title": "Validation Status",
-  "description": "commit-and-verify 검증 결과 표준 스키마",
+  "title": "Validation Status v2",
   "type": "object",
-  "required": ["timestamp", "branch", "base_branch", "commits", "results", "overall", "warnings", "errors"],
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "timestamp",
+    "snapshot",
+    "results",
+    "evidence",
+    "overall",
+    "warnings",
+    "errors"
+  ],
   "properties": {
+    "schema_version": {
+      "const": 2
+    },
     "timestamp": {
       "type": "string",
-      "format": "date-time",
-      "description": "검증 완료 시간 (ISO 8601)"
+      "format": "date-time"
     },
-    "branch": {
-      "type": "string",
-      "description": "현재 브랜치명"
-    },
-    "base_branch": {
-      "type": "string",
-      "description": "기준 브랜치명 (main, master, dev 등)"
-    },
-    "commits": {
-      "type": "array",
-      "description": "브랜치의 커밋 목록 (base_branch 이후)",
-      "items": {
-        "type": "object",
-        "required": ["hash", "message"],
-        "properties": {
-          "hash": {
-            "type": "string",
-            "pattern": "^[a-f0-9]{7,40}$",
-            "description": "커밋 해시"
-          },
-          "message": {
-            "type": "string",
-            "description": "커밋 메시지"
-          }
-        }
-      }
+    "snapshot": {
+      "$ref": "#/$defs/snapshot"
     },
     "results": {
       "type": "object",
-      "description": "각 validator별 결과",
-      "required": ["intent-validator", "doc-validator", "security-validator", "code-simplifier", "test-validator"],
+      "additionalProperties": false,
+      "required": [
+        "intent-validator",
+        "doc-validator",
+        "security-validator",
+        "code-simplifier",
+        "test-validator"
+      ],
       "properties": {
         "intent-validator": {
-          "$ref": "#/$defs/validationResult"
+          "$ref": "#/$defs/result"
         },
         "doc-validator": {
-          "$ref": "#/$defs/validationResult"
+          "$ref": "#/$defs/result"
         },
         "security-validator": {
-          "$ref": "#/$defs/validationResult"
+          "$ref": "#/$defs/result"
         },
         "code-simplifier": {
-          "$ref": "#/$defs/validationResult"
+          "$ref": "#/$defs/result"
         },
         "test-validator": {
-          "$ref": "#/$defs/validationResult"
+          "$ref": "#/$defs/result"
         },
         "cli-validator": {
-          "$ref": "#/$defs/validationResult",
-          "description": "CLI 동기화 검증 결과 (선택적 — .cli-sync.json의 enabled: true 시)"
+          "$ref": "#/$defs/result"
         },
         "visual-qa": {
-          "$ref": "#/$defs/visualQaResult",
-          "description": "Visual QA 결과 (선택적 — 프론트엔드 변경 시)"
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "SKIP",
+            "PENDING"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
     "overall": {
-      "$ref": "#/$defs/validationResult",
-      "description": "전체 검증 결과"
+      "enum": [
+        "PASS",
+        "WARN",
+        "FAIL"
+      ]
     },
     "warnings": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "경고 메시지 목록"
+      }
     },
     "errors": {
       "type": "array",
       "items": {
         "type": "string"
-      },
-      "description": "에러 메시지 목록"
+      }
     }
   },
   "$defs": {
-    "validationResult": {
-      "type": "string",
-      "enum": ["PASS", "WARN", "FAIL", "SKIP"],
-      "description": "검증 결과 상태 (SKIP: 이전 단계 실패로 미실행)"
+    "result": {
+      "enum": [
+        "PASS",
+        "WARN",
+        "FAIL",
+        "SKIP"
+      ]
     },
-    "visualQaResult": {
-      "type": "string",
-      "enum": ["PASS", "WARN", "FAIL", "SKIP", "PENDING"],
-      "description": "Visual QA 결과 (PENDING: 사용자가 /visual-qa 실행 대기 중, SKIP: 프론트엔드 변경 없음 또는 사용자 건너뛰기)"
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "started_at",
+        "repository",
+        "branch",
+        "base_branch",
+        "head_sha",
+        "base_sha",
+        "plan_sha256",
+        "cli_config_sha256",
+        "cli_required"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 2
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "base_sha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
+        "plan_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "cli_config_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "cli_required": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

@@ -18,19 +18,19 @@ How a skill is reached — and the two loads you pay for the choice.
 
 ### Model-Invoked
 
-A skill that keeps its **description** field, so the agent can see it and fire it autonomously — and the human can still type its name, so model-invocation always _includes_ user reach. There is no model-only state: a description only ever _adds_ agent discovery, never removes the human's. Pays a permanent **context load** on every turn in exchange for that discoverability. Reachable by other skills, because the description that makes it agent-discoverable makes it invocable. A model-invoked skill whose content is all **reference** is also one home for shared reference: another skill can invoke it, so reference needed by several skills lives in one place. Pick model-invocation only when the agent must reach the skill on its own; if it never fires except by hand, drop the description and pay no context load.
+A skill eligible for automatic selection through its description. Keep both required metadata fields, name and description. Invocation policy is configured through the host; in Codex automatic selection is the default unless agents/openai.yaml disables it.
 
 _Avoid_: ability, tool, capability
 
 ### User-Invoked
 
-A skill with its **description** stripped — invisible to the agent and reachable only by the human typing its name (user-_only_, where **model-invoked** is user-_and-agent_). Trades agent-discoverability for zero **context load**. Because it has no description, nothing but the human can reach it: no other skill can fire it.
+A skill configured for explicit invocation through host policy. Keep its required description. In Codex set policy.allow_implicit_invocation: false in agents/openai.yaml; Claude uses disable-model-invocation: true. Context visibility and cross-skill reach depend on the host, not on deleting the description.
 
 _Avoid_: procedure, workflow, command
 
 ### Description
 
-The skill's machine-readable trigger, and the one **context pointer** a **model-invoked** skill is forced to keep loaded at all times. Its mere presence _is_ the invocation axis: keep it and the skill is model-invoked (and reachable by other skills); delete it and the skill is **user-invoked**, reachable only by the human. The source of a model-invoked skill's **context load**.
+The required discovery summary describing the capability and the requests it applies to. It informs automatic matching but does not itself set invocation policy. Keep triggers specific and distinguish nearby capabilities.
 
 _Avoid_: frontmatter, summary
 
@@ -42,7 +42,7 @@ _Avoid_: link, reference, import
 
 ### Context Load
 
-The cost a **model-invoked** skill imposes on the agent's context window — its **description**, always loaded, spending both tokens and attention. What **user-invoked** skills escape by having no description, and the brake on splitting into more model-invoked skills.
+The metadata and instructions a host places in the agent's context. Automatic skill discovery has a cost in tokens and attention; explicit-only discovery can reduce that cost depending on the host. Measure the actual loaded context rather than inferring it from the presence of a description.
 
 _Avoid_: token cost, context bloat
 
@@ -54,7 +54,7 @@ _Avoid_: human index, burden, overhead
 
 ### Router Skill
 
-A **user-invoked** skill whose job is to point at your other user-invoked skills — naming each and when to reach for it — so the human has one skill to remember instead of many. It can only hint, never fire them: user-invoked skills have no **description**, so nothing but the human can reach them. The cure for **cognitive load** when user-invoked skills multiply.
+A skill that maps requests to focused skills. The router does not change their host invocation policy or grant permission for their external actions.
 
 _Avoid_: dispatcher, menu, registry, index, router procedure
 
@@ -94,7 +94,7 @@ _Avoid_: supporting material, docs, background
 
 ### External Reference
 
-**Reference** that lives outside the skill system — a plain file, no **description**, no **steps**, not invocable — that any skill can point at. The home for shared reference that needn't fire on its own, and the only shared home two **user-invoked** skills can use, since neither has a description and so neither can fire the other.
+**Reference** stored outside a skill entrypoint, read through an explicit path when needed. It is a useful home for shared contracts regardless of invocation policy. Distribute it with its callers and define when reading it is required.
 
 _Avoid_: doc, resource, knowledge base
 

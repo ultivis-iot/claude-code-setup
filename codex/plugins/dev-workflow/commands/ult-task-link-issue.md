@@ -1,11 +1,17 @@
+---
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.codex/scripts/ult-task-link-issue.sh:*), Read
+description: Notion Task의 비어 있는 Issue URL에 GitHub Issue를 연결. Task를 찾지 못하는 다른 명령을 복구할 때 사용
+argument-hint: [issue_num|issue_url] [--task <notion_task_url>]
+---
+
 # Task에 GitHub Issue 연결
 
-GitHub Issue는 있지만 Notion Task의 `Issue URL`이 비어 있어 `/ult:issue`, `/ult:ult-task-note`, `/ult:ult-task-status`가 Task를 찾지 못할 때 사용합니다.
+GitHub Issue는 있지만 Notion Task의 `Issue URL`이 비어 있어 `/issue`, `/ult-task-note`, `/ult-task-status`가 Task를 찾지 못할 때 사용합니다.
 
 ## 실행
 
 ```bash
-${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-link-issue.sh [issue_num|issue_url] [--task <notion_task_url>]
+~/.codex/scripts/ult-task-link-issue.sh [issue_num|issue_url] [--task <notion_task_url>]
 ```
 
 스크립트가 처리하는 것:
@@ -18,9 +24,9 @@ ${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}/ult-task-link-issue
 ## 사용 예
 
 ```
-/ult:ult-task-link-issue #234 --task https://www.notion.so/...
-/ult:ult-task-link-issue https://github.com/org/repo/issues/234 --task https://www.notion.so/...
-/ult:ult-task-link-issue #234 --name "Token refresh 처리"
+/ult-task-link-issue #234 --task https://www.notion.so/...
+/ult-task-link-issue https://github.com/org/repo/issues/234 --task https://www.notion.so/...
+/ult-task-link-issue #234 --name "Token refresh 처리"
 ```
 
 ## 옵션

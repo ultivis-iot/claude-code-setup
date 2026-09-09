@@ -8,7 +8,7 @@ argument-hint: [week] [--publish]
 
 본문만으로 기본 요약은 가능하고, 아래 문서는 출력 형식이 막막할 때만 연다:
 
-- `docs/references/weekly-report-format.md`
+- `~/.claude/docs/references/weekly-report-format.md`
   - 보고서 구조 예시가 필요할 때
   - 어떤 항목을 강조해야 하는지 애매할 때
 

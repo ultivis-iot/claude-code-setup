@@ -106,6 +106,7 @@ AI Agent가 CLI를 도구로 사용할 때, `--help` 출력만으로 올바른 �
 ```json
 {
   "status": "PASS|WARN|FAIL",
+  "evidence": ["검토한 base/head SHA, API/CLI 경로와 판정 근거"],
   "sync": {
     "status": "PASS|WARN|FAIL|SKIP",
     "apiChanges": ["추가/변경/삭제된 API 목록"],

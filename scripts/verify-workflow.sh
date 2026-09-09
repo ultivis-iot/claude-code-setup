@@ -29,6 +29,11 @@ if [ "$MODE" = "repo" ]; then
     check_script "$WORKFLOW_ROOT/setup.sh"
     check_script "$WORKFLOW_ROOT/setup-codex.sh"
     check_file "$WORKFLOW_ROOT/setup.ps1"
+    node "$WORKFLOW_ROOT/scripts/sync-workflow.mjs" --check
+    check_script "$WORKFLOW_ROOT/hooks/pre-commit"
+    check_script "$WORKFLOW_ROOT/hooks/pre-push"
+    check_script "$WORKFLOW_ROOT/hooks/install-hooks.sh"
+    check_script "$WORKFLOW_ROOT/hooks/copy-plan-on-accept.sh"
     for command_file in "$WORKFLOW_ROOT"/commands/*.md; do
         command_name="$(basename "$command_file")"
         plugin_command="$WORKFLOW_ROOT/codex/plugins/dev-workflow/commands/$command_name"
@@ -85,9 +90,15 @@ check_script "$WORKFLOW_ROOT/scripts/ult-weekly-publish.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-wt-add.sh"
 check_script "$WORKFLOW_ROOT/scripts/check-validation-status.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-cache-refresh.sh"
+check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"
+check_file "$WORKFLOW_ROOT/schemas/validation-status.schema.json"
+check_file "$WORKFLOW_ROOT/docs/references/validation-contract.md"
+check_file "$WORKFLOW_ROOT/docs/references/create-pr-contract.md"
+check_file "$WORKFLOW_ROOT/templates/cli-sync.json"
 
 if [ "$MODE" = "repo" ]; then
     "$WORKFLOW_ROOT/scripts/check-validation-status.sh" "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
+    node "$WORKFLOW_ROOT/scripts/test-validation-gate.mjs"
 else
     echo "OK: installed workflow files are present and shell-parse clean"
 fi

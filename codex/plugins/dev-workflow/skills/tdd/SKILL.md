@@ -21,9 +21,7 @@ See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking g
 
 A **seam** is the public boundary you test at: the interface where you observe behavior without reaching inside. Tests live at seams, never against internals.
 
-**Test only at pre-agreed seams.** Before writing any test, write down the seams under test and confirm them with the user. No test is written at an unconfirmed seam. You can't test everything — agreeing the seams up front is how testing effort lands on the critical paths and complex logic instead of every edge case.
-
-Ask: "What's the public interface, and which seams should we test?"
+Choose the public interface from the requested behavior and existing tests. State the seam and proceed when it follows from the approved scope. Ask only when choosing a seam would change product behavior, scope, or a significant architecture decision.
 
 ## Anti-patterns
 
@@ -35,4 +33,4 @@ Ask: "What's the public interface, and which seams should we test?"
 
 - **Red before green.** Write the failing test first, then only enough code to pass it. Don't anticipate future tests or add speculative features.
 - **One slice at a time.** One seam, one test, one minimal implementation per cycle.
-- **Refactoring is not part of the loop.** It belongs to the Standards Review inside `commit-and-verify`, not the red → green implementation cycle.
+- **Refactor after green when useful.** The implementing agent improves structure while keeping the tests green. Standards Review checks the result and returns findings; it does not implement refactoring.

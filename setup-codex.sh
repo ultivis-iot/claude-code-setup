@@ -122,6 +122,12 @@ echo -e "${GREEN}   ✓ ~/.agents/plugins/marketplace.json${NC}"
 echo -e "${YELLOW}     Codex에서는 plugin이 ultivis-flow skill을 제공하며, /plugins에서 설치 상태를 확인할 수 있습니다.${NC}"
 
 echo "5. Scripts 설치..."
+mkdir -p "$CODEX_DIR/schemas" "$CODEX_DIR/docs/references" "$CODEX_DIR/templates" "$CODEX_DIR/agents"
+cp "$SCRIPT_DIR"/schemas/*.json "$CODEX_DIR/schemas/"
+cp "$SCRIPT_DIR"/docs/references/*.md "$CODEX_DIR/docs/references/"
+cp "$SCRIPT_DIR/templates/cli-sync.json" "$CODEX_DIR/templates/"
+# Review instructions are read as references; these files do not register Codex agents.
+cp "$SCRIPT_DIR"/agents/*.md "$CODEX_DIR/agents/"
 SCRIPTS_DEST="$CODEX_DIR/scripts"
 mkdir -p "$SCRIPTS_DEST"
 for file in "$SCRIPT_DIR/scripts"/*.sh "$SCRIPT_DIR/scripts"/*.mjs; do

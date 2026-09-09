@@ -37,17 +37,18 @@ model: haiku
 
 ## 검증 절차
 
-1. 기준 브랜치 대비 변경된 파일 확인: `git diff <base_branch>...HEAD --name-only`
+1. 메인 에이전트가 전달한 base/head SHA의 diff와 변경 파일 목록 확인. 입력이 없으면 미실행 사유를 보고한다.
 2. 변경된 코드 파일과 관련 문서 파일 비교
 3. 문서 업데이트 필요 여부 판단
 
-**참고**: `<base_branch>`는 main, master, dev 중 존재하는 브랜치
+검토 범위는 전달받은 스냅샷이며 기준 브랜치를 별도로 추측하지 않는다.
 
 ## 결과 형식
 
 ```json
 {
   "status": "PASS" | "WARN" | "FAIL",
+  "evidence": ["검토한 diff/문서 경로와 판정 근거"],
   "findings": [
     {
       "type": "outdated_doc" | "missing_doc" | "inconsistent",

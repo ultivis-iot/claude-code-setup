@@ -4,7 +4,7 @@ Use this procedure when the user wants the Codex equivalent of `/review-cycle`.
 
 ## Goal
 
-Inspect the latest AI PR feedback, classify each finding, and keep processing follow-up rounds through Ralph Loop until there are no new actionable findings. A direct `/review-cycle` invocation should bootstrap Ralph Loop automatically; only `/review-cycle ... --once` performs one concrete round.
+Inspect the latest AI PR feedback and process follow-up rounds in the current Codex session. Ralph Loop is a Claude-specific integration and is not a Codex dependency. Use the product's monitoring/wait capability when waiting for external reviews or checks; do not pretend that a Claude hook schedules Codex turns.
 
 ## Classification
 
@@ -16,8 +16,8 @@ Inspect the latest AI PR feedback, classify each finding, and keep processing fo
 
 ## Required behavior
 
-1. If invoked without `--once`, start Ralph Loop with `/review-cycle ... --once` as the repeated prompt and do not process reviews in the bootstrap call. The loop runs at most 15 iterations unless `REVIEW_CYCLE_MAX_ITERATIONS` says otherwise.
-2. In a `--once` round, read PR checks and the latest comments, reviews, and unresolved review threads. Run `gh` commands one at a time, never concurrently.
+1. Process one round when `--once` is requested. Otherwise continue within the current session, up to 15 rounds by default, recording round number and PR head SHA in the local handoff. Reaching the limit is an incomplete result, never a completion signal.
+2. Read PR checks and the latest comments, reviews, and unresolved review threads. Tie review/check evidence to the current PR head SHA. Independent read-only queries may run concurrently; writes remain ordered.
 3. Keep only AI review items: read comments first, then reviews, then unresolved threads; accept an item only when it comes from a bot account or carries an unmistakable AI review header or pattern; skip threads that are already resolved.
 4. Record what will be addressed before editing code.
 5. Apply fixes only for actionable items inside scope.
@@ -25,7 +25,7 @@ Inspect the latest AI PR feedback, classify each finding, and keep processing fo
 7. Commit and push the follow-up changes.
 8. Record the last processed review ID in `tmp/last-review-id-{PR}.txt`.
 9. End the round without printing `<promise>REVIEW COMPLETE</promise>` if code changes, comments, commits, or pushes were made.
-10. Print `<promise>REVIEW COMPLETE</promise>` only when there are no new actionable findings and checks are clear.
+10. Report completion only when there are no new actionable findings and required checks for the current head have completed successfully. An absent, pending, inaccessible or stale check is not a successful check. If review completion cannot be established, report what is still pending.
 
 ## Story-based PRs
 

@@ -15,7 +15,7 @@ Wayfinder **plans**: a wayfinder session resolves a ticket's question and record
 
 ## Refer by name
 
-Every map and ticket is an issue, so it has a **name** — its title. In everything the human reads — narration, the map's Decisions-so-far — refer to it by that name, never by a bare id, number, or slug. A wall of `#42, #43, #44` is illegible; names read at a glance. The id and URL don't vanish — a name wraps its link — but they ride *inside* the name, never stand in for it.
+Every map and ticket has a **name** — its title. Under Ultivis, the map is a Notion Story and the tickets are Tasks linked to Issues. In narration and Decisions-so-far, use each title as the link text so the reader can understand it without looking up a bare identifier.
 
 ## The Map
 
@@ -27,7 +27,7 @@ The map is an **index**, not a store. It lists the decisions made and points at 
 
 ### The map body
 
-The whole map at low resolution, loaded once per session. Open tickets are **not** listed — they are open child issues, found by query.
+The whole map at low resolution, loaded once per session. Query related open Tasks for an Ultivis Story; use child issues only for a tracker that actually represents the map as an issue.
 
 ```markdown
 ## Destination

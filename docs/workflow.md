@@ -66,7 +66,7 @@ ult-init check      # 필수 요소 검증
 
 ## Plan 승인 흐름
 
-Plan 모드(`Shift+Tab×2`)에서 작성 → 승인하면 hook이 `tmp/current-plan.md`를 저장하고, 그 다음 단계는 AI가 먼저 제안합니다.
+Plan 모드에서 승인된 정확한 Plan을 `tmp/current-plan.md`로 저장하고 다음 단계는 AI가 제안합니다. Hook은 `WORKFLOW_APPROVED_PLAN`에 명시된 경로만 복사합니다. 경로가 없으면 현재 대화의 승인 Plan 저장을 안내하며 다른 세션의 최신 파일을 추측하지 않습니다.
 
 Plan이 크거나 애매하면 승인/발행 전에 AI가 먼저 질문합니다.
 

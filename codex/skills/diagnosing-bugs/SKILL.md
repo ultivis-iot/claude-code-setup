@@ -1,11 +1,13 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+description: Build a reproduction loop for uncertain, recurring or performance bugs. Use for investigation and hypothesis testing; a known local correction does not require the full loop.
 ---
 
 # Diagnosing Bugs
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
+
+For a diagnosis-only request, stop after identifying the cause and supporting evidence. Apply fixes only when the user's request includes remediation. A straightforward error with an established cause can use a focused check instead of every phase below.
 
 When `ultivis-flow` is installed, it remains the lifecycle baseline; this skill only governs diagnosis and regression locking.
 
