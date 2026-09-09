@@ -16,14 +16,14 @@ Inspect the latest AI PR feedback, classify each finding, and keep processing fo
 
 ## Required behavior
 
-1. If invoked without `--once`, start Ralph Loop with `/review-cycle ... --once` as the repeated prompt and do not process reviews in the bootstrap call.
-2. In a `--once` round, read the latest PR comments, reviews, and unresolved review threads.
-3. Ignore human comments when the task is specifically about AI review follow-up.
+1. If invoked without `--once`, start Ralph Loop with `/review-cycle ... --once` as the repeated prompt and do not process reviews in the bootstrap call. The loop runs at most 15 iterations unless `REVIEW_CYCLE_MAX_ITERATIONS` says otherwise.
+2. In a `--once` round, read PR checks and the latest comments, reviews, and unresolved review threads. Run `gh` commands one at a time, never concurrently.
+3. Keep only AI review items: read comments first, then reviews, then unresolved threads; accept an item only when it comes from a bot account or carries an unmistakable AI review header or pattern; skip threads that are already resolved.
 4. Record what will be addressed before editing code.
 5. Apply fixes only for actionable items inside scope.
 6. Run the project's relevant verification commands.
 7. Commit and push the follow-up changes.
-8. Record the last processed review ID.
+8. Record the last processed review ID in `tmp/last-review-id-{PR}.txt`.
 9. End the round without printing `<promise>REVIEW COMPLETE</promise>` if code changes, comments, commits, or pushes were made.
 10. Print `<promise>REVIEW COMPLETE</promise>` only when there are no new actionable findings and checks are clear.
 

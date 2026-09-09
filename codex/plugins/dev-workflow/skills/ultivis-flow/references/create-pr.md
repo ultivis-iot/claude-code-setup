@@ -5,9 +5,9 @@ Use this procedure when the user wants the Codex equivalent of `/create-pr`.
 ## Preconditions
 
 - `tmp/validation-status.json` exists
-- Intent validation passed
-- Quality validation contains only `PASS` or `WARN`
-- The summary indicates the branch is ready for PR
+- `overall` is `PASS` or `WARN`
+- `results.intent-validator` is `PASS`
+- No validator reports `FAIL`
 
 ## Procedure
 
@@ -36,3 +36,5 @@ For Story-based work, GitHub PRs still belong to Tasks:
 - `Validation`: intent/docs/security/code quality/test status
 
 If validation is incomplete, stop and tell the user to rerun the commit-and-verify flow first.
+
+When `git push` or PR creation fails, summarize the cause in one line and stop. Do not retry with different arguments.

@@ -44,7 +44,6 @@ argument-hint: [directory] [commit-message]
    - cli-validator (`.cli-sync.json`이 활성화된 경우만)
 6. 프론트엔드 변경이 있으면 Visual QA 수행 여부를 사용자에게 묻고 `visual-qa`를 `PENDING` 또는 `SKIP`으로 기록한다
 7. 결과를 취합해 `validation-status.json`을 생성한다
-8. 현재 브랜치의 Issue에 연결된 Notion Task가 있으면 검증 요약 코멘트를 남긴다
 
 ## Plan 선택
 

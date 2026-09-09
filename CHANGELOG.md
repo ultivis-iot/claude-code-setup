@@ -1,20 +1,6 @@
 # Changelog
 
-## v0.9.4 (2026-09-09)
-
-- `/visual-qa` 의 수집 계층을 claude-in-chrome 에서 헤드리스 Playwright 로 교체. 확장 연결과 사이트별 권한 승인이 매번 필요하고 사용자의 창을 점유하며 샌드박스에서는 로컬 개발 서버에 닿지 못해, 커밋 직전 게이트인데도 실제로 잘 안 쓰이고 있었음. `scripts/visual-qa-collect.mjs` 를 추가해 라우트 × 뷰포트마다 이동 결과·JS 예외·콘솔·4xx/5xx·DOM 요약·전체 페이지 스크린샷을 모아 `tmp/visual-qa/collected.json` 으로 남김. Playwright 는 이 저장소의 의존성으로 들이지 않고 `ux-review` recorder 와 같은 방식으로 대상 저장소의 `node_modules` 를 찾아 쓰며, 없으면 설치 명령을 안내하고 종료 코드 2 로 끝냄.
-- 수집기는 이동과 읽기만 한다. 클릭·입력·제출이 없으므로 `[QA-TEST]` 접두어 규칙 없이도 데이터가 바뀌지 않고, 인증이 필요한 라우트는 사람이 만들어 둔 Playwright `storageState` 를 `--storage-state` 로 받는다(에이전트가 로그인을 대신 수행하지 않는다는 기존 규칙을 수단까지 갖춰 옮김).
-- 페이지를 닫을 때 끊기는 미디어 preload 가 `net::ERR_ABORTED` 로 잡혀 오탐이 되던 것을 `abortedRequests` 로 분리하고 결함 집계에서 뺌. 실제 뷰어로 돌려 확인함. 같은 항목이 반복되면 `count` 로 묶음.
-- 스크린샷 파일명이 `[^a-zA-Z0-9]` 를 전부 `-` 로 바꾸는 슬러그라 한글 라우트가 통째로 `root` 가 되어 앞 라우트의 스크린샷을 덮던 버그 수정. 유니코드 문자·숫자를 남기고 순번을 앞에 붙여 반드시 갈라 둠.
-- `visual-qa-analyzer` 에서 Chrome MCP 도구를 걷어내고 `Read`/`Grep`/`Glob` 만 남김. 브라우저를 직접 몰지 않게 되면서 "screenshot 액션만 허용" 같은 금지 규칙이 필요 없어졌고, 대신 `collected.json` 의 필드별 의미와 FAIL/WARN/PASS 판정 기준을 명시함.
-- `docs/references/visual-qa-playbook.md` 를 수집기 옵션표·인증 절차·판정 기준 중심으로 다시 씀.
-- 설치 스크립트 세 개(`setup.sh`·`setup-codex.sh`·`setup.ps1`)가 `scripts/*.sh` 만 복사해 `.mjs` 가 설치되지 않던 것을 고침. 저장소 전용 테스트인 `test-*.mjs` 는 제외.
-- 수집기에 스타일 지문을 추가해 화면 간 통일성을 잼. 라우트마다 실제로 쓰인 `color`·`backgroundColor`·`fontFamily`·`fontSize`·`fontWeight`·`borderRadius`·`boxShadow` 의 값별 사용 횟수와 종류 수, 컨트롤(button·link·input)의 높이·패딩·라운드·글자크기 규격을 모으고, 라우트를 다 모은 뒤 같은 뷰포트끼리 비교해 `consistency.onlyOnOneRoute`(한 화면에서만 나타난 값)와 `controlSpread`(화면별 규격 갈래 수)를 냄. 뷰포트가 다르면 값이 갈리는 게 정상이라 뷰포트를 섞지 않음. twin-studio 2개 라우트로 확인했고 `collected.json` 은 12KB.
-- 지문 노이즈 두 가지 제거: 값이 많으면 자주 쓰인 순으로 잘라 `distinct` 로 종류 수만 남기고, Tailwind 계열이 `box-shadow` 앞에 붙이는 완전 투명한 ring 자리표시자를 정규화해서 뺌. 자리표시자 개수만 달라도 다른 값으로 세어져 종류 수가 부풀고 리포트가 읽히지 않았음.
-- `visual-qa-analyzer` 의 description 이 "디자인 품질 평가"라고 과장돼 있던 것을 "라우트별 회귀 판정, 디자인 품질 평가는 하지 않는다"로 정정. 수집값으로 판정할 수 있는 범위를 넘어선 문구였음. `onlyOnOneRoute` 는 결함이 아니라 질문거리이므로 스크린샷에서 다를 이유를 찾지 못한 것만 WARN 으로 올리도록 명시.
-- `code-simplifier`(Standards Review)에 디자인 시스템 미사용 검사 추가. `Button` 이 있는데 원시 `<button>` 을 손으로 만든 자리는 렌더 결과가 같아 브라우저로는 드러나지 않으므로 소스 검사 쪽에 둠. 실제로 twin-studio 에서 DS 가 `Button` 을 내보내고 앱이 19개 파일에서 쓰는데도 5개 파일이 원시 `<button>` 을 쓰고 있었음. 다만 캔버스 오버레이처럼 DS 가 맞지 않는 자리가 있으므로 후보로 올리고 근거를 함께 적도록 하고, export 를 확인한 뒤에만 지적하도록 규정.
-
-## v0.9.3 (2026-09-08)
+## v0.9.3 (2026-09-09)
 
 - `ux-review` 뷰어의 색·글꼴·컴포넌트를 HerdRabbit 의 공통 UI 킷으로 교체. 킷(`ui.css`·`tokens.css`·`base.css`·`components.css`)을 `assets/ui/` 에 복사하고 서버가 `/ui/` 로 서빙함. 기존 shadcn HSL 토큰(`hsl(var(--background))`)과 `.dark` 클래스 방식을 킷의 직접 색상값·`data-theme` 속성으로 바꾸고, 사이드바는 `ui-sidebar`, 시나리오 항목은 `ui-nav-item`+`ui-status`, 버튼은 `ghost-button`/`icon-button`/`ui-menu` 로 옮김. 브랜드색만 킷 뒤에서 핑크로 재정의(다크 `#ff9ecf`, 라이트 `#b01e5f`)해 원본 갱신 시 폴더만 교체하면 되도록 함. `.css` MIME 이 표에 없어 스타일시트로 읽히지 않던 것도 함께 고침.
 - 페이지를 `PAGE` 상수에서 `assets/viewer-page.html` 로 분리하고 요청마다 읽음. 상수는 프로세스 메모리에 상주해 마크업·CSS 를 고칠 때마다 `--restart` 가 필요했음. 이제 새로고침만으로 반영되고 재기동은 서버 코드를 고칠 때만 필요함. `SKILL.md` 의 안내도 그에 맞게 정정.
@@ -38,6 +24,22 @@
 - `viewer.mjs` 사용법 주석 정정. 기본 HOST 가 이미 `0.0.0.0` 인데 `--host 0.0.0.0  # LAN 공개` 라고 적혀 있어 옵트인처럼 읽혔음. 기본이 LAN 공개인 이유(휴대폰 열람)와 함께 인증 없는 `DELETE /api/entry`·`/api/passes` 도 같이 열린다는 점, `--host 127.0.0.1`·`--read-only` 로 좁히는 방법을 적음. 기본값 자체는 그대로 둠.
 - `assets/ui/SOURCE.md` 의 "뷰어 고유 스타일은 `viewer.mjs` 의 `PAGE` 상수 안에" 안내를 `assets/viewer-page.html` 의 `<style>` 로 갱신. 페이지를 파일로 분리하면서 어긋나 있었음.
 - 세부화면 pass 줄 끝의 `…` 작업 메뉴를 없애고 그 안의 `이전 pass 정리`·`pass 삭제` 를 목록 항목 메뉴로 옮김. 작업 메뉴가 목록과 본문 두 곳에 흩어져 있었음. pass 크기·승인 여부는 목록 인덱스에 없는 값이라 메뉴를 열 때 `/api/scenario` 를 읽어 항목을 채우고, 이미 읽은 시나리오는 캐시를 씀. 개별 pass 삭제는 대상이 정해져야 성립하므로 지금 보고 있는 시나리오의 행에만 붙고 나머지 행에는 정리만 나옴. 본문과 메뉴가 같은 pass 를 보도록 `currentPassName()` 으로 모음.
+- `/visual-qa` 의 수집 계층을 claude-in-chrome 에서 헤드리스 Playwright 로 교체. 확장 연결과 사이트별 권한 승인이 매번 필요하고 사용자의 창을 점유하며 샌드박스에서는 로컬 개발 서버에 닿지 못해, 커밋 직전 게이트인데도 실제로 잘 안 쓰이고 있었음. `scripts/visual-qa-collect.mjs` 를 추가해 라우트 × 뷰포트마다 이동 결과·JS 예외·콘솔·4xx/5xx·DOM 요약·전체 페이지 스크린샷을 모아 `tmp/visual-qa/collected.json` 으로 남김. Playwright 는 이 저장소의 의존성으로 들이지 않고 `ux-review` recorder 와 같은 방식으로 대상 저장소의 `node_modules` 를 찾아 쓰며, 없으면 설치 명령을 안내하고 종료 코드 2 로 끝냄.
+- 수집기는 이동과 읽기만 한다. 클릭·입력·제출이 없으므로 `[QA-TEST]` 접두어 규칙 없이도 데이터가 바뀌지 않고, 인증이 필요한 라우트는 사람이 만들어 둔 Playwright `storageState` 를 `--storage-state` 로 받는다(에이전트가 로그인을 대신 수행하지 않는다는 기존 규칙을 수단까지 갖춰 옮김).
+- 페이지를 닫을 때 끊기는 미디어 preload 가 `net::ERR_ABORTED` 로 잡혀 오탐이 되던 것을 `abortedRequests` 로 분리하고 결함 집계에서 뺌. 실제 뷰어로 돌려 확인함. 같은 항목이 반복되면 `count` 로 묶음.
+- 스크린샷 파일명이 `[^a-zA-Z0-9]` 를 전부 `-` 로 바꾸는 슬러그라 한글 라우트가 통째로 `root` 가 되어 앞 라우트의 스크린샷을 덮던 버그 수정. 유니코드 문자·숫자를 남기고 순번을 앞에 붙여 반드시 갈라 둠.
+- `visual-qa-analyzer` 에서 Chrome MCP 도구를 걷어내고 `Read`/`Grep`/`Glob` 만 남김. 브라우저를 직접 몰지 않게 되면서 "screenshot 액션만 허용" 같은 금지 규칙이 필요 없어졌고, 대신 `collected.json` 의 필드별 의미와 FAIL/WARN/PASS 판정 기준을 명시함.
+- `docs/references/visual-qa-playbook.md` 를 수집기 옵션표·인증 절차·판정 기준 중심으로 다시 씀.
+- 설치 스크립트 세 개(`setup.sh`·`setup-codex.sh`·`setup.ps1`)가 `scripts/*.sh` 만 복사해 `.mjs` 가 설치되지 않던 것을 고침. 저장소 전용 테스트인 `test-*.mjs` 는 제외.
+- 수집기에 스타일 지문을 추가해 화면 간 통일성을 잼. 라우트마다 실제로 쓰인 `color`·`backgroundColor`·`fontFamily`·`fontSize`·`fontWeight`·`borderRadius`·`boxShadow` 의 값별 사용 횟수와 종류 수, 컨트롤(button·link·input)의 높이·패딩·라운드·글자크기 규격을 모으고, 라우트를 다 모은 뒤 같은 뷰포트끼리 비교해 `consistency.onlyOnOneRoute`(한 화면에서만 나타난 값)와 `controlSpread`(화면별 규격 갈래 수)를 냄. 뷰포트가 다르면 값이 갈리는 게 정상이라 뷰포트를 섞지 않음. twin-studio 2개 라우트로 확인했고 `collected.json` 은 12KB.
+- 지문 노이즈 두 가지 제거: 값이 많으면 자주 쓰인 순으로 잘라 `distinct` 로 종류 수만 남기고, Tailwind 계열이 `box-shadow` 앞에 붙이는 완전 투명한 ring 자리표시자를 정규화해서 뺌. 자리표시자 개수만 달라도 다른 값으로 세어져 종류 수가 부풀고 리포트가 읽히지 않았음.
+- `visual-qa-analyzer` 의 description 이 "디자인 품질 평가"라고 과장돼 있던 것을 "라우트별 회귀 판정, 디자인 품질 평가는 하지 않는다"로 정정. 수집값으로 판정할 수 있는 범위를 넘어선 문구였음. `onlyOnOneRoute` 는 결함이 아니라 질문거리이므로 스크린샷에서 다를 이유를 찾지 못한 것만 WARN 으로 올리도록 명시.
+- `code-simplifier`(Standards Review)에 디자인 시스템 미사용 검사 추가. `Button` 이 있는데 원시 `<button>` 을 손으로 만든 자리는 렌더 결과가 같아 브라우저로는 드러나지 않으므로 소스 검사 쪽에 둠. 실제로 twin-studio 에서 DS 가 `Button` 을 내보내고 앱이 19개 파일에서 쓰는데도 5개 파일이 원시 `<button>` 을 쓰고 있었음. 다만 캔버스 오버레이처럼 DS 가 맞지 않는 자리가 있으므로 후보로 올리고 근거를 함께 적도록 하고, export 를 확인한 뒤에만 지적하도록 규정.
+- `ultivis-flow` 참조본을 커맨드 정본에 맞춰 동기화. Codex 는 커맨드를 설치하지 않아(`setup-codex.sh` 에 commands 단계가 없음) 같은 절차를 `commands/*.md` 와 `codex/skills/ultivis-flow/references/*.md` 두 벌로 유지하는데, 한쪽만 고쳐 온 탓에 갈라져 있었음. 대조해 보니 참조본이 얇은 쪽이 대부분이었지만 `create-pr` 의 Story PR 금지처럼 참조본에만 있는 것도 있어, 한쪽을 정본으로 삼고 맞춘 흔적이 없었음.
+- `commit-and-verify` 참조본에 빠져 있던 것 보강: Plan 선택 절차(최근 5개 조회, 하나면 확인·여럿이면 선택·없으면 진행 여부와 intent 검증 품질 저하 고지), 커밋 메시지가 없을 때의 사용자 확인과 staged 없을 때 중단, `.cli-sync.json` 이 없거나 비활성일 때의 CLI 탐지·생성 확인 흐름, 검증 서브에이전트 제한(다른 커맨드 호출 금지·파일 쓰기 금지·JSON 텍스트만 반환·메인만 `validation-status.json` 생성), intent 실패 시 나머지 validator 를 `SKIP` 으로 기록.
+- `create-pr` 참조본의 사전조건에서 모호하던 "summary indicates ready" 를 커맨드의 세 조건(`overall` 이 PASS 또는 WARN, `results.intent-validator` 가 PASS, FAIL 없음)으로 교체하고, `git push` 나 PR 생성 실패 시 원인을 한 줄로 요약하고 중단하는 규칙을 추가.
+- `review-cycle` 참조본에 빠져 있던 것 보강: `gh` 명령의 순차 단독 실행, AI 리뷰 필터링 기준(comments → reviews → unresolved threads 우선순위, bot 계정이나 명확한 AI 헤더·패턴만 대상, 이미 해결된 thread 제외), Ralph Loop 반복 상한 15회와 `REVIEW_CYCLE_MAX_ITERATIONS`, 마지막 처리 리뷰 ID 경로 `tmp/last-review-id-{PR}.txt`.
+- `commit-and-verify` 커맨드에서 "Issue 에 연결된 Notion Task 에 검증 요약 코멘트를 남긴다" 8단계를 삭제해 절차가 7단계가 됨. 참조본에는 원래 없어 양쪽이 갈라져 있던 항목인데, 참조본에 넣는 대신 커맨드에서 빼는 쪽으로 정리함. `ult-task-note`·`ult-sync-task`·`ult-story-create` 등 코멘트가 목적인 커맨드는 그대로 둠.
 
 ## v0.9.2 (2026-09-04)
 
