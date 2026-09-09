@@ -38,10 +38,9 @@
 /* 페이지 자체는 스크롤하지 않는다. 목록과 본문이 각자 스크롤한다.
  * (공통 킷의 base.css 는 body 높이를 정하지 않으므로 여기서 잡는다) */
 html,body{height:100%;overflow:hidden}
-#app{display:grid;grid-template-columns:340px minmax(0,1fr);
+#app{display:grid;grid-template-columns:310px minmax(0,1fr);
   grid-template-rows:minmax(0,1fr);height:100vh;height:100dvh;overflow:hidden}
-/* 사이드바 폭은 그리드가 정한다. 공통 킷의 고정폭·전환은 여기서 쓰지 않는다 */
-#side{width:auto;min-height:0;transition:none}
+#side{width:310px;min-height:0}
 /* 항목마다 자기 작업 메뉴를 단다 */
 .navrow{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) 26px;
   align-items:center;gap:2px}
@@ -59,18 +58,18 @@ html,body{height:100%;overflow:hidden}
 .ui-menu-panel{width:180px}
 /* 손가락으로는 hover 가 없으니 항상 보인다 */
 @media(hover:none){.navrow .ui-menu>summary{opacity:1}}
-/* 글자 대신 토끼 마크. 이름은 aria-label 로만 남긴다 */
-.brand{display:inline-grid;place-items:center;flex:0 0 auto;
-  border:0;padding:0;background:transparent;color:var(--accent);cursor:pointer}
-.brand-mark{width:26px;height:34px;display:block;overflow:visible}
-.brand-mark path{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
-.brand-mark>path{stroke-width:3;transition:fill 150ms ease}
-.brand-mark .eyes path{stroke-width:3;transition:stroke 150ms ease}
-/* 채우면 글자가 몸통에 묻히므로 눈은 배경색으로 파낸다 */
-.brand:hover .brand-mark>path,.brand:focus-visible .brand-mark>path{fill:currentColor}
-.brand:hover .brand-mark .eyes path,
-.brand:focus-visible .brand-mark .eyes path{stroke:var(--page)}
-#tree{padding:6px 10px 18px}
+/* HerdRabbit 앱의 사이드바 토글을 그대로 쓴다. */
+.sidebar-toggle{width:34px;min-width:34px;height:34px;flex:0 0 34px;
+  display:inline-grid;place-items:center;padding:0;overflow:hidden;border:0;
+  background:transparent;color:var(--accent);cursor:pointer}
+.sidebar-toggle-mark,.mobile-sidebar-mark{width:34px;height:34px;fill:transparent;
+  stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;stroke-width:3}
+.sidebar-toggle-mark path,.mobile-sidebar-mark path{transition:fill 150ms ease}
+.sidebar-toggle:hover .sidebar-toggle-mark path,
+.sidebar-toggle:focus-visible .sidebar-toggle-mark path,
+.mobile-sidebar-open:hover .mobile-sidebar-mark path,
+.mobile-sidebar-open:focus-visible .mobile-sidebar-mark path{fill:currentColor}
+.mobile-sidebar-open{color:var(--accent)}
 #main{min-height:0;overflow:hidden;display:grid;
   grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);
   container-type:inline-size}
@@ -79,7 +78,9 @@ html,body{height:100%;overflow:hidden}
 #body{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain;
   padding:16px 24px 24px}
 #main>.empty{padding:40px 24px}
-#tree,#main,.vright{scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);scrollbar-width:thin}
+#tree{overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}
+#tree::-webkit-scrollbar{width:0;height:0}
+#main,.vright{scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);scrollbar-width:thin}
 a{color:inherit;text-decoration:none}
 .dim{color:var(--muted)}
 .empty{color:var(--muted);padding:40px 0;text-align:center}
@@ -91,14 +92,27 @@ a{color:inherit;text-decoration:none}
 #th svg{display:block}
 
 /* ── 저장소 · 갈래 ───────────────────────────────────────────────── */
-.repo{display:flex;align-items:center;gap:7px;margin:12px 0 4px;padding:3px 4px;
-  cursor:pointer;user-select:none;color:var(--muted)}
-.repo .caret{width:9px;font-size:9px;transition:transform .12s}
-.repo.collapsed .caret{transform:rotate(-90deg)}
-.repo .nm{flex:1;min-width:0;font-family:var(--mono);font-size:10px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--workspace-heading);word-break:break-all}
-.repo .ct{font-family:var(--mono);font-size:10px}
+.repo{min-width:0;min-height:36px;display:flex;align-items:center;gap:4px;
+  margin:12px 0 4px;padding:4px 0;color:var(--muted)}
+.repo-collapse{width:28px;min-width:28px;height:28px;display:inline-grid;place-items:center;
+  flex:0 0 28px;padding:0;border:1px solid transparent;border-radius:7px;
+  background:transparent;color:var(--muted)}
+.repo-collapse:hover{border-color:var(--line);background:var(--surface-raised);
+  color:var(--control-text)}
+.repo-collapse svg{width:14px;height:14px;fill:none;stroke:currentColor;
+  stroke-linecap:round;stroke-linejoin:round;stroke-width:1.8;
+  transition:transform 180ms ease}
+.repo-collapse[aria-expanded="true"] svg{transform:rotate(90deg)}
+.repo .nm{min-width:0;flex:1 1 auto;overflow:hidden;padding:4px 2px;
+  color:var(--workspace-heading);font-size:12px;font-weight:650;
+  text-overflow:ellipsis;white-space:nowrap}
+.repo .ct{padding-right:5px;font-family:var(--mono);font-size:10px}
 .repo:hover .nm{color:var(--text)}
+.repo-children{min-height:0;display:grid;grid-template-rows:1fr;opacity:1;
+  transition:grid-template-rows 180ms ease,opacity 140ms ease}
+.repo-children-inner{min-height:0;overflow:hidden}
+.repo-group:not(.collapsed) .repo-children-inner{overflow:visible}
+.repo-group.collapsed .repo-children{grid-template-rows:0fr;opacity:0}
 .wt{display:flex;align-items:center;gap:6px;padding:6px 10px 3px;
   color:var(--muted);font-family:var(--mono);font-size:10px}
 .wt::before{content:"\2442";opacity:.75}
@@ -114,9 +128,7 @@ a{color:inherit;text-decoration:none}
 #tree .ui-nav-item.latest:hover{background:color-mix(in srgb,var(--accent) 18%,transparent)}
 #tree .ui-nav-item.latest .ui-nav-copy strong{color:var(--accent)}
 #tree .ui-nav-item.latest .ui-status{color:var(--accent);font-size:11px}
-#tree .ui-nav-copy{flex-wrap:wrap;align-items:center;row-gap:4px}
-#tree .ui-nav-copy strong{flex:1 1 100%}
-#tree .ui-nav-copy small{white-space:nowrap}
+#tree .pill{display:none}
 
 /* ── 심각도 ──────────────────────────────────────────────────────── */
 .pill{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;
@@ -251,20 +263,33 @@ video{width:100%;max-height:min(70vh,560px);background:var(--terminal-bg);
   align-items:center;justify-content:center;z-index:9;padding:20px;cursor:zoom-out}
 #lb img{max-width:100%;max-height:100%;border-radius:var(--radius-panel)}
 
-/* 중간 폭에서는 목록 칸만 좁힌다 */
-@media(max-width:1100px){#app{grid-template-columns:270px minmax(0,1fr)}
-.mainhead{padding:18px 20px 0} #body{padding:14px 20px 20px}}
+@media(max-width:1100px){.mainhead{padding:18px 20px 0} #body{padding:14px 20px 20px}}
 /* 넓은 화면에서는 드로어 장치를 쓰지 않는다 */
 #navopen,#navclose,#scrim{display:none}
-/* 목록 접기(PC). 토끼 마크를 눌러 본문을 넓게 쓴다. */
-#app{transition:grid-template-columns var(--sidebar-motion) var(--sidebar-ease)}
-body.rail #app{grid-template-columns:0 minmax(0,1fr)}
-body.rail #side{transform:translateX(-100%);border-right:0}
-body.rail #navopen{display:inline-grid;position:fixed;top:10px;left:12px;z-index:25}
-body.rail .mainhead{padding-left:60px}
-body.rail .hd{min-height:34px;align-items:center}
+/* HerdRabbit 데스크톱 접힘: 사이드바 오른쪽 64px를 레일로 남긴다. */
+#main{will-change:transform;transition:transform var(--sidebar-motion) var(--sidebar-ease)}
+@media(min-width:761px){
+  body.rail #app{grid-template-columns:310px minmax(0,1fr)}
+  body.rail #side{transform:translateX(-246px)}
+  body.rail .ui-sidebar-heading{justify-content:flex-end}
+  body.rail .ui-sidebar-footer{justify-content:flex-end;padding:14px 15px}
+  body.rail #meta,body.rail .repo,body.rail .wt{display:none}
+  body.rail #tree{padding:4px 10.5px 12px 257.5px}
+  body.rail .repo-group,body.rail .wtbox{margin:0}
+  body.rail .repo-group+.repo-group{margin-top:10px}
+  body.rail .wtbox+.wtbox{margin-top:6px}
+  body.rail .navrow{grid-template-columns:minmax(0,1fr)}
+  body.rail .navrow .ui-menu{display:none}
+  body.rail .ui-nav-item{height:42px;margin:0 auto 4px;padding:0 11px;
+    grid-template-columns:18px;gap:0;justify-content:start}
+  body.rail .ui-nav-copy{display:none}
+  body.rail #tree .ui-nav-item .ui-status{font-size:0;color:var(--muted)}
+  body.rail .ui-status::before{content:attr(data-rail-icon);font-size:17px}
+  body.rail #tree .ui-nav-item[aria-pressed="true"] .ui-status{color:var(--accent)}
+  body.rail #main{width:calc(100% + 246px);transform:translateX(-246px)}
+}
 
-@media(prefers-reduced-motion:reduce){#app{transition:none}}
+@media(prefers-reduced-motion:reduce){#main,.repo-children{transition:none}}
 
 /* 좁은 화면: 목록을 화면 밖에 두고 밀어서 연다 (HerdRabbit 과 같은 방식) */
 @media(max-width:760px){
@@ -278,7 +303,8 @@ body.rail .hd{min-height:34px;align-items:center}
     background:var(--scrim);visibility:hidden;opacity:0;pointer-events:none;
     transition:opacity 220ms ease,visibility 0s linear var(--sidebar-motion)}
   body.nav-open #scrim{visibility:visible;opacity:1;pointer-events:auto;transition-delay:0s}
-  #navopen{display:inline-grid;position:fixed;top:10px;left:12px;z-index:25}
+  #navopen{display:inline-grid;position:fixed;top:10px;left:12px;z-index:25;
+    padding:0;border-color:transparent;background:transparent;overflow:hidden}
   #navclose{display:inline-grid}
   #main{height:100vh;height:100dvh}
   /* 떠 있는 열기 버튼과 겹치지 않게 자리를 비우고, 제목 줄을 버튼 중심에 맞춘다 */
@@ -306,20 +332,18 @@ body.rail .hd{min-height:34px;align-items:center}
 }
 </style></head><body>
 <div id="app">
-  <button id="navopen" class="brand" type="button" aria-label="목록 열기"
+  <button id="navopen" class="icon-button mobile-sidebar-open" type="button" aria-label="목록 열기"
     aria-controls="side" aria-expanded="false">
-    <svg class="brand-mark" viewBox="9 2 46 60" aria-hidden="true" focusable="false">
+    <svg class="mobile-sidebar-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
       <path d="M17 30C12 21 12 6 20 6c7 0 9 13 9 22a13 13 0 0 1 6 0c0-9 2-22 9-22 8 0 8 15 3 24 7 5 8 14 4 21-4 6-11 8-19 8s-15-2-19-8c-4-7-3-16 4-21Z"/>
-      <g class="eyes"><path d="M19.6 38.4v5a5 5 0 0 0 10 0v-5"/><path d="M33.8 38.4 43.6 49M43.6 38.4l-9.8 10.6"/></g>
     </svg>
   </button>
   <aside id="side" class="ui-sidebar">
     <div class="ui-sidebar-heading">
-      <button id="railtoggle" class="brand" type="button" aria-label="목록 접기"
+      <button id="railtoggle" class="sidebar-toggle" type="button" aria-label="목록 접기"
         title="목록 접기" aria-expanded="true">
-        <svg class="brand-mark" viewBox="9 2 46 60" aria-hidden="true" focusable="false">
+        <svg class="sidebar-toggle-mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
           <path d="M17 30C12 21 12 6 20 6c7 0 9 13 9 22a13 13 0 0 1 6 0c0-9 2-22 9-22 8 0 8 15 3 24 7 5 8 14 4 21-4 6-11 8-19 8s-15-2-19-8c-4-7-3-16 4-21Z"/>
-          <g class="eyes"><path d="M19.6 38.4v5a5 5 0 0 0 10 0v-5"/><path d="M33.8 38.4 43.6 49M43.6 38.4l-9.8 10.6"/></g>
         </svg>
       </button>
       <button id="navclose" class="icon-button" type="button" aria-label="목록 닫기">&times;</button>
@@ -396,10 +420,16 @@ function collapsedSet(){
 function saveCollapsed(set){
   try{ localStorage.setItem('ux-collapsed',JSON.stringify([...set])); }catch{}
 }
-function toggleRepo(name){
+function toggleRepo(name,heading){
   const set=collapsedSet();
-  if(set.has(name))set.delete(name); else set.add(name);
-  saveCollapsed(set); renderTree();
+  const collapsed=!set.has(name);
+  if(collapsed)set.add(name); else set.delete(name);
+  saveCollapsed(set);
+  const group=heading&&heading.closest('.repo-group');
+  if(!group){renderTree();return;}
+  group.classList.toggle('collapsed',collapsed);
+  heading.setAttribute('aria-expanded',collapsed?'false':'true');
+  heading.setAttribute('aria-label',(collapsed?'펼치기 ':'접기 ')+name);
 }
 // 그 묶음에서 가장 나중 활동 시각. 정렬과 최신 표시의 기준이다.
 function newest(scenarios){ return scenarios.reduce((m,s)=>Math.max(m,s.activeAt||0),0); }
@@ -415,10 +445,7 @@ function renderTree(){
     // 이유로 이 저장소의 최근 것이 묻히면 목록을 훑는 뜻이 없다.
     const maxActive=newest(repo.worktrees.flatMap(w=>w.scenarios));
     const show=!collapsed.has(repo.name);
-    h+='<div class="repo'+(show?'':' collapsed')+'" data-repo="'+esc(repo.name)+'">'
-      +'<span class="caret">▼</span><span class="nm">'+esc(repo.name)+'</span>'
-      +'<span class="ct">'+count+'</span></div>';
-    if(!show)continue;
+    let children='';
     const worktrees=repo.worktrees.slice().sort((a,b)=>
       newest(b.scenarios)-newest(a.scenarios));
     for(const wt of worktrees){
@@ -440,9 +467,9 @@ function renderTree(){
         inner+='<div class="navrow">'
           +'<a class="ui-nav-item'+(isNew?' latest':'')+'"'
           +' aria-pressed="'+(cur===s.path?'true':'false')+'"'
-          +' aria-label="'+esc(label)+'" title="'+esc(stamp(s.activeAt,s.date))+'"'
+          +' aria-label="'+esc(label)+'" title="'+esc(s.id+' · '+stamp(s.activeAt,s.date))+'"'
           +' href="#/'+enc(s.path)+'">'
-          +'<span class="ui-status" aria-hidden="true">'+(isNew?'\u25cf':'')+'</span>'
+          +'<span class="ui-status" data-rail-icon="'+(cur===s.path?'●':'○')+'" aria-hidden="true">'+(isNew?'\u25cf':'')+'</span>'
           +'<span class="ui-nav-copy"><strong>'+esc(s.id)+'</strong>'
           +'<small>'+when+' · '+s.passCount+' pass</small>'+pills.join('')+'</span></a>'
           +'<details class="ui-menu" data-menu="'+esc(s.path)+'"><summary class="icon-button" role="button"'
@@ -452,9 +479,17 @@ function renderTree(){
           +'<span>시나리오 삭제</span></button></div></details></div>';
       }
       // worktree 이름이 저장소와 같으면(일반 저장소) 갈래 표시를 생략한다
-      h+= wt.name===repo.name ? '<div class="wtbox">'+inner+'</div>'
+      children+= wt.name===repo.name ? '<div class="wtbox">'+inner+'</div>'
         : '<div class="wtbox"><div class="wt"><span class="nm">'+esc(wt.name)+'</span></div>'+inner+'</div>';
     }
+    h+='<div class="repo-group'+(show?'':' collapsed')+'">'
+      +'<div class="repo"><button class="repo-collapse" type="button" data-repo="'+esc(repo.name)+'"'
+      +' aria-expanded="'+(show?'true':'false')+'"'
+      +' aria-label="'+esc((show?'접기 ':'펼치기 ')+repo.name)+'">'
+      +'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+      +'<path d="M9 18l6-6-6-6"/></svg></button>'
+      +'<span class="nm">'+esc(repo.name)+'</span><span class="ct">'+count+'</span></div>'
+      +'<div class="repo-children"><div class="repo-children-inner">'+children+'</div></div></div>';
   }
   $('#tree').innerHTML=h;
 }
@@ -857,11 +892,12 @@ document.addEventListener('click',e=>{
     fillPassItems(summary.parentElement);
   }
   if(e.target.closest('#railtoggle')){
-    if(NARROW.matches)setNav(false); else setRail(true);
+    if(NARROW.matches)setNav(false);
+    else setRail(!document.body.classList.contains('rail'));
     return;
   }
   if(e.target.closest('#navopen')){
-    if(NARROW.matches)setNav(true); else setRail(false);
+    if(NARROW.matches)setNav(true);
     return;
   }
   if(e.target.closest('#navclose')||e.target.closest('#scrim')){setNav(false);return;}
@@ -871,8 +907,8 @@ document.addEventListener('click',e=>{
   if(pr){e.preventDefault();prune(pr.dataset.prune);return;}
   const d=e.target.closest('[data-del]');
   if(d){e.preventDefault();del(d.dataset.del,d.dataset.label);return;}
-  const repo=e.target.closest('.repo');
-  if(repo){e.preventDefault();toggleRepo(repo.dataset.repo);return;}
+  const repo=e.target.closest('.repo-collapse');
+  if(repo){e.preventDefault();toggleRepo(repo.dataset.repo,repo);return;}
   const img=e.target.closest('[data-image]');
   if(img){e.preventDefault();$('#lbi').src=img.dataset.image;$('#lb').style.display='flex';return;}
   const v=e.target.closest('[data-video]');
