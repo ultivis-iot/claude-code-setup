@@ -18,6 +18,7 @@ This is the lifecycle baseline when selected or required by repository instructi
 ## Which reference to read
 
 - For the overall flow, read [references/core-workflow.md](references/core-workflow.md).
+- For codebase navigation and Graft lifecycle behavior, read [references/graft-code-map.md](references/graft-code-map.md).
 - For natural-language overlay selection, read [references/overlay-routing.md](references/overlay-routing.md).
 - For commit and validation behavior, read [references/commit-and-verify.md](references/commit-and-verify.md).
 - For PR creation, read [references/create-pr.md](references/create-pr.md).

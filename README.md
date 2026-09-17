@@ -361,14 +361,30 @@ mkdir -p tmp
 /path/to/claude-code-setup/hooks/install-hooks.sh
 ```
 
-설치기는 실행기와 스키마를 hook 옆에 함께 설치하며 worktree와 `core.hooksPath`를 지원합니다. 기존 사용자 hook은 기본적으로 보존합니다. `--replace`를 명시하면 백업 후 교체합니다. 기존 워크플로우 hook도 백업하고 새 계약으로 교체합니다.
+설치기는 실행기, 스키마, Graft 갱신 스크립트를 hook 옆에 함께 설치하며 worktree와 `core.hooksPath`를 지원합니다. 기존 사용자 hook은 기본적으로 보존합니다. `--replace`를 명시하면 백업 후 교체합니다. 기존 워크플로우 hook도 백업하고 새 계약으로 교체합니다.
 
 **Hook 동작**:
 - pre-commit은 staged diff를 검사하며 검증 결과가 없어도 커밋할 수 있습니다.
 - pre-push는 현재 브랜치/HEAD/base/Plan/CLI 설정과 검증 스냅샷이 같은지 확인합니다. 필수 검증 미실행·실패·dirty 상태는 차단합니다.
+- post-merge는 merge나 pull로 갱신된 현재 worktree의 로컬 Graft 그래프를 다시 만듭니다.
 - 현재 검증된 브랜치와 그 커밋의 태그만 게시할 수 있습니다. 다른 브랜치나 삭제 작업은 별도 흐름으로 처리합니다.
 - 로컬 hook은 `git push --no-verify`로 우회할 수 있습니다. 서버 측 강제가 필요하면 보호 브랜치/CI를 별도로 구성해야 합니다.
 - v1 결과는 자동 승격하지 않습니다. 업데이트 후 검증을 다시 실행합니다. 이미 선택적 hook을 사용하는 저장소만 hook 설치기도 다시 실행하세요.
+
+### Graft 코드맵 (선택)
+
+설치·업데이트 스크립트는 Node.js 20 이상과 Graft CLI를 확인합니다. 대화형 실행에서는 `@nanonets/graft@0.18.0` 설치 또는 업데이트 여부를 묻고, 비대화형 실행이나 설치 실패 시에는 권장 명령만 출력한 뒤 workflow 설치를 계속합니다. 현재 Node에서 tree-sitter 네이티브 호환 오류가 나면 LTS Node 24로 다시 시도하면 됩니다.
+
+```bash
+npm install -g @nanonets/graft@0.18.0
+```
+
+`GRAFT_INSTALL=always`로 확인 없이 설치하고 `GRAFT_INSTALL=never`로 건너뛸 수 있습니다. `ult-wt-add.sh`는 worktree 생성·재사용 직후, 관리형 post-merge hook은 로컬 merge/pull 직후 `graft build`를 실행합니다.
+
+- 기본 빌드는 `DO_NOT_TRACK=1`이며 모델/API를 사용하지 않습니다.
+- `--deep`은 사용자가 명시적으로 요청하지 않는 한 실행하지 않습니다.
+- `graft/`는 PC·worktree별 로컬 캐시이며 커밋·복사·worktree 간 symlink 대상이 아닙니다.
+- Node.js 20 이상이나 Graft가 없으면 설치를 한 번 권고하고 `rg` 기반 탐색으로 계속합니다.
 
 ## 보안 검증
 

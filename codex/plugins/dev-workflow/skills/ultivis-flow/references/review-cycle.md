@@ -33,6 +33,7 @@ Inspect the latest AI PR feedback and process follow-up rounds in the current Co
 - Do not create Story PRs. After all Task PRs are merged, run Story-level integration validation.
 - If Task PR feedback is Story-wide or belongs to another Task, do not expand the Task PR. Record it in `tmp/story-handoff.md` and the Notion Story.
 - After each Task PR merge, update the Story handoff before starting dependent Tasks.
+- When merge or pull updates the local target/main worktree, refresh its Graft graph. The managed `post-merge` hook normally performs this automatically; a remote-only merge is refreshed when the local worktree is next updated.
 
 ## Boundaries
 

@@ -1,0 +1,11 @@
+#!/bin/bash
+# Refresh the current worktree's local Graft graph after merge/pull.
+# Ultivis Graft graph refresh
+set -uo pipefail
+
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+REFRESH="$HOOK_DIR/workflow/scripts/graft-refresh.sh"
+
+[ -x "$REFRESH" ] && "$REFRESH" "$REPO" post-merge || true
+exit 0

@@ -24,6 +24,12 @@ Key expectations:
 - Quality validation should cover docs, security, code simplicity, tests, and CLI sync when relevant.
 - Frontend changes should trigger a suggestion for Visual QA instead of being ignored.
 
+## Codebase navigation
+
+- When Graft is available, read [graft-code-map.md](graft-code-map.md) before broad codebase exploration and use its structural CLI before opening large file sets.
+- Graft is an accelerator, not a blocker. If Node.js 20+, the CLI, or a compatible native module is unavailable, recommend installation once and fall back to `rg` and normal source inspection. LTS Node 24 is a compatibility fallback, not a requirement.
+- Keep every `graft/` graph local to its PC and worktree. Never commit it or share it across worktrees.
+
 Commit message convention:
 
 ```text

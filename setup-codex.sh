@@ -35,6 +35,10 @@ fi
 echo "==================================="
 echo ""
 
+echo "0-1. Graft CLI 확인..."
+"$SCRIPT_DIR/scripts/ensure-graft-cli.sh"
+echo ""
+
 echo "1. 디렉토리 생성..."
 mkdir -p "$CODEX_DIR/rules"
 mkdir -p "$CODEX_DIR/skills"

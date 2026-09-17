@@ -32,6 +32,7 @@ if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/sync-workflow.mjs" --check
     check_script "$WORKFLOW_ROOT/hooks/pre-commit"
     check_script "$WORKFLOW_ROOT/hooks/pre-push"
+    check_script "$WORKFLOW_ROOT/hooks/post-merge"
     check_script "$WORKFLOW_ROOT/hooks/install-hooks.sh"
     check_script "$WORKFLOW_ROOT/hooks/copy-plan-on-accept.sh"
     for command_file in "$WORKFLOW_ROOT"/commands/*.md; do
@@ -88,6 +89,8 @@ check_script "$WORKFLOW_ROOT/scripts/ult-task-status.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-weekly-collect.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-weekly-publish.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-wt-add.sh"
+check_script "$WORKFLOW_ROOT/scripts/graft-refresh.sh"
+check_script "$WORKFLOW_ROOT/scripts/ensure-graft-cli.sh"
 check_script "$WORKFLOW_ROOT/scripts/check-validation-status.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-cache-refresh.sh"
 check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"

@@ -99,6 +99,7 @@ if [ -d "$WT_PATH" ]; then
     if [ -n "$BASE_BRANCH" ]; then
         git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$(normalize_base_branch_name "$BASE_BRANCH")" 2>/dev/null || true
     fi
+    "$SCRIPT_DIR/graft-refresh.sh" "$WT_PATH" worktree-reuse || true
     echo "$WT_PATH"
     exit 0
 fi
@@ -126,6 +127,7 @@ else
 fi
 
 git -C "$WT_PATH" config "branch.$BRANCH.gh-merge-base" "$BASE_BRANCH" 2>/dev/null || true
+"$SCRIPT_DIR/graft-refresh.sh" "$WT_PATH" worktree-create || true
 
 _log "✓ Worktree: $WT_PATH"
 echo "$WT_PATH"

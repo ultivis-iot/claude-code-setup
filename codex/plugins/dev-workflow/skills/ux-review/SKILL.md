@@ -131,10 +131,18 @@ Start the viewer and return links that open in a browser instead of filesystem p
 node "$UX/scripts/viewer.mjs" --ensure --host 0.0.0.0
 ```
 
-`--ensure` reuses a running viewer and starts one only when none answers. The page lives in `assets/viewer-page.html` and is read per request, so edits to markup, CSS or client script show up on a browser refresh with no restart. Use `--restart` only after editing `viewer.mjs` itself, since server code is held in the process. It prints every reachable address (localhost, hostname `.local`, LAN interfaces, Tailscale when present); pick the one the reader can open. Deep-link the reviewed pass:
+`--ensure` reuses a running viewer and starts one only when none answers. The page lives in `assets/viewer-page.html` and is read per request, so edits to markup, CSS or client script show up on a browser refresh with no restart. Use `--restart` only after editing `viewer.mjs` itself, since server code is held in the process.
+
+The banner lists every reachable address. When `tailscale serve` or `tailscale funnel` publishes the viewer port on an external port, that address is listed first and marked `→`; hand the reader that origin and no other. Localhost, `.local` and LAN addresses only open on this machine, so fall back to them only when the banner shows no `→` entry. Deep-link the reviewed pass from the chosen origin:
 
 ```text
-http://<host>:7830/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
+<viewer-origin>/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
+```
+
+Example with a `tailscale serve` mapping of `https://<machine>.<tailnet>.ts.net:8443` onto the viewer port:
+
+```text
+https://<machine>.<tailnet>.ts.net:8443/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
 ```
 
 Also state the P-level counts. P0 blocks or makes work unsafe/inaccessible, P1 causes major primary-path friction, and P2 covers measurable consistency or polish issues.

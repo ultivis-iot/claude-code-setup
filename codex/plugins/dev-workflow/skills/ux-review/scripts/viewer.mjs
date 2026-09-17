@@ -332,8 +332,39 @@ function renderMarkdown(source, baseUrl) {
 }
 
 // ── 접근 가능한 주소 ─────────────────────────────────────────────────
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0', '::1', '::']);
+
+// tailscale serve/funnel 가 뷰어 포트를 외부 포트에 물려 두었으면, 그 주소가
+// 읽는 사람이 실제로 열 수 있는 유일한 경로다. 그래서 목록의 맨 앞에 둔다.
+async function tailscaleServeUrls() {
+  const urls = [];
+  let status;
+  try {
+    const { stdout } = await run('tailscale', ['serve', 'status', '--json']);
+    status = JSON.parse(stdout);
+  } catch { return urls; }
+
+  for (const [hostPort, site] of Object.entries(status?.Web ?? {})) {
+    for (const [mount, handler] of Object.entries(site?.Handlers ?? {})) {
+      if (typeof handler?.Proxy !== 'string') continue;
+      let target;
+      try { target = new URL(handler.Proxy); } catch { continue; }
+      const host = target.hostname.replace(/^\[|\]$/g, '');
+      if (!LOOPBACK_HOSTS.has(host) || Number(target.port) !== PORT) continue;
+      const prefix = mount === '/' ? '' : mount.replace(/\/$/, '');
+      urls.push({
+        label: '외부',
+        url: `https://${hostPort}${prefix}`,
+        note: status?.AllowFunnel?.[hostPort] ? 'tailscale funnel' : 'tailscale serve',
+        preferred: true,
+      });
+    }
+  }
+  return urls;
+}
+
 async function reachableUrls() {
-  const urls = [{ label: '로컬', url: `http://localhost:${PORT}` }];
+  const urls = [...(await tailscaleServeUrls()), { label: '로컬', url: `http://localhost:${PORT}` }];
   const hostname = os.hostname().toLowerCase();
   let mdns = false;
   try { await run('systemctl', ['is-active', '--quiet', 'avahi-daemon']); mdns = true; } catch {}
@@ -523,8 +554,13 @@ async function printBanner() {
     .flatMap((r) => r.worktrees).flatMap((w) => w.scenarios).length;
   console.log(`\nux-review viewer  ·  ${STORE}`);
   console.log(`포트 ${PORT} · 시나리오 ${scenarioCount}개${READ_ONLY ? ' · 읽기 전용' : ''}\n`);
-  for (const entry of await reachableUrls()) {
-    console.log(`  ${entry.label.padEnd(10)} ${entry.url}${entry.note ? `   (${entry.note})` : ''}`);
+  const urls = await reachableUrls();
+  for (const entry of urls) {
+    const mark = entry.preferred ? '→' : ' ';
+    console.log(`${mark} ${entry.label.padEnd(10)} ${entry.url}${entry.note ? `   (${entry.note})` : ''}`);
+  }
+  if (urls.some((entry) => entry.preferred)) {
+    console.log('\n  → 표시된 외부 주소를 링크로 전달하세요. 로컬/LAN 주소는 이 머신에서만 열립니다.');
   }
   console.log('');
 }

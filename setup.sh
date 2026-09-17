@@ -77,6 +77,10 @@ else
 fi
 echo ""
 
+echo "0-1. Graft CLI 확인..."
+"$SCRIPT_DIR/scripts/ensure-graft-cli.sh"
+echo ""
+
 # 디렉토리 생성
 echo "1. 디렉토리 생성..."
 mkdir -p "$CLAUDE_DIR/commands"

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `ultivis-flow`에 Claude Code·Codex 공통 Graft 코드맵 수명주기를 추가. 설치·업데이트 시 Node.js 20 이상과 `@nanonets/graft@0.18.0`을 확인해 대화형 설치를 제안하고, 누락·실패 시 권고 후 계속한다. `ult-wt-add.sh`는 worktree 생성·재사용 직후 로컬 그래프를 만들며 관리형 `post-merge` hook은 merge/pull 뒤 현재 worktree 그래프를 갱신한다. `graft/`는 worktree별 비공유 캐시로 유지하고 `DO_NOT_TRACK=1`, 비-LLM 기본 빌드만 사용한다. tree-sitter 네이티브 호환 문제가 생길 때만 LTS Node 24를 대안으로 권고한다.
+- `ux-review` 뷰어가 `tailscale serve`/`funnel` 로 외부 포트에 물린 주소를 먼저 알리도록 함. 배너는 localhost·`.local`·LAN·tailscale IP 를 순서 없이 늘어놓기만 해서, 읽는 사람이 다른 기기에서 여는 링크를 건네야 하는데도 이 머신에서만 열리는 주소가 뽑히곤 했음. 이제 `tailscale serve status --json` 의 `Web` 핸들러 중 프록시 대상이 루프백의 뷰어 포트인 항목을 찾아 `https://<host>:<외부포트>` 를 맨 위에 `→` 로 표시하고(funnel 이면 그렇게 표기), 그런 항목이 있으면 그 주소를 전달하라는 문구를 덧붙임. `SKILL.md` 의 딥링크 템플릿도 `http://<host>:7830/...` 대신 고른 오리진 기준으로 바꿈.
+
 ## v1.0.0 (2026-09-09)
 
 - 호환성 변경: 공통 검증에 Node.js가 필요하며 기존 v1 검증 결과는 재사용하지 않는다. 업데이트 후 검증을 다시 실행하고, 선택적 Git hook을 이미 사용하는 저장소는 hook 설치기도 다시 실행한다.

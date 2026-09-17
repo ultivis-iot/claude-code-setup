@@ -25,6 +25,60 @@ if ($Update) {
 Write-Host "===================================" -ForegroundColor Cyan
 Write-Host ""
 
+Write-Host "0-1. Graft CLI 확인..."
+$GraftPackage = "@nanonets/graft@0.18.0"
+$GraftVersion = "0.18.0"
+$NodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $NodeCmd) {
+    Write-Host "   Node.js가 없어 Graft 설치를 건너뜁니다." -ForegroundColor Yellow
+    Write-Host "   권장: Node.js 20 이상에서 npm install -g $GraftPackage" -ForegroundColor Yellow
+} else {
+    $NodeMajor = (& node -p 'process.versions.node.split(".")[0]' 2>$null | Out-String).Trim()
+    if (-not ($NodeMajor -match '^\d+$') -or [int]$NodeMajor -lt 20) {
+        Write-Host "   현재 Node $NodeMajor; Graft는 Node.js 20 이상이 필요합니다." -ForegroundColor Yellow
+        Write-Host "   권장: Node.js 20 이상에서 npm install -g $GraftPackage" -ForegroundColor Yellow
+    } else {
+        $InstalledGraftVersion = ""
+        if (Get-Command graft -ErrorAction SilentlyContinue) {
+            $InstalledGraftVersion = (& graft --version 2>$null | Select-Object -Last 1 | Out-String).Trim()
+        }
+        if ($InstalledGraftVersion -eq $GraftVersion) {
+            Write-Host "   Graft CLI $GraftVersion 준비됨 (Node $(& node --version))." -ForegroundColor Green
+        } else {
+            $Action = if ($InstalledGraftVersion) { "업데이트 ($InstalledGraftVersion → $GraftVersion)" } else { "설치" }
+            $InstallGraft = $false
+            $GraftInstallMode = if ($env:GRAFT_INSTALL) { $env:GRAFT_INSTALL } else { "ask" }
+            switch -Regex ($GraftInstallMode) {
+                '^(1|yes|true|always)$' { $InstallGraft = $true; break }
+                '^(0|no|false|never)$' { $InstallGraft = $false; break }
+                default {
+                    $Answer = Read-Host "   $GraftPackage CLI를 $Action할까요? [Y/n]"
+                    $InstallGraft = $Answer -notmatch '^(n|no)$'
+                }
+            }
+            if ($InstallGraft -and (Get-Command npm -ErrorAction SilentlyContinue)) {
+                & npm install -g $GraftPackage
+                if ($LASTEXITCODE -eq 0) {
+                    $StartedGraftVersion = (& graft --version 2>$null | Select-Object -Last 1 | Out-String).Trim()
+                    if ($StartedGraftVersion -eq $GraftVersion) {
+                        Write-Host "   Graft CLI $GraftVersion $Action 완료." -ForegroundColor Green
+                    } else {
+                        Write-Host "   Graft CLI를 설치했지만 현재 Node 환경에서 시작하지 못했습니다. workflow 설치는 계속합니다." -ForegroundColor Yellow
+                        Write-Host "   tree-sitter 네이티브 호환 오류면 LTS Node 24로 다시 시도하세요." -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host "   Graft CLI $Action 실패. workflow 설치는 계속합니다." -ForegroundColor Yellow
+                    Write-Host "   tree-sitter 네이티브 호환 오류면 LTS Node 24로 다시 시도하세요." -ForegroundColor Yellow
+                }
+            } else {
+                Write-Host "   Graft CLI $Action 건너뜀." -ForegroundColor Yellow
+                Write-Host "   권장: Node.js 20 이상에서 npm install -g $GraftPackage" -ForegroundColor Yellow
+            }
+        }
+    }
+}
+Write-Host ""
+
 # 디렉토리 생성
 Write-Host "1. 디렉토리 생성..."
 New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "commands") | Out-Null
