@@ -96,6 +96,16 @@ cd claude-code-setup
 > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 > ```
 
+### OpenCode (사내 배포)
+
+OpenCode + 사내 vLLM 엔드포인트 설정까지 한 번에 설치합니다 (Linux/macOS). `ULTIVIS_ENDPOINT` 환경변수가 필요합니다:
+
+```bash
+export ULTIVIS_ENDPOINT=http://<사내 vLLM 주소>:8000/v1
+bash setup-opencode.sh             # 신규 설치
+bash setup-opencode.sh --config-only   # 설정만 갱신
+```
+
 ## 업데이트
 
 설정이 변경되면 `git pull` 후 업데이트 명령을 실행합니다.
