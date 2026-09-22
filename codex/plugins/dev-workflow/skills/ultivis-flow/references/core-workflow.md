@@ -15,7 +15,7 @@ Key expectations:
 
 - The plan must include the user's intent, expected outcome, and meaningful constraints.
 - An explicit skill invocation wins. For an ambiguous route, ask one question with 2–3 choices and put the recommendation first.
-- Before writing or publishing a plan, ask blocking clarification questions when scope, success criteria, target repo/project/story, dependencies, or verification expectations are unclear.
+- 짧은 신규 요청의 Plan은 같은 설치 루트의 `docs/references/request-to-plan.md`를 따른다. 프로젝트·Graft 조사로 사실을 먼저 확인하고 중요한 미결 결정만 질문한다. 가정을 명시한 초안은 제시할 수 있으며 확정·발행 전에 중요한 결정을 해소한다.
 - Ask questions that help the user think and decide. Present the decision point and tradeoff briefly instead of filling gaps with hidden assumptions.
 - Ask only the next 1-3 important questions at a time. Record answers as plan decisions, and record non-blocking assumptions explicitly.
 - Do not create Story/Task/Issue records until the plan is approved and the Story/Task breakdown has been confirmed.

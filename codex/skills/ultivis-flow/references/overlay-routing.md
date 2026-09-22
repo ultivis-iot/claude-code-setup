@@ -15,7 +15,7 @@
 
 | Signal in the request or repository | Primary overlay |
 |---|---|
-| Important ambiguity, competing decisions, or an under-specified plan | `grilling` |
+| 조사 후 남은 중요한 제품·범위 결정, 또는 명시적인 심층 인터뷰 요청 | `grilling` |
 | Concrete behavior to implement test-first | `tdd` |
 | Unknown bug, regression, intermittent failure, or performance degradation | `diagnosing-bugs` |
 | External documentation, API facts, standards, or primary-source investigation | `research` |
@@ -31,6 +31,8 @@
 | Authoring or revising a reusable skill | `writing-great-skills` |
 
 `grill-me` is the explicit shortcut for starting `grilling`; the router normally selects `grilling` directly.
+
+짧은 신규 요청은 같은 설치 루트의 `docs/references/request-to-plan.md`에 따라 프로젝트·Graft 조사부터 한다. 요청이 짧다는 이유만으로 긴 인터뷰를 시작하지 않는다.
 
 `visual-qa` and `ux-review` both open a browser and are easy to confuse. `visual-qa` asks whether the change broke a route — it sweeps routes with no scenario and no approval, and it is the gate `commit-and-verify` offers when frontend files change. `ux-review` asks whether an approved journey meets its intent, and it requires a scenario the user approved before Playwright runs. Reach for `visual-qa` for regression, `ux-review` for judgment. `visual-qa` is a Claude command and is not installed for Codex.
 

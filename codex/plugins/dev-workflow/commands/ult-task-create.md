@@ -12,6 +12,8 @@ argument-hint: [story-title-or-url] [--name <task>] [--topic <topic>]
 
 ## 실행
 
+같은 설치본의 `~/.codex/docs/references/request-to-plan.md` 중 Task 분해·발행 기준을 읽는다. 설정 저장소에서는 저장소의 대응 문서를 사용한다. Story 성공 사례에 연결된 결과·범위·의존성·검증을 `--description`에 담는다. 이미 합의된 내용은 재질문하지 않고 새 범위와 중요한 미결 결정만 확인한다.
+
 ```bash
 ~/.codex/scripts/ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
 ```

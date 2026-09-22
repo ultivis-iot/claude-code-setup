@@ -18,6 +18,7 @@ This is the lifecycle baseline when selected or required by repository instructi
 ## Which reference to read
 
 - For the overall flow, read [references/core-workflow.md](references/core-workflow.md).
+- 짧은 요청을 조사·합의·Plan·Task로 구체화할 때는 같은 설치 루트의 `docs/references/request-to-plan.md`를 읽는다. 설정 저장소에서는 해당 저장소의 문서를 사용한다. 확정된 Issue는 필요한 부분만 확인하고 재발행하지 않는다.
 - For codebase navigation and Graft lifecycle behavior, read [references/graft-code-map.md](references/graft-code-map.md).
 - For natural-language overlay selection, read [references/overlay-routing.md](references/overlay-routing.md).
 - For commit and validation behavior, read [references/commit-and-verify.md](references/commit-and-verify.md).

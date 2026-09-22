@@ -8,6 +8,9 @@ argument-hint: [--dry-run]
 
 발행 입력 spec을 만들기 전에 아래 계약을 읽는다:
 
+- `~/.codex/docs/references/request-to-plan.md`
+  - 의도·범위·성공 사례와 Task 결과·의존성·검증의 연결을 확인한다. 미확정 요청은 조사·합의로 돌아가고 승인된 계획은 임의로 재기획하지 않는다.
+
 - `~/.codex/docs/references/task-publishing-model.md`
   - Story/Task/Issue 관계를 다시 확인할 때
   - exec 스크립트에 넘길 JSON spec을 확인할 때
@@ -43,6 +46,8 @@ argument-hint: [--dry-run]
    - Story tag
    - Story priority
    - Task N개 분해
+   - 공통 request-to-plan 기준으로 성공 사례와 Task 결과·검증을 연결하고 Story `body_markdown`과 Task `description`에 근거·결정을 보존한다.
+   - 실험에 의존하는 후속 작업은 초안으로 남긴다. 새 Task 간 의존성 ID가 없으면 선행 작업부터 발행하고 후속 Task는 실제 ID로 기존 추가 흐름에서 발행한다.
 7. 사용자에게 Project와 최종 발행 미리보기를 확인받는다
 8. 아래 JSON spec을 생성한다
    - `github_repo`

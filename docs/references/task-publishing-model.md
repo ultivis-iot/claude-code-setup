@@ -1,5 +1,7 @@
 # Task Publishing Model
 
+짧은 요청의 조사·기획과 Task 분해는 [request-to-plan.md](request-to-plan.md)를 따른다. 이 문서는 합의된 계획의 발행 관계와 실행 spec을 정의한다.
+
 `/ult-story-create`나 `/ult-task-create`에서 Story/Task/Issue 관계가 헷갈릴 때만 보는 문서.
 
 핵심 관계:

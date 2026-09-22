@@ -29,6 +29,8 @@ Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니�
 
 ## 처음 시작
 
+짧은 기능 요청만으로 시작할 수 있습니다. AI가 프로젝트·Graft 조사 → 문제 해석·해결안 → 핵심 질문 → Plan·Task 분해를 수행합니다. [공통 Plan 방법론](docs/references/request-to-plan.md)에 범위·성공 사례·변경 시 재합의·결과 증거 기준을 정리했습니다.
+
 처음 쓰는 사용자는 보통 아래 순서로 시작하면 됩니다.
 
 1. Plan 작성 후 승인
