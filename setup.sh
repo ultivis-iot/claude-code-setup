@@ -94,7 +94,17 @@ if command -v node > /dev/null 2>&1; then
     [ "$UPDATE_MODE" = true ] && CLAUDE_MD_ARGS+=(--update)
     node "$SCRIPT_DIR/scripts/install-claude-md.mjs" "${CLAUDE_MD_ARGS[@]}"
 else
-    echo -e "${YELLOW}   ⚠ Node.js가 없어 CLAUDE.md 설치를 건너뜀${NC}"
+    # Node.js 없이도 첫 설치·추가는 한다. 병합이 필요한 업데이트만 건너뛴다.
+    MARKER="# === Claude Code 개발 플로우 설정 ==="
+    if [ ! -f "$CLAUDE_DIR/CLAUDE.md" ]; then
+        { echo "$MARKER"; cat "$SCRIPT_DIR/templates/global-claude.md"; } > "$CLAUDE_DIR/CLAUDE.md"
+        echo -e "${GREEN}   ✓ CLAUDE.md 생성 완료${NC}"
+    elif ! grep -qF "$MARKER" "$CLAUDE_DIR/CLAUDE.md"; then
+        { echo ""; echo "$MARKER"; cat "$SCRIPT_DIR/templates/global-claude.md"; } >> "$CLAUDE_DIR/CLAUDE.md"
+        echo -e "${GREEN}   ✓ CLAUDE.md에 설정 추가 완료${NC}"
+    else
+        echo -e "${YELLOW}   ⚠ Node.js가 없어 CLAUDE.md 병합 업데이트를 건너뜀 (파일은 그대로)${NC}"
+    fi
 fi
 
 # Commands 설치
