@@ -70,13 +70,15 @@ git push origin master --tags
 - Codex 설치: `./setup-codex.sh`
 - 업데이트: `./setup.sh --update`
 - 워크플로우 검증: `./scripts/verify-workflow.sh`
+- CLAUDE.md 설치기 테스트: `node scripts/test-install-claude-md.mjs` (워크플로우 검증에 포함)
 
 ### 업데이트 검증
 `./setup.sh --update` 실행 후 아래 항목 확인:
 
 ```bash
-# 1. CLAUDE.md 전역 설정 확인
+# 1. CLAUDE.md 전역 설정 확인 (--update 출력에 '충돌'·'건너뜀'이 없어야 함)
 cat ~/.claude/CLAUDE.md | grep "Plan 모드 가이드"
+test ! -e ~/.claude/.claude-code-setup/CLAUDE.md.conflict
 
 # 2. Agents 파일 동기화 확인
 diff -q agents/ ~/.claude/agents/

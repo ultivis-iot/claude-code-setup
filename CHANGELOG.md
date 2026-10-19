@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `setup.sh --update`/`setup.ps1 -Update`가 `~/.claude/CLAUDE.md` 설정 구역을 템플릿으로 통째로 덮어써 구역 안에 직접 넣은 개인 설정이 지워지던 문제 수정. 설치한 템플릿을 `~/.claude/.claude-code-setup/claude-md-base.md`에 남기고, 업데이트 때 현재 구역·이전 템플릿·새 템플릿을 `git merge-file`로 3-way 병합한다(`scripts/install-claude-md.mjs`). 양쪽이 같은 자리에 추가만 한 경우는 둘 다 남기고, 같은 줄을 서로 다르게 고친 충돌은 파일을 그대로 두고 충돌본을 남긴다. base가 없는 기존 설치는 저장소 git 이력에서 가장 가까운 템플릿을 base로 쓴다. 교체 전 파일은 `backups/`에 백업.
+- `setup.sh --update`/`setup.ps1 -Update`가 `~/.claude/CLAUDE.md` 설정 구역을 템플릿으로 통째로 덮어써 구역 안에 직접 넣은 개인 설정이 지워지던 문제 수정. 설치한 템플릿을 `~/.claude/.claude-code-setup/claude-md-base.md`에 남기고, 업데이트 때 현재 구역·이전 템플릿·새 템플릿을 `git merge-file`로 3-way 병합한다(`scripts/install-claude-md.mjs`). 양쪽이 같은 자리에 추가만 한 경우는 둘 다 남기고, 같은 줄을 서로 다르게 고친 충돌은 파일을 그대로 두고 충돌본을 남긴다. base가 없는 기존 설치는 저장소 git 이력에서 가장 가까운 템플릿을 base로 쓴다. 교체 전 파일은 `backups/`에 백업. CRLF 설치본은 줄바꿈을 유지한 채 병합하고, 비어 있는 구역은 새 템플릿으로 채운다.
 - Plan 질문의 최소 확인 항목에 비기능 제약(보안·성능·접근성/반응형·DB 마이그레이션/롤백)을 추가. 작업에 해당할 때만 확인하고, 기존 구현을 먼저 조사한 뒤 정책·목표치만 질문해 `결정사항`에 남긴다. Claude는 `templates/global-claude.md`, Codex는 `ultivis-flow` `core-workflow.md`에 반영.
 - OpenCode 사내 배포 스크립트(`setup-opencode.sh`) 추가. README에 설치 안내 포함.
 - 짧은 요청을 프로젝트·Graft 조사, 핵심 grilling, 범위·성공 사례 합의, 결과 중심 Task 분해로 연결하는 공통 Plan 방법론 추가. 시작·Story/Task 발행·스킬 라우팅에 연결하고 블루프린트 근거, 변경 경계와 결과 증거를 계획에 보존하도록 정리.

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,6 +79,10 @@ try {
     assert.match(f.install('--update'), /충돌/);
     assert.equal(f.read(), edited);
     assert.match(readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8'), /<<<<<<<[\s\S]*>>>>>>>/);
+    // 사람이 충돌을 해결하면 다음 --update가 남은 충돌본을 지운다.
+    writeFileSync(f.target, `${MARKER}\n${V1.replace('- 항목 1', '- 항목 1 (템플릿 수정)')}`);
+    f.install('--update');
+    assert.ok(!existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
   }
   // base 파일이 없는 기존 설치: git 이력에서 가장 가까운 템플릿을 base로 쓴다.
   {
@@ -97,6 +101,36 @@ try {
     writeFileSync(f.target, legacy);
     f.install('--update');
     assert.equal(f.read(), legacy);
+  }
+  // CRLF로 저장된 설치본도 병합하고 CRLF를 유지한다.
+  {
+    const f = fixture(V1);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${V1}- 개인 항목\n`.replace(/\n/g, '\r\n'));
+    writeFileSync(f.templatePath, V2);
+    assert.match(f.install('--update'), /업데이트 완료/);
+    const merged = f.read();
+    assert.ok(merged.includes('- 항목 2\r\n') && merged.includes('- 개인 항목\r\n'), JSON.stringify(merged));
+    assert.ok(!/[^\r]\n/.test(merged), 'LF만 있는 줄이 섞이지 않는다');
+  }
+  // 마커만 있고 구역이 비어 있으면(개행 없이 파일 끝 포함) 새 템플릿으로 채운다.
+  {
+    const f = fixture(V2);
+    writeFileSync(f.target, `# 위\n${MARKER}`);
+    f.install('--update');
+    assert.equal(f.read(), `# 위\n${MARKER}\n${V2}`);
+  }
+  // 충돌 표시처럼 보이는 개인 줄이 있어도 줄을 잃지 않는다(병합되거나, 해석 불가면 파일 유지).
+  {
+    const f = fixture(V1);
+    f.install();
+    const odd = `${MARKER}\n<<<<<<< 현재 CLAUDE.md\n${V1}- 개인 항목\n`;
+    writeFileSync(f.target, odd);
+    writeFileSync(f.templatePath, V2);
+    const output = f.install('--update');
+    const result = f.read();
+    if (/병합 실패/.test(output)) assert.equal(result, odd);
+    else for (const line of ['<<<<<<< 현재 CLAUDE.md', '- 개인 항목', '- 항목 2']) assert.ok(result.includes(line), line);
   }
   console.log(`OK: install-claude-md (${count} cases)`);
 } finally {
