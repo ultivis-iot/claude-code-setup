@@ -87,35 +87,14 @@ mkdir -p "$CLAUDE_DIR/commands"
 mkdir -p "$CLAUDE_DIR/agents"
 mkdir -p "$CLAUDE_DIR/skills"
 
-# CLAUDE.md 설치 (기존 파일에 추가)
+# CLAUDE.md 설치 (기존 파일에 추가, 업데이트 시 직접 고친 내용과 3-way 병합)
 echo "2. CLAUDE.md 설치..."
-MARKER="# === Claude Code 개발 플로우 설정 ==="
-if [ -f "$CLAUDE_DIR/CLAUDE.md" ]; then
-    # 이미 설치된 내용이 있는지 확인
-    if grep -q "$MARKER" "$CLAUDE_DIR/CLAUDE.md" 2>/dev/null; then
-        if [ "$UPDATE_MODE" = true ]; then
-            # 업데이트 모드: 기존 설정 섹션 교체
-            echo -e "${YELLOW}   기존 설정 섹션 업데이트${NC}"
-            # MARKER 이전 내용만 유지
-            sed -i "/$MARKER/,\$d" "$CLAUDE_DIR/CLAUDE.md"
-            # 새 내용 추가
-            echo "$MARKER" >> "$CLAUDE_DIR/CLAUDE.md"
-            cat "$SCRIPT_DIR/templates/global-claude.md" >> "$CLAUDE_DIR/CLAUDE.md"
-            echo -e "${GREEN}   ✓ CLAUDE.md 업데이트 완료${NC}"
-        else
-            echo -e "${YELLOW}   이미 설치된 설정 발견. 건너뜀 (업데이트: --update)${NC}"
-        fi
-    else
-        echo -e "${YELLOW}   기존 CLAUDE.md에 설정 추가${NC}"
-        echo "" >> "$CLAUDE_DIR/CLAUDE.md"
-        echo "$MARKER" >> "$CLAUDE_DIR/CLAUDE.md"
-        cat "$SCRIPT_DIR/templates/global-claude.md" >> "$CLAUDE_DIR/CLAUDE.md"
-        echo -e "${GREEN}   ✓ CLAUDE.md에 설정 추가 완료${NC}"
-    fi
+if command -v node > /dev/null 2>&1; then
+    CLAUDE_MD_ARGS=("$CLAUDE_DIR/CLAUDE.md" "$SCRIPT_DIR/templates/global-claude.md" --state "$CLAUDE_DIR/.claude-code-setup" --repo "$SCRIPT_DIR")
+    [ "$UPDATE_MODE" = true ] && CLAUDE_MD_ARGS+=(--update)
+    node "$SCRIPT_DIR/scripts/install-claude-md.mjs" "${CLAUDE_MD_ARGS[@]}"
 else
-    echo "$MARKER" > "$CLAUDE_DIR/CLAUDE.md"
-    cat "$SCRIPT_DIR/templates/global-claude.md" >> "$CLAUDE_DIR/CLAUDE.md"
-    echo -e "${GREEN}   ✓ CLAUDE.md 생성 완료${NC}"
+    echo -e "${YELLOW}   ⚠ Node.js가 없어 CLAUDE.md 설치를 건너뜀${NC}"
 fi
 
 # Commands 설치

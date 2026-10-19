@@ -85,37 +85,17 @@ New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "commands") | Ou
 New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "agents") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $ClaudeDir "skills") | Out-Null
 
-# CLAUDE.md 설치
+# CLAUDE.md 설치 (기존 파일에 추가, 업데이트 시 직접 고친 내용과 3-way 병합)
 Write-Host "2. CLAUDE.md 설치..."
 $ClaudeMdPath = Join-Path $ClaudeDir "CLAUDE.md"
-$Marker = "# === Claude Code 개발 플로우 설정 ==="
 $SourceClaudeMd = Join-Path $ScriptDir "templates\global-claude.md"
-
-if (Test-Path $ClaudeMdPath) {
-    $Content = Get-Content $ClaudeMdPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-    if ($Content -and $Content.Contains($Marker)) {
-        if ($Update) {
-            # 업데이트 모드: 기존 설정 섹션 교체
-            Write-Host "   기존 설정 섹션 업데이트" -ForegroundColor Yellow
-            # MARKER 이전 내용만 유지
-            $MarkerIndex = $Content.IndexOf($Marker)
-            $BeforeMarker = $Content.Substring(0, $MarkerIndex)
-            # 새 내용으로 교체
-            $NewContent = $BeforeMarker + $Marker + "`n" + (Get-Content $SourceClaudeMd -Raw -Encoding UTF8)
-            Set-Content -Path $ClaudeMdPath -Value $NewContent -Encoding UTF8 -NoNewline
-            Write-Host "   CLAUDE.md 업데이트 완료" -ForegroundColor Green
-        } else {
-            Write-Host "   이미 설치된 설정 발견. 건너뜀 (업데이트: -Update)" -ForegroundColor Yellow
-        }
-    } else {
-        Add-Content -Path $ClaudeMdPath -Value "`n$Marker" -Encoding UTF8
-        Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
-        Write-Host "   CLAUDE.md에 설정 추가 완료" -ForegroundColor Green
-    }
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    $ClaudeMdArgs = @($ClaudeMdPath, $SourceClaudeMd, "--state", (Join-Path $ClaudeDir ".claude-code-setup"), "--repo", $ScriptDir)
+    if ($Update) { $ClaudeMdArgs += "--update" }
+    & node (Join-Path $ScriptDir "scripts\install-claude-md.mjs") @ClaudeMdArgs
+    if ($LASTEXITCODE -ne 0) { throw "CLAUDE.md 설치 실패" }
 } else {
-    Set-Content -Path $ClaudeMdPath -Value $Marker -Encoding UTF8
-    Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
-    Write-Host "   CLAUDE.md 생성 완료" -ForegroundColor Green
+    Write-Host "   Node.js가 없어 CLAUDE.md 설치를 건너뜀" -ForegroundColor Yellow
 }
 
 # Commands 설치

@@ -30,6 +30,7 @@ if [ "$MODE" = "repo" ]; then
     check_script "$WORKFLOW_ROOT/setup-codex.sh"
     check_file "$WORKFLOW_ROOT/setup.ps1"
     node "$WORKFLOW_ROOT/scripts/sync-workflow.mjs" --check
+    node "$WORKFLOW_ROOT/scripts/test-install-claude-md.mjs"
     check_script "$WORKFLOW_ROOT/hooks/pre-commit"
     check_script "$WORKFLOW_ROOT/hooks/pre-push"
     check_script "$WORKFLOW_ROOT/hooks/post-merge"
