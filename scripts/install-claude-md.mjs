@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 
+// setup.sh and setup.ps1 repeat this marker in their no-Node fallback; keep them in sync.
 const MARKER = '# === Claude Code 개발 플로우 설정 ===';
 const usage = 'Usage: install-claude-md.mjs <CLAUDE.md> <template> --state <dir> [--repo <dir>] [--update]';
 
@@ -22,10 +23,15 @@ if (!target || !templatePath || target.startsWith('--') || !stateDir) throw new 
 const basePath = path.join(stateDir, 'claude-md-base.md');
 const template = readFileSync(templatePath, 'utf8');
 const say = message => console.log(`   ${message}`);
+const lf = text => text.replace(/\r\n/g, '\n');
 
+const conflictPath = path.join(stateDir, 'CLAUDE.md.conflict');
+
+// Record the template now in effect; a leftover conflict copy from an earlier run is stale.
 function saveBase() {
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(basePath, template);
+  rmSync(conflictPath, { force: true });
 }
 
 function backup(content) {
@@ -70,7 +76,10 @@ function merge(ours, base, theirs) {
     const labels = ['현재 CLAUDE.md', '이전 템플릿', '새 템플릿'];
     const result = spawnSync('git', ['merge-file', '-p', '--diff3', ...labels.flatMap(label => ['-L', label]),
       path.join(dir, 'ours'), path.join(dir, 'base'), path.join(dir, 'theirs')], { encoding: 'utf8' });
-    if (result.error || result.status < 0 || result.status > 127) return { error: result.error?.message || result.stderr.trim() };
+    // merge-file exits with the conflict count (0-127); negative or null (killed by a signal) is a failure.
+    if (result.error || typeof result.status !== 'number' || result.status < 0 || result.status > 127) {
+      return { error: result.error?.message || result.stderr.trim() || `git merge-file exit ${result.status ?? result.signal}` };
+    }
     return resolveAdditions(result.stdout, labels);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -98,7 +107,48 @@ function resolveAdditions(text, [ours, base, theirs]) {
     } else if (hunk) hunk[hunk.part].push(line);
     else out.push(line);
   }
+  // An unterminated hunk means a section line looked like a conflict marker; refuse rather than drop lines.
+  if (hunk) return { error: '충돌 표시처럼 보이는 줄 때문에 병합 결과를 해석하지 못함' };
   return { merged: out.join(''), conflicts };
+}
+
+function updateSection(content, index) {
+  const markerEnd = index + MARKER.length;
+  const eol = content.slice(markerEnd).match(/^\r?\n/)?.[0] ?? '';
+  const crlf = eol === '\r\n';
+  const head = content.slice(0, markerEnd) + (eol || '\n');
+  const section = lf(content.slice(markerEnd + eol.length));
+  const write = text => writeFileSync(target, head + (crlf ? text.replace(/\n/g, '\r\n') : text));
+  const theirs = lf(template);
+
+  if (section === theirs) {
+    saveBase();
+    return say('✓ CLAUDE.md 이미 최신');
+  }
+  if (!section.trim()) {
+    const saved = backup(content);
+    write(theirs);
+    saveBase();
+    return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
+  }
+  const base = existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
+  if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (git 저장소에서 setup을 실행하세요)');
+
+  const { merged, conflicts, error } = merge(section, lf(base), theirs);
+  if (error) return say(`⚠ CLAUDE.md 병합 실패, 파일은 그대로 둠: ${error}`);
+  if (conflicts) {
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(conflictPath, head + merged);
+    say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
+    say(`  충돌 표시가 든 병합본: ${conflictPath}`);
+    return say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);
+  }
+  saveBase();
+  if (merged === section) return say('✓ CLAUDE.md 이미 최신 (직접 고친 내용 유지)');
+  const saved = backup(content);
+  write(merged);
+  say('✓ CLAUDE.md 업데이트 완료 (직접 고친 내용 유지)');
+  say(`  이전 파일 백업: ${saved}`);
 }
 
 if (!existsSync(target)) {
@@ -115,35 +165,6 @@ if (!existsSync(target)) {
   } else if (!update) {
     say('이미 설치된 설정 발견. 건너뜀 (업데이트: --update)');
   } else {
-    const head = content.slice(0, index + MARKER.length + 1);
-    const section = content.slice(head.length);
-    const base = existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
-    if (section === template) {
-      saveBase();
-      say('✓ CLAUDE.md 이미 최신');
-    } else if (base === undefined) {
-      say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (git 저장소에서 setup을 실행하세요)');
-    } else {
-      const { merged, conflicts, error } = merge(section, base, template);
-      if (error) {
-        say(`⚠ CLAUDE.md 병합 실패, 파일은 그대로 둠: ${error}`);
-      } else if (conflicts) {
-        const file = path.join(stateDir, 'CLAUDE.md.conflict');
-        mkdirSync(stateDir, { recursive: true });
-        writeFileSync(file, head + merged);
-        say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
-        say(`  충돌 표시가 든 병합본: ${file}`);
-        say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);
-      } else if (merged === section) {
-        saveBase();
-        say('✓ CLAUDE.md 이미 최신 (직접 고친 내용 유지)');
-      } else {
-        const saved = backup(content);
-        writeFileSync(target, head + merged);
-        saveBase();
-        say('✓ CLAUDE.md 업데이트 완료 (직접 고친 내용 유지)');
-        say(`  이전 파일 백업: ${saved}`);
-      }
-    }
+    updateSection(content, index);
   }
 }
