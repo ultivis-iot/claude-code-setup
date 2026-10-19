@@ -76,7 +76,7 @@ git push origin master --tags
 `./setup.sh --update` 실행 후 아래 항목 확인:
 
 ```bash
-# 1. CLAUDE.md 전역 설정 확인 (--update 출력에 '충돌'·'건너뜀'이 없어야 함)
+# 1. CLAUDE.md 전역 설정 확인 (--update 출력에 '충돌'·'건너뜀'·'병합 실패'가 없어야 함)
 cat ~/.claude/CLAUDE.md | grep "Plan 모드 가이드"
 test ! -e ~/.claude/.claude-code-setup/CLAUDE.md.conflict
 

@@ -78,7 +78,7 @@ try {
     writeFileSync(f.templatePath, V1.replace('- 항목 1', '- 항목 1 (템플릿 수정)'));
     assert.match(f.install('--update'), /충돌/);
     assert.equal(f.read(), edited);
-    assert.match(readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8'), /<<<<<<<[\s\S]*>>>>>>>/);
+    assert.match(readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8'), /<{32}[\s\S]*>{32}/);
     // 사람이 충돌을 해결하면 다음 --update가 남은 충돌본을 지운다.
     writeFileSync(f.target, `${MARKER}\n${V1.replace('- 항목 1', '- 항목 1 (템플릿 수정)')}`);
     f.install('--update');
@@ -93,6 +93,19 @@ try {
     f.install('--update');
     const merged = f.read();
     assert.ok(merged.includes('- 항목 2') && merged.includes('- 개인 항목'), merged);
+  }
+  // 얕은 clone이면 과거 템플릿이 없으므로 추정하지 않고 건너뛴다.
+  {
+    const f = fixture(V1, { git: true });
+    f.commit(V1);
+    f.commit(V2);
+    const shallowRepo = path.join(path.dirname(f.target), 'shallow');
+    ok(spawnSync('git', ['clone', '-q', '--depth', '1', `file://${path.dirname(f.templatePath)}/..`, shallowRepo]));
+    const legacy = `${MARKER}\n${V1}- 개인 항목\n`;
+    writeFileSync(f.target, legacy);
+    const out = ok(spawnSync('node', [installer, f.target, path.join(shallowRepo, 'templates/global-claude.md'), '--state', f.state, '--repo', shallowRepo, '--update'], { encoding: 'utf8' }));
+    assert.match(out, /건너뜀/);
+    assert.equal(f.read(), legacy);
   }
   // base도 git 이력도 없으면 업데이트를 건너뛴다.
   {
@@ -131,6 +144,15 @@ try {
     const result = f.read();
     if (/병합 실패/.test(output)) assert.equal(result, odd);
     else for (const line of ['<<<<<<< 현재 CLAUDE.md', '- 개인 항목', '- 항목 2']) assert.ok(result.includes(line), line);
+  }
+  // 마크다운 setext 밑줄(=======)이 있어도 구분자로 오인하지 않는다.
+  {
+    const S1 = '# 설정\n\n제목\n=======\n- 항목 1\n';
+    const f = fixture(S1);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${S1.replace('- 항목 1', '- 항목 1 (내 수정)')}`);
+    writeFileSync(f.templatePath, S1.replace('- 항목 1', '- 항목 1 (템플릿 수정)'));
+    assert.match(f.install('--update'), /충돌\(1곳\)/);
   }
   console.log(`OK: install-claude-md (${count} cases)`);
 } finally {
