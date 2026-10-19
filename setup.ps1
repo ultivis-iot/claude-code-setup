@@ -95,7 +95,20 @@ if (Get-Command node -ErrorAction SilentlyContinue) {
     & node (Join-Path $ScriptDir "scripts\install-claude-md.mjs") @ClaudeMdArgs
     if ($LASTEXITCODE -ne 0) { throw "CLAUDE.md 설치 실패" }
 } else {
-    Write-Host "   Node.js가 없어 CLAUDE.md 설치를 건너뜀" -ForegroundColor Yellow
+    # Node.js 없이도 첫 설치·추가는 한다. 병합이 필요한 업데이트만 건너뛴다.
+    $Marker = "# === Claude Code 개발 플로우 설정 ==="
+    $Content = if (Test-Path $ClaudeMdPath) { Get-Content $ClaudeMdPath -Raw -Encoding UTF8 } else { $null }
+    if ($null -eq $Content) {
+        Set-Content -Path $ClaudeMdPath -Value $Marker -Encoding UTF8
+        Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
+        Write-Host "   CLAUDE.md 생성 완료" -ForegroundColor Green
+    } elseif (-not $Content.Contains($Marker)) {
+        Add-Content -Path $ClaudeMdPath -Value "`n$Marker" -Encoding UTF8
+        Get-Content $SourceClaudeMd -Encoding UTF8 | Add-Content -Path $ClaudeMdPath -Encoding UTF8
+        Write-Host "   CLAUDE.md에 설정 추가 완료" -ForegroundColor Green
+    } else {
+        Write-Host "   Node.js가 없어 CLAUDE.md 병합 업데이트를 건너뜀 (파일은 그대로)" -ForegroundColor Yellow
+    }
 }
 
 # Commands 설치
