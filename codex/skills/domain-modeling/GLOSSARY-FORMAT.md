@@ -55,6 +55,7 @@ The skill infers which structure applies:
 
 - If `GLOSSARY-MAP.md` exists, read it to find contexts
 - If only a root `GLOSSARY.md` exists, single context
-- If neither exists, create a root `GLOSSARY.md` lazily when the first term is resolved
+- If neither exists but a legacy `CONTEXT-MAP.md` or `CONTEXT.md` does, use that file in place (see the legacy layout note in [SKILL.md](./SKILL.md)); don't create a second glossary
+- If none of these exist, create a root `GLOSSARY.md` lazily when the first term is resolved
 
 When multiple contexts exist, infer which one the current topic relates to. If unclear, ask.
