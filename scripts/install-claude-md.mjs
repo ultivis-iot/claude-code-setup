@@ -58,6 +58,9 @@ function distance(a, b) {
 // Installs made before the base file existed: recover the base from the template's git history.
 function inferBase(section) {
   if (!repo) return undefined;
+  // A shallow clone lacks the older templates, so the closest match would wrongly be the current one.
+  const shallow = spawnSync('git', ['-C', repo, 'rev-parse', '--is-shallow-repository'], { encoding: 'utf8' });
+  if (shallow.status !== 0 || shallow.stdout.trim() !== 'false') return undefined;
   const log = spawnSync('git', ['-C', repo, 'log', '--format=%H', '--', 'templates/global-claude.md'], { encoding: 'utf8' });
   if (log.status !== 0) return undefined;
   const candidates = [template];
@@ -74,7 +77,7 @@ function merge(ours, base, theirs) {
     const files = { ours, base, theirs };
     for (const [name, content] of Object.entries(files)) writeFileSync(path.join(dir, name), content);
     const labels = ['현재 CLAUDE.md', '이전 템플릿', '새 템플릿'];
-    const result = spawnSync('git', ['merge-file', '-p', '--diff3', ...labels.flatMap(label => ['-L', label]),
+    const result = spawnSync('git', ['merge-file', '-p', '--diff3', `--marker-size=${MARKER_SIZE}`, ...labels.flatMap(label => ['-L', label]),
       path.join(dir, 'ours'), path.join(dir, 'base'), path.join(dir, 'theirs')], { encoding: 'utf8' });
     // merge-file exits with the conflict count (0-127); negative or null (killed by a signal) is a failure.
     if (result.error || typeof result.status !== 'number' || result.status < 0 || result.status > 127) {
@@ -88,20 +91,24 @@ function merge(ours, base, theirs) {
 
 // Both sides adding lines at the same spot (e.g. a personal section and a template line
 // appended at the end) is not a real conflict: keep the template lines, then the local ones.
+// Long markers so a Markdown line such as a setext '=======' is never read as a separator.
+const MARKER_SIZE = 32;
+const [OPEN, BASE, SPLIT, CLOSE] = ['<', '|', '=', '>'].map(c => c.repeat(MARKER_SIZE));
+
 function resolveAdditions(text, [ours, base, theirs]) {
   const out = [];
   let conflicts = 0;
   let hunk;
   for (const line of text.split(/(?<=\n)/)) {
     const bare = line.replace(/\r?\n$/, '');
-    if (!hunk && bare === `<<<<<<< ${ours}`) hunk = { part: 'ours', ours: [], base: [], theirs: [] };
-    else if (hunk && hunk.part === 'ours' && bare === `||||||| ${base}`) hunk.part = 'base';
-    else if (hunk && hunk.part === 'base' && bare === '=======') hunk.part = 'theirs';
-    else if (hunk && hunk.part === 'theirs' && bare === `>>>>>>> ${theirs}`) {
+    if (!hunk && bare === `${OPEN} ${ours}`) hunk = { part: 'ours', ours: [], base: [], theirs: [] };
+    else if (hunk && hunk.part === 'ours' && bare === `${BASE} ${base}`) hunk.part = 'base';
+    else if (hunk && hunk.part === 'base' && bare === SPLIT) hunk.part = 'theirs';
+    else if (hunk && hunk.part === 'theirs' && bare === `${CLOSE} ${theirs}`) {
       if (hunk.base.every(l => !l.trim())) out.push(...hunk.base, ...hunk.theirs, ...hunk.ours);
       else {
         conflicts++;
-        out.push(`<<<<<<< ${ours}\n`, ...hunk.ours, `||||||| ${base}\n`, ...hunk.base, '=======\n', ...hunk.theirs, `>>>>>>> ${theirs}\n`);
+        out.push(`${OPEN} ${ours}\n`, ...hunk.ours, `${BASE} ${base}\n`, ...hunk.base, `${SPLIT}\n`, ...hunk.theirs, `${CLOSE} ${theirs}\n`);
       }
       hunk = undefined;
     } else if (hunk) hunk[hunk.part].push(line);
@@ -132,7 +139,7 @@ function updateSection(content, index) {
     return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
   }
   const base = existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
-  if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (git 저장소에서 setup을 실행하세요)');
+  if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (전체 이력이 있는 git clone에서 setup을 실행하세요)');
 
   const { merged, conflicts, error } = merge(section, lf(base), theirs);
   if (error) return say(`⚠ CLAUDE.md 병합 실패, 파일은 그대로 둠: ${error}`);
@@ -143,10 +150,13 @@ function updateSection(content, index) {
     say(`  충돌 표시가 든 병합본: ${conflictPath}`);
     return say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);
   }
-  saveBase();
-  if (merged === section) return say('✓ CLAUDE.md 이미 최신 (직접 고친 내용 유지)');
+  if (merged === section) {
+    saveBase();
+    return say('✓ CLAUDE.md 이미 최신 (직접 고친 내용 유지)');
+  }
   const saved = backup(content);
   write(merged);
+  saveBase();
   say('✓ CLAUDE.md 업데이트 완료 (직접 고친 내용 유지)');
   say(`  이전 파일 백업: ${saved}`);
 }

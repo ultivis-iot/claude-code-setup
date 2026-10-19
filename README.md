@@ -136,7 +136,7 @@ git pull
 .\setup.ps1 -Update
 ```
 
-> **참고**: 업데이트 시 `~/.claude/CLAUDE.md`의 `# === Claude Code 개발 플로우 설정 ===` 이후 구역을 새 템플릿과 3-way 병합합니다. 구역 안에 직접 추가·수정한 내용은 유지되고, 템플릿이 같은 줄을 다르게 바꿔 충돌하면 파일을 그대로 두고 `~/.claude/.claude-code-setup/CLAUDE.md.conflict`에 충돌본을 남깁니다. 병합 전 파일은 `~/.claude/.claude-code-setup/backups/`에 백업됩니다. 병합에는 Node.js와 git이 필요합니다. 충돌이 나면 충돌본의 `<<<<<<<`~`>>>>>>>` 구간을 정리해 `~/.claude/CLAUDE.md`에 반영한 뒤 `--update`를 다시 실행하세요. 이 기능 이전에 설치해 base 기록이 없으면 저장소 git 이력에서 가장 가까운 템플릿을 base로 쓰고, git 이력도 없으면 업데이트를 건너뜁니다.
+> **참고**: 업데이트 시 `~/.claude/CLAUDE.md`의 `# === Claude Code 개발 플로우 설정 ===` 이후 구역을 새 템플릿과 3-way 병합합니다. 구역 안에 직접 추가·수정한 내용은 유지되고, 템플릿이 같은 줄을 다르게 바꿔 충돌하면 파일을 그대로 두고 `~/.claude/.claude-code-setup/CLAUDE.md.conflict`에 충돌본을 남깁니다. 병합 전 파일은 `~/.claude/.claude-code-setup/backups/`에 백업됩니다. 병합에는 Node.js와 git이 필요합니다. 충돌이 나면 충돌본의 `<<<<…`~`>>>>…` 구간을 정리해 `~/.claude/CLAUDE.md`에 반영한 뒤 `--update`를 다시 실행하세요. 이 기능 이전에 설치해 base 기록이 없으면 저장소 git 이력에서 가장 가까운 템플릿을 base로 쓰고, git 이력이 없거나 얕은 clone이면 업데이트를 건너뜁니다. Node.js가 없으면 첫 설치·추가만 하고 병합 업데이트는 건너뜁니다.
 
 ## 설치되는 파일
 
@@ -441,6 +441,7 @@ npm install -g @nanonets/graft@0.18.0
 - v2 결과 스키마와 집계 검사
 - 임시 저장소에서 상태 변경·검증 생략·실제 push 차단 회귀 테스트
 - 스킬 및 커맨드의 배포본 동기화 검사
+- `~/.claude/CLAUDE.md` 설치기(3-way 병합·충돌·base 추정) 회귀 테스트
 
 스킬/커맨드 원본을 수정한 뒤 `node scripts/sync-workflow.mjs --write`로 배포본을 생성합니다. 검증은 `--check`로 차이를 탐지하며 파일을 바꾸지 않습니다. UX 계약 테스트는 별도로 `node scripts/test-ux-review-skill.mjs`를 실행합니다.
 
