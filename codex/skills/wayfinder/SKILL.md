@@ -55,15 +55,19 @@ The whole map at low resolution, loaded once per session. Query related open Tas
 
 ### Tickets
 
-Each ticket is a **child issue** of the map; the tracker's issue id is its identity. Its body is the question, sized to one 100K token agent session:
+Each ticket belongs to the map: under `ultivis-flow`, a Notion Task under the map's Story with its linked GitHub Issue; on a plain issue tracker, a child issue of the map. The tracker's id is its identity. Its body opens with the type and the question, sized to one 100K token agent session:
 
 ```markdown
+## Type
+
+<research | prototype | grilling | task> (<HITL | AFK>)
+
 ## Question
 
 <the decision or investigation this ticket resolves>
 ```
 
-Each ticket carries a `wayfinder:<type>` label — one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)).
+`## Type` is one of `research`, `prototype`, `grilling`, `task` (see [Ticket Types](#ticket-types)). It lives in the body so no tracker schema change is needed; read the type from there, never infer it from the question.
 
 A session **claims** a ticket by assigning it to the dev driving the map, **first**, before any work, so concurrent sessions skip it. That assignee _is_ the claim: an open, unassigned ticket is unclaimed.
 
@@ -77,7 +81,7 @@ Every ticket is either **HITL** — human in the loop, worked *with* a human who
 
 - **Research** (AFK): Reading documentation, third-party APIs, or local resources to surface a fact a decision waits on. Resolve with `research` in the main session unless the user explicitly authorizes delegation.
 - **Prototype** (HITL): Raise discussion fidelity with a cheap, disposable artifact. If `prototype` is installed, use it; otherwise create only the minimum inline or temporary artifact the user approves.
-- **Grilling** (HITL): Conversation via the /grilling and /domain-modeling skills, one question at a time. The default case.
+- **Grilling** (HITL): Conversation via the /grilling and /domain-modeling skills, in the rounds `grilling` defines. The default case.
 - **Task** (HITL or AFK): Manual work that must happen before a *decision* can be made — nothing to decide, prototype, or research, but the discussion is blocked until it's done. Signing up for a service so its API can be judged, provisioning access, moving data so its shape can be seen. This is the one type that *does* rather than decides — and it earns its place by unblocking a decision, not by delivering the destination. The agent drives it alone where it can (AFK); otherwise it hands the human a precise checklist (HITL). Resolved when the work is done; the answer records what was done and any resulting facts (credentials location, new URLs, row counts) later tickets depend on.
 
 ## Fog of war
@@ -111,8 +115,8 @@ User invokes with a loose idea.
 
 1. **Name the destination.** Run a `/grilling` and `/domain-modeling` session to pin down what this map is finding its way to — the spec, decision, or change. The destination fixes the scope, so it's settled first.
 2. **Map the frontier.** Grill again, **breadth-first** this time: fan out across the whole space rather than deep on any one thread, surfacing the open decisions and the first steps takeable now. **If this surfaces no fog** — the way to the destination is already clear, the whole journey small enough for one session — you don't need a map. Stop and ask the user how they'd like to proceed.
-3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
-4. **Create the tickets you can specify now** as child issues of the map — then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog — the **Not yet specified** section.
+3. **Create the map** (under `ultivis-flow`, the Notion Story; otherwise the tracker's map issue): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**. Creating records needs the user's explicit approval of the map and breakdown.
+4. **Create the tickets you can specify now** under the map — then wire blocking edges in a **second pass** (tickets need ids before they can reference each other). Write cross-references in that pass too, with real ids: a placeholder `#<n>` auto-links to an unrelated GitHub Issue. Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog — the **Not yet specified** section.
 5. **Queue research tickets.** Resolve them one at a time with `research`. Parallel subagents and throwaway branches require explicit user authorization and still follow `ultivis-flow` rules.
 6. Stop — charting is one session's work; it hand-resolves nothing.
 
@@ -122,7 +126,7 @@ User invokes with a map (URL or number). A ticket is **optional** — without on
 
 1. Load the **map** — the low-res view, not every ticket body.
 2. Choose the ticket. If the user named one, use it. Otherwise take the first frontier ticket in order. **Claim it**: assign it to yourself before any work.
-3. Resolve it — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `/grilling` and `/domain-modeling`.
+3. Resolve it as the type its `## Type` names (see [Ticket Types](#ticket-types)) — **zoom as needed**: fetch the full body of any related or closed ticket on demand; invoke the skills the `## Notes` block names. If in doubt, use `/grilling` and `/domain-modeling`.
 4. Record the resolution: post the answer as a **resolution comment** and **append a context pointer** to the map's Decisions-so-far. A decision-only ticket **closes** here; a ticket that names buildable work **stays open and hands off to implementation on the same ticket** — issue-keyed branch via `ult-start-task`, closed when its PR merges.
 5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 

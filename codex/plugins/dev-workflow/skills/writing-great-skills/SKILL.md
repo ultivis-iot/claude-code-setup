@@ -7,7 +7,7 @@ A skill exists to wrangle determinism out of a stochastic system. **Predictabili
 
 **Bold terms** are defined in [`GLOSSARY.md`](GLOSSARY.md); look them up there for the full meaning.
 
-In this cross-platform setup, keep `SKILL.md` frontmatter to `name` and `description`. Codex explicit-only policy belongs in `agents/openai.yaml` as `policy.allow_implicit_invocation: false`; the `disable-model-invocation` mechanics below describe the upstream Claude-specific form.
+In this cross-platform setup, keep `SKILL.md` frontmatter to `name` and `description`, plus `disable-model-invocation: true` for an explicit-only skill (Claude reads it; Codex ignores it, as the upstream plugin already ships it). Codex explicit-only policy belongs in `agents/openai.yaml` as `policy.allow_implicit_invocation: false`; set both so the skill is explicit-only on each host.
 
 ## Invocation
 

@@ -20,6 +20,8 @@ Key expectations:
 - Ask only the next 1-3 important questions at a time. Record answers as plan decisions, and record non-blocking assumptions explicitly.
 - 비기능 제약은 작업에 해당할 때만 확인한다: 보안(인증·권한, 외부 입력 검증, 비밀값 보관 위치), 성능(예상 데이터 양·부하, 허용 지연), 접근성·반응형(모바일, 키보드·스크린리더 지원 수준), DB(마이그레이션 방식, 기존 데이터 이전, 롤백 가능 여부). 기존 구현을 먼저 조사하고 코드로 정할 수 없는 정책·목표치만 질문하며, 정한 값은 plan decisions에 남겨 구현 뒤 품질 검증의 기준으로 쓴다.
 - Do not create Story/Task/Issue records until the plan is approved and the Story/Task breakdown has been confirmed.
+- At breakdown, if the Task list can't be written yet, several open decisions depend on each other, and no single session can reach a conclusion, recommend charting a `wayfinder` map instead of publishing fixed Tasks.
+- For an implementation Task that is a reproducible bug fix, a logic change, or a public interface change in a repository with a runnable test setup, use `tdd` and name the seams under test in the plan's verification.
 - Preserve the approved plan in `tmp/current-plan.md` when the project already uses that artifact.
 - Validation is a gate, not a summary. If intent validation fails, stop and fix the implementation before moving on.
 - Quality validation should cover docs, security, code simplicity, tests, and CLI sync when relevant.

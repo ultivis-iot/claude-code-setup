@@ -28,16 +28,19 @@ argument-hint: [story-or-task-context]
    - **새 Task/Issue/Story를 만들지 않는다.** 해당 Issue 기준 브랜치를 만들고(`scripts/ult-wt-add.sh`, 브랜치명은 이슈 번호 기반) 그 브랜치/worktree에서 바로 구현한다.
    - wayfinder 티켓처럼 확정 스펙이 이슈 코멘트에 있으면 그 스펙이 곧 Plan이다 — 재발행 없이 코멘트를 읽고 구현하며, PR은 이 이슈를 참조하고 머지 시 이슈를 닫는다.
 
-3. 승인된 Plan이 있고, 새 Story + Task 여러 개 + Issue/브랜치 발행이 필요한 작업이면:
+3. Task 목록을 아직 쓸 수 없고, 선후 관계가 있는 미결 결정이 여러 개이며, 한 세션에 결론까지 갈 수 없는 작업이면:
+   - Story 발행 대신 `wayfinder` 지도 작성을 추천한다. Notion Story가 지도, 결정 티켓이 Task + Issue다. 기록 생성은 지도와 티켓 구성을 사용자가 승인한 뒤에 한다.
+
+4. 승인된 Plan이 있고, 새 Story + Task 여러 개 + Issue/브랜치 발행이 필요한 작업이면:
    - `/ult-story-create`의 절차를 따른다.
 
-4. 기존 Story에 Task 하나만 추가하는 상황이면:
+5. 기존 Story에 Task 하나만 추가하는 상황이면:
    - `/ult-task-create`의 절차를 따른다.
 
-5. 기존 Story의 Ready Task를 실행하거나 병렬 서브에이전트 작업을 준비하는 상황이면:
+6. 기존 Story의 Ready Task를 실행하거나 병렬 서브에이전트 작업을 준비하는 상황이면:
    - `/ult-story-run`의 절차를 따른다.
 
-6. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
+7. 현재 Task에 메모나 보완만 남기면 되는 상황이면:
    - `/ult-task-note`의 절차를 따른다.
 
 ## 출력

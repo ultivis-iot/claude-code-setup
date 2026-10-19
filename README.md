@@ -58,8 +58,9 @@ Notion에서는 Task의 `Repository` relation이 repo ownership의 기준입니�
 
 [mattpocock/skills](https://github.com/mattpocock/skills)의 다음 스킬을 추가했습니다.
 
-- Engineering: `tdd`, `diagnosing-bugs`, `research`, `domain-modeling`, `codebase-design`, `improve-codebase-architecture`, `wayfinder`, `resolving-merge-conflicts`
-- Productivity: `grilling`, `grill-me`, `handoff`, `teach`, `writing-great-skills`
+- Engineering: `tdd`, `diagnosing-bugs`, `research`, `domain-modeling`, `codebase-design`, `wayfinder`, `resolving-merge-conflicts`
+- Productivity: `grilling`, `handoff`, `teach`, `writing-great-skills`
+- 명시 호출 전용: `improve-codebase-architecture`, `grill-me`, `grill-with-docs`
 
 `ultivis-flow`가 기존 GitHub/Notion 개발 흐름을 계속 담당하고, 사용자의 자연어 요청에 맞는 스킬을 자동으로 선택합니다. 필요하면 Codex의 `$tdd`나 Claude Code의 `/tdd`처럼 스킬을 직접 호출할 수도 있습니다. 선택이 필요한 경우에는 추천안을 포함한 2~3개 선택지를 제시합니다.
 

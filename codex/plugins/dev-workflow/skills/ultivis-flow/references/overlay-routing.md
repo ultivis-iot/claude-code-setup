@@ -16,13 +16,13 @@
 | Signal in the request or repository | Primary overlay |
 |---|---|
 | 조사 후 남은 중요한 제품·범위 결정, 또는 명시적인 심층 인터뷰 요청 | `grilling` |
-| Concrete behavior to implement test-first | `tdd` |
+| Reproducible bug fix, domain logic / state machine / calculation / parser change, or public interface (API, module) change, in a repository with a runnable test setup. Not for layout/styling, config, glue code, docs, or exploratory spikes | `tdd` |
 | Unknown bug, regression, intermittent failure, or performance degradation | `diagnosing-bugs` |
 | External documentation, API facts, standards, or primary-source investigation | `research` |
 | Domain terms, invariants, bounded contexts, or durable terminology decisions | `domain-modeling` |
 | Module interface, seam, dependency direction, or testability design | `codebase-design` |
-| Repository-wide structural improvement candidates | `improve-codebase-architecture` |
-| A large, foggy, multi-session effort that needs a decision map | `wayfinder` |
+| Repository-wide structural improvement candidates — user-invoked only; when you notice structural friction, suggest `/improve-codebase-architecture` instead of running it | `improve-codebase-architecture` |
+| The Task list can't be written yet, several open decisions depend on each other and need research, prototypes, or human calls, and no single session can reach a conclusion | `wayfinder` |
 | Merge or rebase conflicts | `resolving-merge-conflicts` |
 | Transfer of unfinished context to another session | `handoff` |
 | A dedicated, stateful learning workspace | `teach` |
@@ -30,7 +30,9 @@
 | Frontend routes changed and need a regression sweep — console, network, DOM, responsive | `visual-qa` |
 | Authoring or revising a reusable skill | `writing-great-skills` |
 
-`grill-me` is the explicit shortcut for starting `grilling`; the router normally selects `grilling` directly.
+`grill-me` is the explicit shortcut for starting `grilling`; `grill-with-docs` also runs `domain-modeling` to capture the glossary and ADRs. Both are user-invoked; the router selects `grilling` directly.
+
+`wayfinder` is proposed during Plan breakdown, before `ult-story-create`: when the signals above all hold, recommend charting a map instead of publishing a Story with fixed Tasks, and publish only after the user approves.
 
 짧은 신규 요청은 같은 설치 루트의 `docs/references/request-to-plan.md`에 따라 프로젝트·Graft 조사부터 한다. 요청이 짧다는 이유만으로 긴 인터뷰를 시작하지 않는다.
 

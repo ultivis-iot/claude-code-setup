@@ -19,19 +19,19 @@
 기본 매핑:
 
 - 중요한 모호성/의사결정: `grilling`
-- test-first 구현: `tdd`
+- 테스트 실행 환경이 있는 저장소의 재현 가능한 버그 수정, 도메인 로직·상태·계산·파서 변경, 공개 인터페이스 변경: `tdd` (화면 배치·스타일, 설정, 문서, 탐색용 코드는 제외)
 - 원인 불명의 버그/회귀/성능 저하: `diagnosing-bugs`
 - 외부 문서/API/표준 확인: `research`
 - 도메인 용어와 불변식: `domain-modeling`
 - module/interface/seam 설계: `codebase-design`
-- 코드베이스 구조 개선 후보 탐색: `improve-codebase-architecture`
-- 여러 세션이 필요한 foggy work: `wayfinder`
+- 코드베이스 구조 개선 후보 탐색: `improve-codebase-architecture` (사용자 명시 호출 전용. 구조 문제가 보이면 `/improve-codebase-architecture` 호출을 제안만 한다)
+- Task 목록을 아직 쓸 수 없고, 선후 관계가 있는 미결 결정이 여러 개이며, 한 세션에 결론까지 갈 수 없는 작업: `wayfinder`
 - merge/rebase conflict: `resolving-merge-conflicts`
 - 세션 인수인계: `handoff`
 - 전용 학습 workspace: `teach`
 - skill 작성/수정: `writing-great-skills`
 
-`grill-me`는 사용자가 명시적으로 `grilling`을 시작하는 단축 진입점이다.
+`grill-me`는 사용자가 명시적으로 `grilling`을 시작하는 단축 진입점이다. `grill-with-docs`는 grilling을 하면서 결정을 용어집(GLOSSARY.md)과 ADR로 남기는 단축 진입점이다. 둘 다 사용자만 호출한다.
 
 ## Plan 모드 가이드
 Plan 모드 사용 시 반드시 의도 섹션이 포함되어 **사용자의 의도를 명확하게 명문화**해야 합니다.
@@ -75,6 +75,7 @@ Plan 승인 후 현재 대화의 정확한 Plan을 `tmp/current-plan.md`에 저�
 
 | Plan 성격 | 기본 제안 |
 |---|---|
+| Task 목록을 아직 쓸 수 없고 선후 관계가 있는 미결 결정이 여러 개인 작업 | `wayfinder` 지도 작성 제안 — Notion Story를 지도로, 결정 티켓을 Task + Issue로 |
 | 새 Story로 관리할 작업 | `ult-story-create` 흐름 제안 — Story 1개 + Task N개 + Issue N개 + 필요 시 브랜치/worktree |
 | 기존 Story의 추가 작업 | `ult-task-create` 흐름 제안 — Task 1개 + Issue 1개 + 필요 시 브랜치/worktree |
 | 현재 Task의 보완/메모 | `ult-task-note` 흐름 제안 |

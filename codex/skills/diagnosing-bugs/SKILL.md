@@ -11,7 +11,7 @@ For a diagnosis-only request, stop after identifying the cause and supporting ev
 
 When `ultivis-flow` is installed, it remains the lifecycle baseline; this skill only governs diagnosis and regression locking.
 
-When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+When exploring the codebase, read `GLOSSARY.md` (or a legacy `CONTEXT.md`, if that is what the repo keeps) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
 ## Phase 1 — Build a feedback loop
 
@@ -135,4 +135,4 @@ Required before declaring done:
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
 - [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
 
-**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) suggest the user run the `/improve-codebase-architecture` skill, with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
