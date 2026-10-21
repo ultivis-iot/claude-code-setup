@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob, Write
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, Grep, Glob, Write, AskUserQuestion
 description: 현재 Task를 Notion/GitHub 컨텍스트와 동기화. 메모 추가, 상태 변경, 이슈 컨텍스트 확인을 하나의 진입점으로 제공
 argument-hint: [note-or-action]
 ---
@@ -11,10 +11,12 @@ argument-hint: [note-or-action]
 ## 실행
 
 ```bash
-~/.claude/scripts/ult-sync-task.sh [note-or-action]
+node ~/.claude/scripts/ult-notion.mjs sync-task [note-or-action]
 ```
 
+인자: `$ARGUMENTS`
+
 동작:
-- 인자 없음 → `issue.sh`로 Issue + Notion 컨텍스트 출력
-- `cancel`, `reopen`, `todo`, `in-progress`, `done` → Task 상태 변경
-- 그 외 텍스트 → 현재 Task에 Notion 코멘트 추가
+- 인자 없음 → `issue` 와 같은 Issue + Notion 컨텍스트 출력
+- `cancel`, `reopen`, `todo`, `in-progress`, `done` → Task 상태 변경 (`/ult-task-status`)
+- 그 외 텍스트 → 현재 Task에 Notion 코멘트 추가 (`/ult-task-note`)

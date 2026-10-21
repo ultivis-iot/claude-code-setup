@@ -149,4 +149,6 @@ Story 기반 작업은 Task PR마다 review-cycle을 돌린다.
 - Plan을 읽고 Story 1개와 Task N개로 분해
 - Story tag/priority와 Task topic을 추론
 - Project 후보를 사용자에게 제시하고 선택받음
-- 위 JSON spec만 확정하면 실행은 전역 `ult-story-create-exec.sh`에 위임
+- 위 JSON spec만 확정하면 실행은 `ult-notion.mjs story-create` 가 한다 (Notion REST API 호출, gh/git/worktree/handoff 는 내부에서 `ult-flow.mjs` 호출)
+
+선택 확장: 같은 spec 안의 Task 끼리 선행 관계가 필요하면 `parent_task_ids`(이미 존재하는 Task 의 Notion page id) 대신/함께 `parent_task_indexes`(spec 의 `tasks` 배열 위치, 0부터)를 쓴다. 선행 Task 를 먼저 만든 뒤 후속 Task 를 만든다. 선행 관계가 없는 Task 는 병렬로 생성한다.

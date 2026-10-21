@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.codex/scripts/ult-story-create-exec.sh:*), Read, Grep, Glob, Write, AskUserQuestion
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, Grep, Glob, Write, AskUserQuestion
 description: 승인된 Plan을 Story 1개 + Task N개 + Issue N개로 발행. 사용자가 명시적으로 승인했을 때만 실행하는 발행 명령
 argument-hint: [--dry-run]
 ---
@@ -13,7 +13,7 @@ argument-hint: [--dry-run]
 
 - `~/.codex/docs/references/task-publishing-model.md`
   - Story/Task/Issue 관계를 다시 확인할 때
-  - exec 스크립트에 넘길 JSON spec을 확인할 때
+  - 실행 스크립트에 넘길 JSON spec을 확인할 때
 
 새 Story가 필요할 때 Plan을 `Story + Task N개 + Issue N개`로 발행한다.
 
@@ -26,7 +26,7 @@ argument-hint: [--dry-run]
 ## 책임 분리
 
 - LLM: Plan 분석, Story/Task 구조화, Project 선택, spec 확정
-- 스크립트: `scripts/ult-story-create-exec.sh`가 Story/Task/Issue/브랜치 생성 실행
+- 스크립트: `ult-notion.mjs story-create` 가 Story/Task/Issue/브랜치/worktree/handoff 생성 실행 (gh/git/worktree/handoff 는 내부에서 `ult-flow.mjs` 호출)
 
 ## 수행 절차
 
@@ -41,20 +41,27 @@ argument-hint: [--dry-run]
 3. 질문은 사용자가 스스로 판단할 수 있도록 선택 기준과 tradeoff를 짧게 제시하고, 한 번에 1~3개만 묻는다
 4. 사용자의 답변은 Plan의 결정사항으로 반영하고, 위험하지 않은 미확정 사항만 가정으로 남긴다
 5. 현재 사용자, Repository, Project 후보, 현재 Week를 조회한다
+   - Project 후보와 Repository id: `node ~/.codex/scripts/ult-notion.mjs cache-refresh` 후 `~/.codex/notion-cache/projects.json`, `repositories.json` 을 읽는다 (Repository 의 `project_ids` 가 그 repo 의 Project 후보)
+   - 현재 사용자의 Notion user id: `~/.codex/notion-cache/members.json` 의 `by_github[<gh 로그인>].notion_id` (생략하면 스크립트가 같은 방식으로 채운다)
+   - 현재 Week id: `weekly-collect` 출력의 `week` 로 날짜를 확인할 수 있고, Task 에 Week 를 연결하려면 Week DB 의 페이지 id 가 필요하다. 모르면 `week_id` 는 생략한다.
 6. Plan을 읽고 아래를 결정한다
    - Story title
    - Story tag
    - Story priority
    - Task N개 분해
    - 공통 request-to-plan 기준으로 성공 사례와 Task 결과·검증을 연결하고 Story `body_markdown`과 Task `description`에 근거·결정을 보존한다.
-   - 실험에 의존하는 후속 작업은 초안으로 남긴다. 새 Task 간 의존성 ID가 없으면 선행 작업부터 발행하고 후속 Task는 실제 ID로 기존 추가 흐름에서 발행한다.
+   - 실험에 의존하는 후속 작업은 초안으로 남긴다. 새 Task 간 의존성은 `parent_task_indexes`(같은 spec 안의 Task 위치, 0부터)로 표현하거나, 이미 존재하는 Task 는 `parent_task_ids`(Notion page id)로 표현한다.
 7. 사용자에게 Project와 최종 발행 미리보기를 확인받는다
 8. 아래 JSON spec을 생성한다
    - `github_repo`
    - `story`
    - `tasks`
    - 실행 전 최소 확정값은 Project, Story title, priority, Task 목록이다
-9. `--dry-run`이 아니면 확정된 spec을 `scripts/ult-story-create-exec.sh`에 전달한다
+9. `--dry-run`이 아니면 확정된 spec을 `story-create` 에 전달한다
+   ```bash
+   node ~/.codex/scripts/ult-notion.mjs story-create tmp/story-spec.json
+   ```
+   (spec 은 `tmp/story-spec.json` 에 Write 한 뒤 경로로 넘긴다. 표준입력은 `story-create -`.)
 10. Story URL, 생성된 Task/Issue 목록, worktree 결과를 요약해 출력한다
 
 ## 출력 규칙
@@ -63,7 +70,7 @@ argument-hint: [--dry-run]
 - 각 Task는 topic, description, planned date를 가진다
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 만든다
 - Story/Task page는 configured Notion template을 사용한다
-- description/body markdown은 heading/list/todo Notion block으로 변환되어야 한다
+- description/body markdown은 heading/list/todo/code/table Notion block으로 변환되어야 한다
 - Task dependency가 있으면 `Parent Task` relation을 사용한다
 - Story GitHub Issue/PR은 만들지 않는다
 - Task branch/worktree는 Task Issue 기준으로 만들고 최신 원격 base를 사용한다

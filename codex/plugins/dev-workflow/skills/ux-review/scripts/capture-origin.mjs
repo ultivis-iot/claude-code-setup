@@ -11,6 +11,7 @@
 import { execFile } from 'node:child_process';
 import { copyFile, readdir, writeFile, stat } from 'node:fs/promises';
 import os from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { findRepositoryRoot } from './repository-paths.mjs';
@@ -26,10 +27,11 @@ async function git(repositoryRoot, args) {
   } catch { return null; }
 }
 
-async function shell(script) {
+// bash 없이 실행 파일을 직접 호출한다 (Windows 지원). 실패하면 null.
+async function run(file, args, options = {}) {
   try {
-    const { stdout } = await execFileAsync('bash', ['-lc', script],
-      { encoding: 'utf8', timeout: NETWORK_TIMEOUT });
+    const { stdout } = await execFileAsync(file, args,
+      { encoding: 'utf8', timeout: NETWORK_TIMEOUT, windowsHide: true, ...options });
     return stdout.trim();
   } catch { return null; }
 }
@@ -60,8 +62,7 @@ export async function captureOrigin(scenarioDirectory) {
 
   origin.issue = issueNumberFromBranch(origin.branch);
   if (origin.issue) {
-    const raw = await shell(
-      `cd ${JSON.stringify(repositoryRoot)} && gh issue view ${origin.issue} --json url,title 2>/dev/null`);
+    const raw = await run('gh', ['issue', 'view', String(origin.issue), '--json', 'url,title'], { cwd: repositoryRoot });
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
@@ -71,19 +72,27 @@ export async function captureOrigin(scenarioDirectory) {
     }
   }
 
-  // Notion 은 워크플로 스크립트가 있을 때만 조회한다
+  // Notion 조회는 best-effort: ult-notion.mjs 가 없거나 토큰이 없거나 실패하면 건너뛴다 (null 유지)
   if (origin.issueUrl) {
-    const notionApi = path.join(os.homedir(), '.claude', 'scripts', 'notion-api.sh');
+    // 설치본에서는 skills/ux-review/scripts/ 기준 ../../../scripts/ 가 ~/.claude(또는 ~/.codex)/scripts 와 같다
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      path.resolve(here, '..', '..', '..', 'scripts', 'ult-notion.mjs'),
+      path.join(os.homedir(), '.claude', 'scripts', 'ult-notion.mjs'),
+      path.join(os.homedir(), '.codex', 'scripts', 'ult-notion.mjs'),
+    ];
     try {
-      await stat(notionApi);
-      for (const [field, fn] of [['notionTaskUrl', 'find_task_by_issue_url'],
-                                 ['notionStoryUrl', 'find_story_by_issue_url']]) {
-        const raw = await shell(
-          `source ${JSON.stringify(notionApi)} >/dev/null 2>&1 && ` +
-          `${fn} ${JSON.stringify(origin.issueUrl)} 2>/dev/null | jq -r '.url // empty'`);
-        if (raw) origin[field] = raw;
+      let notionCli = null;
+      for (const candidate of candidates) {
+        try { await stat(candidate); notionCli = candidate; break; } catch { /* 다음 후보 */ }
       }
-    } catch { /* notion-api.sh 없으면 건너뛴다 */ }
+      if (!notionCli) throw new Error('ult-notion.mjs not found');
+      for (const [field, sub] of [['notionTaskUrl', 'find-task-by-issue-url'],
+                                  ['notionStoryUrl', 'find-story-by-issue-url']]) {
+        const raw = await run(process.execPath, [notionCli, sub, origin.issueUrl]);
+        if (raw) origin[field] = raw.split(/\r?\n/)[0];
+      }
+    } catch { /* ult-notion.mjs 없으면 건너뛴다 */ }
   }
 
   await writeFile(path.join(scenarioDirectory, 'origin.json'),
@@ -113,7 +122,7 @@ export async function capturePlan(scenarioDirectory) {
   } catch { return null; }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const directory = path.resolve(process.argv[2] || '.');
   const origin = await captureOrigin(directory);
   const plan = await capturePlan(directory);

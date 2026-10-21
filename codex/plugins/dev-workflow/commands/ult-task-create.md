@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.codex/scripts/ult-task-create.sh:*), Read, AskUserQuestion
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, AskUserQuestion
 description: 기존 Story에 Task 1개와 GitHub Issue 1개를 추가하고 브랜치/worktree까지 생성. 사용자가 명시적으로 Task 추가를 승인했을 때만 실행
 argument-hint: [story-title-or-url] [--name <task>] [--topic <topic>]
 ---
@@ -15,8 +15,12 @@ argument-hint: [story-title-or-url] [--name <task>] [--topic <topic>]
 같은 설치본의 `~/.codex/docs/references/request-to-plan.md` 중 Task 분해·발행 기준을 읽는다. 설정 저장소에서는 저장소의 대응 문서를 사용한다. Story 성공 사례에 연결된 결과·범위·의존성·검증을 `--description`에 담는다. 이미 합의된 내용은 재질문하지 않고 새 범위와 중요한 미결 결정만 확인한다.
 
 ```bash
-~/.codex/scripts/ult-task-create.sh [story-title-or-url] [--name <task>] [--topic <topic>] [--description <body>]
+node ~/.codex/scripts/ult-notion.mjs task-create [story-title-or-url] --name "<task>" [--topic <topic>] [--description "<body>"]
 ```
+
+인자: `$ARGUMENTS`
+
+이 환경에서는 대화형 입력이 없으므로 `--name` 은 반드시 넘긴다(없으면 오류). Story 후보가 여러 개이면 후보 목록과 함께 중단하니, 사용자에게 고르게 한 뒤 `--story <Notion URL>` 로 다시 실행한다.
 
 스크립트가 처리하는 것:
 - 현재 GitHub 계정, repository, repository에 연결된 Project, Week 조회
@@ -69,3 +73,5 @@ Story는 전역 분류가 아니라 Project 산하 작업 단위입니다.
 Story 기반 작업에서는 `Parent Task`를 선행관계로 사용한다. Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch를 target으로 한다. Story GitHub Issue/PR은 만들지 않는다. 같은 Story가 여러 repository를 건드리더라도 Task의 Repository relation이 repo ownership의 기준이다.
 
 Story를 명시하지 않으면 현재 worktree의 `tmp/story-handoff.json`, 현재 GitHub Issue 순서로 Story를 추론한다. 오래된 branch base나 과거 worktree만으로 Story를 추론하지 않는다. 추론이 애매하면 active Story 후보를 보여주고 사용자 선택으로 fallback한다.
+
+Repository 의 Project relation 이 비어 있어 `Repository에서 Project relation을 찾을 수 없습니다` 오류가 나면 `~/.codex/skills/ultivis-flow/references/ult-notion.md` 의 "Repository Project Relation Gaps" 순서를 따른다.

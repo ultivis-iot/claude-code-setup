@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git:*), Bash(gh:*), Read, Grep, Glob, Write
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, Grep, Glob, Write
 description: 작업 시작 진입점. 상황에 맞게 Task 조회, Story 발행, Task 추가 중 하나를 선택해 진행
 argument-hint: [story-or-task-context]
 ---
@@ -22,7 +22,7 @@ argument-hint: [story-or-task-context]
 해결 방향이 미정인 요청은 공통 request-to-plan 절차로 원문 보존 → 조사 → 해석·해결안 → 핵심 합의 → Task 분해를 진행한 뒤 발행 흐름에 연결한다. 확정된 Issue와 작은 명확한 수정은 필요한 부분만 사용한다. 이미 받은 승인을 반복 요청하지 않는다. 설정 저장소에서는 저장소의 대응 계약 문서를 읽는다.
 
 1. 인자가 없고 현재 작업을 고르려는 상황이면:
-   - `scripts/ult-my-tasks.sh`를 사용해 본인 Task 목록을 보여주고 선택을 진행한다.
+   - `/ult-my-tasks` 절차(`ult-notion.mjs my-tasks`)로 본인 Task 목록을 보여주고 선택을 진행한다.
 
 2. 기존 Task/Issue(번호·URL·제목)가 지목되었거나 그 구현을 시작하는 상황이면:
    - **새 Task/Issue/Story를 만들지 않는다.** 해당 Issue 기준 브랜치를 만들고(`scripts/ult-wt-add.sh`, 브랜치명은 이슈 번호 기반) 그 브랜치/worktree에서 바로 구현한다.

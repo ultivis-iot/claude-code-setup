@@ -4,7 +4,7 @@
 
 입력:
 
-- 전역 `ult-weekly-collect.sh`가 JSON 출력
+- 전역 `ult-notion.mjs weekly-collect`가 JSON 출력
 - 기본: 직전 주, 본인 (Week DB에서 현재 Week를 찾아 `DateFrom` 기준 바로 이전 Week 사용)
 - 옵션: `--week <YYYY-MM-DD>`, `--team`
 
@@ -36,6 +36,6 @@ LLM 출력 목표:
 
 후속 액션:
 
-- `s` 또는 `publish`: 전역 `ult-weekly-publish.sh`로 발행 (기본 템플릿 `마케팅`, 필요 시 `--project`)
+- `s` 또는 `publish`: 전역 `ult-notion.mjs weekly-publish`로 발행 (기본 템플릿 `마케팅`, 필요 시 `--project`)
 - `c`: 클립보드 복사
 - Enter: 종료
