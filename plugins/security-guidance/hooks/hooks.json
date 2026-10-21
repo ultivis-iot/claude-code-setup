@@ -5,7 +5,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/security_reminder_hook.py"
+          "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/security-reminder.mjs\""
         }
       ]
     }
