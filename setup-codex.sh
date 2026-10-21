@@ -144,6 +144,22 @@ for file in "$SCRIPT_DIR/scripts"/*.sh "$SCRIPT_DIR/scripts"/*.mjs; do
         echo -e "${GREEN}   ✓ ~/.codex/scripts/$filename${NC}"
     fi
 done
+# Node 스크립트가 쓰는 공용 모듈 (scripts/lib/*.mjs)
+mkdir -p "$SCRIPTS_DEST/lib"
+for file in "$SCRIPT_DIR/scripts/lib"/*.mjs; do
+    if [ -f "$file" ]; then
+        filename=$(basename "$file")
+        cp "$file" "$SCRIPTS_DEST/lib/$filename"
+        echo -e "${GREEN}   ✓ ~/.codex/scripts/lib/$filename${NC}"
+    fi
+done
+# Node 로 대체되어 제거된 구버전 Notion bash 스크립트 정리 (이 저장소가 설치했던 파일만)
+for stale in issue.sh notion-api.sh ult-my-tasks.sh ult-task-note.sh ult-task-status.sh ult-task-link-issue.sh ult-sync-task.sh ult-weekly-collect.sh ult-weekly-publish.sh ult-story-create-exec.sh ult-task-create.sh ult-story-run.sh ult-cache-refresh.sh ; do
+    if [ -f "$SCRIPTS_DEST/$stale" ]; then
+        rm "$SCRIPTS_DEST/$stale"
+        echo -e "${GREEN}   ✓ 제거: ~/.codex/scripts/$stale${NC}"
+    fi
+done
 
 echo "6. Dev-tools 설치..."
 DEV_TOOLS_DEST="$CODEX_DIR/dev-tools"
@@ -200,7 +216,7 @@ else
 fi
 
 echo "7. Notion cache 준비..."
-CACHE_REFRESH_OUTPUT=$("$SCRIPTS_DEST/ult-cache-refresh.sh" --quiet 2>&1 || true)
+CACHE_REFRESH_OUTPUT=$(node "$SCRIPTS_DEST/ult-notion.mjs" cache-refresh --quiet 2>&1 || true)
 if printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^DONE:'; then
     echo -e "${GREEN}   ✓ ~/.codex/notion-cache 준비 완료${NC}"
 elif printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^SKIP:'; then
@@ -221,7 +237,7 @@ echo "  ~/.codex/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json"
 echo "  ~/.codex/plugins/$PLUGIN_NAME/commands/*.md (legacy compatibility)"
 echo "  ~/.codex/plugins/$PLUGIN_NAME/skills/*/SKILL.md"
 echo "  ~/.agents/plugins/marketplace.json"
-echo "  ~/.codex/scripts/*.sh, *.mjs"
+echo "  ~/.codex/scripts/*.sh, *.mjs, lib/*.mjs"
 echo "  ~/.codex/dev-tools/dev-commands.sh"
 echo "  ~/.codex/dev-tools/.env"
 echo "  ~/.codex/notion-cache/ (Notion token 사용 가능 시 자동 준비)"

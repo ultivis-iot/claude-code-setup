@@ -171,10 +171,20 @@ $ScriptsSource = Join-Path $ScriptDir "scripts"
 $ScriptsDest = Join-Path $ClaudeDir "scripts"
 if (Test-Path $ScriptsSource) {
     New-Item -ItemType Directory -Force -Path $ScriptsDest | Out-Null
-    Get-ChildItem -Path $ScriptsSource -Include "*.sh", "*.mjs" -File |
+    Get-ChildItem -Path (Join-Path $ScriptsSource "*") -Include "*.sh", "*.mjs" -File |
         Where-Object { $_.Name -notlike "test-*" } | ForEach-Object {
         Copy-Item $_.FullName -Destination $ScriptsDest -Force
         Write-Host "   $($_.Name)" -ForegroundColor Green
+    }
+    # Node 스크립트가 쓰는 공용 모듈 (scripts/lib/*.mjs)
+    $LibSource = Join-Path $ScriptsSource "lib"
+    if (Test-Path $LibSource) {
+        $LibDest = Join-Path $ScriptsDest "lib"
+        New-Item -ItemType Directory -Force -Path $LibDest | Out-Null
+        Get-ChildItem -Path (Join-Path $LibSource "*.mjs") -File | ForEach-Object {
+            Copy-Item $_.FullName -Destination $LibDest -Force
+            Write-Host "   lib\$($_.Name)" -ForegroundColor Green
+        }
     }
 }
 
@@ -195,7 +205,20 @@ $StaleFiles = @(
     "scripts\isaac-task-status.sh",
     "scripts\isaac-weekly-collect.sh",
     "scripts\isaac-weekly-publish.sh",
-    "scripts\isaac-wt-add.sh"
+    "scripts\isaac-wt-add.sh",
+    "scripts\issue.sh",
+    "scripts\notion-api.sh",
+    "scripts\ult-my-tasks.sh",
+    "scripts\ult-task-note.sh",
+    "scripts\ult-task-status.sh",
+    "scripts\ult-task-link-issue.sh",
+    "scripts\ult-sync-task.sh",
+    "scripts\ult-weekly-collect.sh",
+    "scripts\ult-weekly-publish.sh",
+    "scripts\ult-story-create-exec.sh",
+    "scripts\ult-task-create.sh",
+    "scripts\ult-story-run.sh",
+    "scripts\ult-cache-refresh.sh"
 )
 $StaleRemoved = 0
 foreach ($RelPath in $StaleFiles) {
@@ -271,13 +294,18 @@ New-Item -ItemType Directory -Force -Path $NotionCacheDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $NotionCacheDir "schemas") | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $NotionCacheDir "templates") | Out-Null
 
-$CacheRefreshScript = Join-Path $ScriptsDest "ult-cache-refresh.sh"
-$BashCmd = Get-Command bash -ErrorAction SilentlyContinue
-if ($BashCmd -and (Test-Path $CacheRefreshScript)) {
+$CacheRefreshScript = Join-Path $ScriptsDest "ult-notion.mjs"
+$NodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if ($NodeCmd -and (Test-Path $CacheRefreshScript)) {
     $PreviousWorkflowHome = $env:WORKFLOW_HOME
     $env:WORKFLOW_HOME = $ClaudeDir
-    $CacheRefreshOutput = & bash "$CacheRefreshScript" --quiet 2>&1
-    $CacheRefreshExit = $LASTEXITCODE
+    try {
+        $CacheRefreshOutput = & node "$CacheRefreshScript" cache-refresh --quiet 2>&1
+        $CacheRefreshExit = $LASTEXITCODE
+    } catch {
+        $CacheRefreshOutput = $_ | Out-String
+        $CacheRefreshExit = 1
+    }
     if ($null -eq $PreviousWorkflowHome) {
         Remove-Item Env:\WORKFLOW_HOME -ErrorAction SilentlyContinue
     } else {
@@ -296,7 +324,7 @@ if ($BashCmd -and (Test-Path $CacheRefreshScript)) {
     }
 } else {
     Write-Host "   ~/.claude/notion-cache 디렉토리 준비 완료" -ForegroundColor Green
-    Write-Host "   bash를 찾을 수 없어 cache warm-up은 건너뜁니다." -ForegroundColor Yellow
+    Write-Host "   node를 찾을 수 없어 cache warm-up은 건너뜁니다." -ForegroundColor Yellow
 }
 
 Write-Host ""
@@ -316,7 +344,7 @@ Write-Host "  ~/.claude/agents/code-simplifier.md"
 Write-Host "  ~/.claude/skills/*/SKILL.md"
 Write-Host "  ~/.claude/schemas/validation-status.schema.json"
 Write-Host "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
-Write-Host "  ~/.claude/scripts/*.sh (workflow 실행 스크립트)"
+Write-Host "  ~/.claude/scripts/*.sh, *.mjs, lib/*.mjs (workflow 실행 스크립트)"
 Write-Host "  ~/.claude/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
 Write-Host "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"
 Write-Host ""

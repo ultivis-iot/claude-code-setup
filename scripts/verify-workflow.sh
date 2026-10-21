@@ -77,24 +77,15 @@ else
     exit 1
 fi
 
-check_script "$WORKFLOW_ROOT/scripts/issue.sh"
-check_script "$WORKFLOW_ROOT/scripts/notion-api.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-my-tasks.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-story-create-exec.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-story-run.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-sync-task.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-task-create.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-task-link-issue.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-task-note.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-task-status.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-weekly-collect.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-weekly-publish.sh"
 check_script "$WORKFLOW_ROOT/scripts/ult-wt-add.sh"
 check_script "$WORKFLOW_ROOT/scripts/graft-refresh.sh"
 check_script "$WORKFLOW_ROOT/scripts/ensure-graft-cli.sh"
 check_script "$WORKFLOW_ROOT/scripts/check-validation-status.sh"
-check_script "$WORKFLOW_ROOT/scripts/ult-cache-refresh.sh"
 check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"
+for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs; do
+    check_file "$WORKFLOW_ROOT/scripts/$node_script"
+    node --check "$WORKFLOW_ROOT/scripts/$node_script"
+done
 check_file "$WORKFLOW_ROOT/schemas/validation-status.schema.json"
 check_file "$WORKFLOW_ROOT/docs/references/validation-contract.md"
 check_file "$WORKFLOW_ROOT/docs/references/create-pr-contract.md"
@@ -103,6 +94,7 @@ check_file "$WORKFLOW_ROOT/templates/cli-sync.json"
 if [ "$MODE" = "repo" ]; then
     "$WORKFLOW_ROOT/scripts/check-validation-status.sh" "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
     node "$WORKFLOW_ROOT/scripts/test-validation-gate.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"
 fi
