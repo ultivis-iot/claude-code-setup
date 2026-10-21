@@ -173,8 +173,10 @@ git pull
 ├── plugins/
 │   └── security-guidance/      # 실시간 보안 검사 Plugin
 ├── scripts/
-│   ├── ult-cache-refresh.sh    # Notion cache 준비/갱신
-│   └── ...                     # workflow 실행 스크립트
+│   ├── ult-notion.mjs          # Notion 명령 (Task/Story/주간 리뷰/cache 갱신, Node 20+)
+│   ├── ult-flow.mjs            # gh/git/worktree/handoff 보조 (ult-notion.mjs 가 호출)
+│   ├── lib/notion.mjs          # Notion REST 클라이언트 공용 모듈
+│   └── ...                     # 그 외 workflow 실행 스크립트
 ├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
 └── dev-tools/
     ├── dev-commands.sh         # 개발 환경 셸 명령어
@@ -241,7 +243,31 @@ Codex 설치 시:
 
 Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고, 같은 세트를 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
 
-설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `bash`가 있으면 같은 refresh 스크립트로 warm-up을 시도합니다.
+설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `node`가 있으면 `ult-notion.mjs cache-refresh`로 warm-up을 시도합니다.
+
+### Notion 토큰
+
+Notion 명령(`/issue`, `/ult-my-tasks`, `/ult-task-note`, `/ult-task-status`, `/ult-task-link-issue`, `/ult-sync-task`, `/ult-weekly-report`, `/ult-story-create`, `/ult-task-create`, `/ult-story-run`)은 Node.js 20 이상만 있으면 동작합니다. 이 명령들에는 더 이상 bash, jq, curl이 필요하지 않습니다. (`gh`와 `git`은 계속 필요합니다.)
+
+토큰은 아래 순서로 찾습니다. 위치는 이전과 같습니다.
+
+1. 환경변수 `NOTION_TOKEN`
+2. `~/.claude/dev-tools/.env`의 `NOTION_TOKEN=...` (Codex 설치본은 `~/.codex/dev-tools/.env`)
+3. `claude mcp add ... notion-api`로 등록된 값 (`~/.claude.json`의 `mcpServers.notion-api.env.NOTION_TOKEN`)
+
+Windows에서는 PowerShell에서 사용자 환경변수로 등록하고 Claude Code를 다시 시작합니다.
+
+```powershell
+setx NOTION_TOKEN "secret_xxx"
+```
+
+또는 `%USERPROFILE%\.claude\dev-tools\.env` 파일에 한 줄을 추가해도 됩니다.
+
+```text
+NOTION_TOKEN=secret_xxx
+```
+
+토큰이 없거나 Integration이 데이터베이스에 공유되지 않았으면 명령이 원인을 한국어로 안내합니다. 토큰 값은 출력하거나 저장소에 커밋하지 마세요.
 
 ### 1. Plan 모드 진입
 
