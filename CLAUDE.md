@@ -71,6 +71,7 @@ git push origin master --tags
 - 업데이트: `./setup.sh --update`
 - 워크플로우 검증: `./scripts/verify-workflow.sh`
 - CLAUDE.md 설치기 테스트: `node scripts/test-install-claude-md.mjs` (워크플로우 검증에 포함)
+- settings.json hook 설치기 테스트: `node scripts/test-install-settings.mjs` (워크플로우 검증에 포함)
 - Notion 스크립트(`ult-notion.mjs`) 테스트: `node scripts/test-ult-notion.mjs` (mock Notion 서버·가짜 gh 사용, 네트워크 불필요, 워크플로우 검증에 포함)
 
 ### 업데이트 검증

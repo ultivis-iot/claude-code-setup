@@ -22,9 +22,9 @@ Queries refresh the structural graph against the current worktree before answeri
 
 ## Lifecycle
 
-- `ult-wt-add.sh` invokes `graft-refresh.sh` after creating or reusing a worktree.
+- `ult-flow.mjs wt-add` runs `graft.mjs refresh` after creating or reusing a worktree.
 - The managed `post-merge` hook invokes it after merge or pull updates a local worktree, including the main worktree.
 - A remote PR merge does not change the local main worktree; refresh occurs when that worktree is next updated locally.
 - Missing Node.js 20+, a missing CLI, or a build failure must recommend installation and fall back to normal exploration without blocking Git.
 
-The helper is installed at `~/.claude/scripts/graft-refresh.sh` for Claude Code and `~/.codex/scripts/graft-refresh.sh` for Codex. Repository hooks receive a managed copy from `hooks/install-hooks.sh`.
+The helper (`graft.mjs refresh`, plus `graft.mjs ensure` for the pinned CLI check) is installed at `~/.claude/scripts/graft.mjs` for Claude Code and `~/.codex/scripts/graft.mjs` for Codex. Repository hooks receive a managed copy from `hooks/install-hooks.sh`.

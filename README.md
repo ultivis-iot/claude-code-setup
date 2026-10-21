@@ -169,12 +169,13 @@ git pull
 ├── schemas/
 │   └── validation-status.schema.json  # 검증 결과 표준 스키마
 ├── hooks/
-│   └── copy-plan-on-accept.sh  # 명시적으로 연결된 승인 Plan만 복사
+│   └── copy-plan-on-accept.mjs # 명시적으로 연결된 승인 Plan만 복사 (Node)
 ├── plugins/
 │   └── security-guidance/      # 실시간 보안 검사 Plugin
 ├── scripts/
 │   ├── ult-notion.mjs          # Notion 명령 (Task/Story/주간 리뷰/cache 갱신, Node 20+)
-│   ├── ult-flow.mjs            # gh/git/worktree/handoff 보조 (ult-notion.mjs 가 호출)
+│   ├── ult-flow.mjs            # gh/git/worktree/handoff 보조 (ult-notion.mjs 가 호출, `wt-add` 가 worktree 생성)
+│   ├── graft.mjs               # Graft CLI 확인(ensure)·그래프 갱신(refresh)
 │   ├── lib/notion.mjs          # Notion REST 클라이언트 공용 모듈
 │   └── ...                     # 그 외 workflow 실행 스크립트
 ├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
@@ -244,6 +245,10 @@ Codex 설치 시:
 Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고, 같은 세트를 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
 
 설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `node`가 있으면 `ult-notion.mjs cache-refresh`로 warm-up을 시도합니다.
+
+### Hook·스크립트 런타임
+
+Claude Code hook(`copy-plan-on-accept.mjs`, `security-reminder.mjs`)과 worktree·Graft·review-cycle 보조 스크립트도 Node.js 20 이상만 있으면 동작하며 bash·jq·python3이 필요하지 않습니다. `~/.claude/settings.json`의 hook 명령은 `node ~/.claude/hooks/copy-plan-on-accept.mjs`이고, 예전 `~/.claude/hooks/copy-plan-on-accept.sh` 를 가리키던 기존 설정은 `setup.sh --update`/`setup.ps1 -Update`가 자동으로 새 명령으로 바꿉니다(다른 사용자 hook은 그대로 둠). 저장소에 Git hook을 설치해 둔 경우에는 `hooks/install-hooks.sh`를 다시 실행하면 `post-merge`가 새 방식으로 바뀝니다. 다시 실행하지 않아도 예전 hook은 그대로 동작합니다. `/review-cycle`이 쓰는 ralph-loop 플러그인의 `setup-ralph-loop.sh`는 플러그인 소유의 bash 스크립트라 Windows에서는 Git for Windows(bash)가 필요합니다.
 
 ### Notion 토큰
 
@@ -400,7 +405,7 @@ mkdir -p tmp
 /path/to/claude-code-setup/hooks/install-hooks.sh
 ```
 
-설치기는 실행기, 스키마, Graft 갱신 스크립트를 hook 옆에 함께 설치하며 worktree와 `core.hooksPath`를 지원합니다. 기존 사용자 hook은 기본적으로 보존합니다. `--replace`를 명시하면 백업 후 교체합니다. 기존 워크플로우 hook도 백업하고 새 계약으로 교체합니다.
+설치기는 실행기, 스키마, Graft 갱신 스크립트(`graft.mjs`)를 hook 옆에 함께 설치하며 worktree와 `core.hooksPath`를 지원합니다. 기존 사용자 hook은 기본적으로 보존합니다. `--replace`를 명시하면 백업 후 교체합니다. 기존 워크플로우 hook도 백업하고 새 계약으로 교체합니다.
 
 **Hook 동작**:
 - pre-commit은 staged diff를 검사하며 검증 결과가 없어도 커밋할 수 있습니다.
@@ -418,7 +423,7 @@ mkdir -p tmp
 npm install -g @nanonets/graft@0.18.0
 ```
 
-`GRAFT_INSTALL=always`로 확인 없이 설치하고 `GRAFT_INSTALL=never`로 건너뛸 수 있습니다. `ult-wt-add.sh`는 worktree 생성·재사용 직후, 관리형 post-merge hook은 로컬 merge/pull 직후 `graft build`를 실행합니다.
+`GRAFT_INSTALL=always`로 확인 없이 설치하고 `GRAFT_INSTALL=never`로 건너뛸 수 있습니다. `ult-flow.mjs wt-add`는 worktree 생성·재사용 직후, 관리형 post-merge hook은 로컬 merge/pull 직후 `graft.mjs refresh`로 `graft build`를 실행합니다. Git hook 파일(`pre-commit`·`pre-push`·`post-merge`)은 Git이 `sh`로 실행하므로 Windows에서도 동작하며, post-merge는 `node`를 호출하는 얇은 래퍼입니다.
 
 - 기본 빌드는 `DO_NOT_TRACK=1`이며 모델/API를 사용하지 않습니다.
 - `--deep`은 사용자가 명시적으로 요청하지 않는 한 실행하지 않습니다.
@@ -431,7 +436,7 @@ npm install -g @nanonets/graft@0.18.0
 
 | 검증 | 시점 | 방식 |
 |-----|------|------|
-| security-guidance | 파일 편집 **전** | PreToolUse Hook |
+| security-guidance | 파일 편집 **전** | PreToolUse Hook (`security-reminder.mjs`, Node) |
 | security-validator | 커밋 **후** | Subagent 검증 |
 
 ### 감지 항목

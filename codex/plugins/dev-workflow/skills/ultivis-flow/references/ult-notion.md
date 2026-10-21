@@ -40,8 +40,7 @@ Former bash script -> `ult-notion.mjs` subcommand:
 | `ult-task-create.sh` | `task-create` |
 | `ult-story-run.sh` | `story-run` (Notion fallback input: `story-run-fetch`) |
 | `ult-cache-refresh.sh` | `cache-refresh` |
-
-`ult-wt-add.sh` is still a bash script (`ult-flow.mjs wt-add` is its Node counterpart).
+| `ult-wt-add.sh` | `ult-flow.mjs wt-add --branch <b> [--repo-path <p>] [--base <b>]` (prints JSON; the path is its `worktree` field) |
 
 Task and Story lookup uses the exact GitHub Issue URL only; an issue number alone is never used to guess a Task because numbers collide across repositories.
 
