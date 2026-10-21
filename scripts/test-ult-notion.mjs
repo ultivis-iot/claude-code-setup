@@ -4,7 +4,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, cpSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, delimiter } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createMock, T, RT, SEL, STA, URLP, REL, PEO, DATE, NUM, FNUM, FDATE } from "./test-ult-notion-mock.mjs";
 
@@ -35,17 +35,18 @@ const section = (n) => console.log(`\n== ${n}`);
 // ---------------------------------------------------------------- 환경
 for (const d of [join(HOME, ".claude"), WT, GHDIR, REPO]) mkdirSync(d, { recursive: true });
 const SHIMDIR = join(ROOT, "shim"); mkdirSync(SHIMDIR);
-const REALGIT = spawnSync("which", ["git"], { encoding: "utf8" }).stdout.trim();
-// git 래퍼: fetch 만 로컬 bare 로 우회(remote url 은 github 그대로 두어 slug 판별이 실제와 같게 한다)
-writeFileSync(join(SHIMDIR, "git"), `#!/bin/sh\ncase " $* " in *" fetch "*) exec ${REALGIT} -c "url.${BARE}.insteadOf=https://github.com/ultivis/demo.git" "$@";; esac\nexec ${REALGIT} "$@"\n`, { mode: 0o755 });
-const SHIMPATH = SHIMDIR + ":" + process.env.PATH;
+// 가짜 gh/git 은 ULT_GH_BIN/ULT_GIT_BIN(.mjs)로 지정하므로 셸 shim 이 필요 없다(Windows 에서도 동작).
+// SHIMDIR 은 ux-review capture-origin 테스트(POSIX 전용)의 gh shim 용.
+const FAKE_GIT = join(HERE, "test-ult-notion-fake-git.mjs");
+const SHIMPATH = SHIMDIR + delimiter + process.env.PATH;
+const hasCmd = (name) => spawnSync(process.platform === "win32" ? "where" : "which", [name], { stdio: "ignore" }).status === 0;
 const g = (args, cwd = REPO) => { const r = spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, PATH: SHIMPATH, HOME, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } }); if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`); return r.stdout.trim(); };
 g(["init", "-b", "main"]);
 writeFileSync(join(REPO, "README.md"), "hi\n");
 g(["add", "."]); g(["commit", "-m", "init"]);
 g(["init", "--bare", "-b", "main", BARE], ROOT);
 g(["remote", "add", "origin", "https://github.com/ultivis/demo.git"]);
-g(["branch", "dev"]); g(["push", BARE, "main:main", "dev:dev"]); g(["fetch", "origin"]);
+g(["branch", "dev"]); g(["push", BARE, "main:main", "dev:dev"]); g(["-c", `url.${BARE}.insteadOf=https://github.com/ultivis/demo.git`, "fetch", "origin"]);
 
 const mock = createMock();
 await mock.start();
@@ -88,7 +89,7 @@ writeFileSync(join(GHDIR, "state.json"), JSON.stringify({ next: 100, issues: [{ 
 
 const FAKE_GH = join(HERE, "test-ult-notion-fake-gh.mjs");
 const baseEnv = () => {
-  const e = { ...process.env, PATH: SHIMPATH, HOME, USERPROFILE: HOME, NOTION_API_BASE: mock.base, NOTION_TOKEN: "tok-env", ULT_GH_BIN: FAKE_GH, FAKE_GH_DIR: GHDIR, WORKTREE_ROOT: WT,
+  const e = { ...process.env, PATH: SHIMPATH, HOME, USERPROFILE: HOME, NOTION_API_BASE: mock.base, NOTION_TOKEN: "tok-env", ULT_GH_BIN: FAKE_GH, ULT_GIT_BIN: FAKE_GIT, FAKE_GIT_BARE: BARE, FAKE_GH_DIR: GHDIR, WORKTREE_ROOT: WT,
     ULT_NOTION_RETRY_BASE_MS: "5", ULT_NOTION_TEMPLATE_POLL_MS: "40", GIT_TERMINAL_PROMPT: "0", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
   for (const k of ["WORKFLOW_HOME", "APP_HOME", "WORKFLOW_CONFIG_JSON", "WORKFLOW_DEV_TOOLS_DIR", "WORKFLOW_CACHE_DIR", "ULT_NOTION_TEMPLATE_WAIT_SECONDS"]) delete e[k];
   return e;
@@ -485,7 +486,7 @@ try {
   // ------------------------------------------------------------ 10c. 대화형(TTY) 경로: script(1) 로 pty 를 준다
   section("interactive (pty via script)");
   {
-    const hasScript = spawnSync("which", ["script"]).status === 0;
+    const hasScript = process.platform !== "win32" && hasCmd("script");
     if (!hasScript) console.log("  SKIP no script(1)");
     else {
       const pty = (args, input, cwd = REPO) => new Promise((resolve) => {
@@ -506,7 +507,8 @@ try {
 
   // ------------------------------------------------------------ 10d. ux-review capture-origin
   section("ux-review capture-origin -> ult-notion.mjs");
-  {
+  if (process.platform === "win32") console.log("  SKIP capture-origin 은 PATH 의 gh 를 직접 실행하므로 POSIX shim 이 필요하다");
+  else {
     writeFileSync(join(SHIMDIR, "gh"), `#!/bin/sh\nexec ${process.execPath} ${FAKE_GH} "$@"\n`, { mode: 0o755 });
     const scen = join(wt7, "tmp", "ux-scenario"); mkdirSync(scen, { recursive: true });
     const r = await new Promise((resolve) => { const p = spawn(process.execPath, [join(PLUGIN, "skills", "ux-review", "scripts", "capture-origin.mjs"), scen], { env: baseEnv(), cwd: wt7 }); let o = ""; let e = ""; p.stdout.on("data", (d) => (o += d)); p.stderr.on("data", (d) => (e += d)); p.on("close", (c) => resolve({ c, o, e })); });
@@ -527,7 +529,7 @@ try {
     r = await cli(["my-tasks"], { env: { FAKE_GH_LOGIN: "stranger" } });
     check("gh user not in Member DB -> Korean error", r.code === 1 && /Member DB에 Github 계정\(stranger\)이 등록되지 않았습니다/.test(r.err), r.err);
     // dev-commands.sh 의 wa 가 쓰는 _wt_add: ult-flow.mjs wt-add 의 JSON 에서 worktree 경로만 뽑는다 (bash 가 있을 때만)
-    if (spawnSync("bash", ["-c", "true"]).status === 0) {
+    if (process.platform !== "win32" && spawnSync("bash", ["-c", "true"]).status === 0) {
       cpSync(join(REPO_ROOT, "dev-tools"), join(INSTALLED, "dev-tools"), { recursive: true });
       writeFileSync(join(INSTALLED, "dev-tools", ".env"), `WORKTREE_ROOT="${WT.replace(/\\/g, "/")}"\n`);
       const sh = (script) => spawnSync("bash", ["-c", `source "$HOME/.claude/dev-tools/dev-commands.sh" >/dev/null 2>&1; ${script}`], { cwd: REPO, env: baseEnv(), encoding: "utf8" });

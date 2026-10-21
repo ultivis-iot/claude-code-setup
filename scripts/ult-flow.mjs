@@ -49,8 +49,10 @@ function run(cmd, args, o = {}) {
   const r = spawnSync(cmd, args, { encoding: "utf8", windowsHide: true, ...o });
   return { ok: r.status === 0, out: (r.stdout || "").trim(), err: (r.stderr || "").trim(), status: r.status };
 }
-const git = (args, cwd) => run("git", cwd ? ["-C", cwd, ...args] : args);
-const gh = (args) => run(process.env.ULT_GH_BIN || "gh", args);
+// 테스트용 ULT_GH_BIN/ULT_GIT_BIN 이 .mjs/.js 이면 node 로 실행한다 (Windows 는 shebang 스크립트를 직접 실행할 수 없다).
+const runBin = (bin, args) => (/\.[cm]?js$/i.test(bin) ? run(process.execPath, [bin, ...args]) : run(bin, args));
+const git = (args, cwd) => runBin(process.env.ULT_GIT_BIN || "git", cwd ? ["-C", cwd, ...args] : args);
+const gh = (args) => runBin(process.env.ULT_GH_BIN || "gh", args);
 
 function readJsonArg(v) {
   if (!v || v === true) fail("JSON 인자가 필요합니다");

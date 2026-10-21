@@ -5,7 +5,7 @@
 //   ~/.claude.json (WORKFLOW_CONFIG_JSON 로 변경 가능)의 .mcpServers["notion-api"].env.NOTION_TOKEN
 //   → 첫 번째 .projects[*].mcpServers["notion-api"].env.NOTION_TOKEN
 //
-// 테스트용 환경변수: NOTION_API_BASE, ULT_GH_BIN, ULT_NOTION_RETRY_BASE_MS, ULT_NOTION_MAX_RETRIES,
+// 테스트용 환경변수: NOTION_API_BASE, ULT_GH_BIN, ULT_GIT_BIN, ULT_NOTION_RETRY_BASE_MS, ULT_NOTION_MAX_RETRIES,
 //   ULT_NOTION_TEMPLATE_WAIT_SECONDS, ULT_NOTION_TEMPLATE_POLL_MS, ULT_NOTION_TIMEOUT_MS
 
 import { spawnSync } from "node:child_process";
@@ -330,8 +330,11 @@ export function sh(cmd, args, opts = {}) {
   return { ok: r.status === 0, out: (r.stdout || "").trim(), err: (r.stderr || "").trim(), status: r.status };
 }
 export const ghBin = () => process.env.ULT_GH_BIN || "gh";
-export const gh = (args, opts) => sh(ghBin(), args, opts);
-export const git = (args, cwd) => sh("git", cwd ? ["-C", cwd, ...args] : args);
+export const gitBin = () => process.env.ULT_GIT_BIN || "git";
+// 테스트용 ULT_GH_BIN/ULT_GIT_BIN 이 .mjs/.js 이면 node 로 실행한다 (Windows 는 shebang 스크립트를 직접 실행할 수 없다).
+export const shBin = (bin, args, opts) => (/\.[cm]?js$/i.test(bin) ? sh(process.execPath, [bin, ...args], opts) : sh(bin, args, opts));
+export const gh = (args, opts) => shBin(ghBin(), args, opts);
+export const git = (args, cwd) => shBin(gitBin(), cwd ? ["-C", cwd, ...args] : args);
 export const githubLogin = () => {
   const r = gh(["api", "user", "--jq", ".login"]);
   return r.ok ? r.out : "";
