@@ -72,6 +72,18 @@ const topicComponent = (t) => TOPIC[String(t || "").toLowerCase()] || "chore";
 function issueNumFromUrl(u) { const m = String(u || "").match(/(\d+)$/); return m ? m[1] : ""; }
 function repoFromIssueUrl(u) { return String(u || "").replace(/^https:\/\/github\.com\//, "").replace(/\/issues\/\d+$/, ""); }
 
+// .env 는 예전 bash 가 source 하던 파일이라 WORKTREE_ROOT="$HOME/Git" 처럼 변수를 쓴다.
+// 작은따옴표가 아니면 $VAR / ${VAR} 와 맨 앞 ~ 를 bash 처럼 펼친다.
+function expandEnvValue(raw, envs) {
+  const s = raw.trim();
+  if (/^'.*'$/.test(s)) return s.slice(1, -1);
+  const lookup = (k) => envs[k] ?? process.env[k] ?? (k === "HOME" ? homedir() : "");
+  return s
+    .replace(/^"|"$/g, "")
+    .replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (_, a, b) => lookup(a || b))
+    .replace(/^~(?=$|[\/\\])/, homedir());
+}
+
 function loadEnvFile() {
   const envs = {};
   const dirs = [join(homedir(), ".claude", "dev-tools", ".env"), join(homedir(), ".codex", "dev-tools", ".env")];
@@ -79,7 +91,7 @@ function loadEnvFile() {
     if (!existsSync(f)) continue;
     for (const line of readFileSync(f, "utf8").split(/\r?\n/)) {
       const m = line.match(/^\s*(?:export\s+)?([A-Z_]+)=(.*)$/);
-      if (m) envs[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      if (m) envs[m[1]] = expandEnvValue(m[2], envs);
     }
   }
   return envs;
@@ -179,16 +191,18 @@ cmds["wt-add"] = ({ opt }) => {
   }
 
   let base = normalizeBase(opt.base);
-  if (!base) base = defaultBase(main);
 
   if (existsSync(wt)) {
     const cur = git(["branch", "--show-current"], wt).out;
     if (cur !== branch) fail("worktree 경로가 다른 브랜치로 이미 존재합니다", { path: wt, expected: branch, actual: cur || "unknown" });
-    git(["config", `branch.${branch}.gh-merge-base`, base], wt);
+    // 재사용할 때는 --base 를 명시한 경우에만 base 설정을 바꾼다 (기존 브랜치의 base 를 기본값으로 덮어쓰지 않음)
+    if (base) git(["config", `branch.${branch}.gh-merge-base`, base], wt);
+    else base = git(["config", `branch.${branch}.gh-merge-base`], wt).out || defaultBase(main);
     graftRefresh(wt, "worktree-reuse");
     return out({ worktree: wt, branch, base, reused: true, repo_path: main });
   }
 
+  if (!base) base = defaultBase(main);
   const baseRef = git(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${base}`], main).ok ? `origin/${base}` : base;
   let r;
   if (git(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`], main).ok) {
@@ -438,8 +452,9 @@ cmds["story-eval"] = ({ opt }) => {
     if (pr && (pr.state === "MERGED" || pr.mergedAt) || issueCur === "CLOSED") state = "Done";
     else if (pr?.state === "OPEN" || t.status === "AI검토중") state = "Review";
     else if (pr?.state === "CLOSED" || t.status === "미완료") state = "Stopped";
-    else if (!parentReady) state = "Blocked";
+    // Notion 상태가 이미 완료면 선행 Task 와 무관하게 Done (예전 Notion fallback 판정과 같음)
     else if (DONE_STATUS.has(t.status)) state = "Done";
+    else if (!parentReady) state = "Blocked";
 
     return {
       state, task_id: t.notion_task_id || t.task_id || "", name: t.name || "(제목 없음)", status: t.status || "", repo,

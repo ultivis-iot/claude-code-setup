@@ -154,6 +154,9 @@ export async function notionApi(method, path, body) {
   const maxRetries = Number(process.env.ULT_NOTION_MAX_RETRIES ?? 5);
   const baseDelay = Number(process.env.ULT_NOTION_RETRY_BASE_MS ?? 500);
   const timeout = Number(process.env.ULT_NOTION_TIMEOUT_MS ?? 30000);
+  // 페이지/코멘트 생성과 블록 append 는 서버에서 이미 처리됐을 수 있어 타임아웃·5xx 에 다시 보내면 중복이 생긴다.
+  // 이런 요청은 처리되지 않았음이 확실한 429 에만 재시도한다.
+  const unsafe = (method === "POST" && !/\/query$/.test(path)) || (method === "PATCH" && /\/children$/.test(path));
 
   for (let attempt = 0; ; attempt++) {
     let res;
@@ -169,7 +172,9 @@ export async function notionApi(method, path, body) {
         signal: AbortSignal.timeout(timeout),
       });
     } catch (e) {
-      if (attempt < maxRetries) {
+      // 연결 자체가 안 된 경우(요청이 서버에 닿지 않음)는 생성 요청도 안전하게 다시 보낼 수 있다
+      const neverSent = ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN"].includes(e?.cause?.code);
+      if ((!unsafe || neverSent) && attempt < maxRetries) {
         await sleep(Math.min(baseDelay * 2 ** attempt, 8000));
         continue;
       }
@@ -182,7 +187,7 @@ export async function notionApi(method, path, body) {
 
     if (res.ok) return json ?? {};
 
-    if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
+    if ((res.status === 429 || (res.status >= 500 && !unsafe)) && attempt < maxRetries) {
       const ra = Number(res.headers.get("retry-after"));
       const delay = res.status === 429 && Number.isFinite(ra) && ra >= 0 ? Math.min(ra * 1000, 30000) : Math.min(baseDelay * 2 ** attempt, 8000);
       await sleep(delay);

@@ -182,6 +182,14 @@ try {
     mock.faults.length = 0;
     r = await cli(["task-link-issue", "#7", "--task", "12345678-1234-4234-8234-123456789012"]);
     check("404 -> Korean hint about sharing integration", r.code === 1 && /공유\(연결\)/.test(r.err), r.err);
+    // 코멘트/페이지 생성은 서버에서 이미 처리됐을 수 있으므로 5xx 에 다시 보내지 않는다 (중복 생성 방지)
+    const cf = join(ROOT, "retry-comment.md");
+    writeFileSync(cf, "재시도 금지 확인");
+    await fetch(mock.base.replace("/v1", "") + "/__faults", { method: "POST", body: JSON.stringify({ count: 1, status: 503 }) });
+    mock.log.length = 0;
+    r = await cli(["story-comment", T1.id, "--file", cf]);
+    check("POST /comments 503 is not retried", r.code === 1 && mock.log.filter((x) => x.path === "/comments").length === 1 && !commentsOf(T1.id).includes("재시도 금지 확인"), `${r.all} log=${mock.log.map((x) => x.path).join()}`);
+    mock.faults.length = 0;
   }
 
   // ------------------------------------------------------------ 3. my-tasks
@@ -540,6 +548,33 @@ try {
       const w3 = sh("_wt_add feat/wa-902 -r /nonexistent/path");
       check("dev-commands _wt_add: 오류는 한국어 메시지 + 비정상 종료", w3.status !== 0 && /저장소 경로를 찾을 수 없습니다/.test(w3.stderr), w3.stdout + w3.stderr);
     }
+    // wt-add: .env 의 WORKTREE_ROOT="$HOME/..." 는 bash 처럼 펼친다 (export 안 된 wa 셸 변수 대신 .env 만 보이는 경우)
+    const FLOW = join(INSTALLED, "scripts", "ult-flow.mjs");
+    const flowRun = (args, env = {}) => {
+      const e = { ...baseEnv(), ...env };
+      delete e.WORKTREE_ROOT;
+      const p = spawnSync(process.execPath, [FLOW, ...args], { cwd: REPO, env: e, encoding: "utf8" });
+      let json = null;
+      try { json = JSON.parse(p.stdout); } catch { /* 비 JSON */ }
+      return { code: p.status, json, all: p.stdout + p.stderr };
+    };
+    mkdirSync(join(INSTALLED, "dev-tools"), { recursive: true });
+    writeFileSync(join(INSTALLED, "dev-tools", ".env"), 'WORKTREE_ROOT="$HOME/wt-env"\n');
+    const we = flowRun(["wt-add", "--branch", "feat/env-903"]);
+    check("wt-add: .env 의 $HOME 을 펼친다", we.code === 0 && we.json?.worktree === join(HOME, "wt-env", "d-903") && existsSync(we.json.worktree) && !existsSync(join(REPO, "$HOME")), we.all);
+    // 재사용할 때 --base 가 없으면 기존 gh-merge-base 를 덮어쓰지 않는다
+    spawnSync("git", ["-C", we.json.worktree, "config", "branch.feat/env-903.gh-merge-base", "release"]);
+    const wr = flowRun(["wt-add", "--branch", "feat/env-903"]);
+    const kept = spawnSync("git", ["-C", we.json.worktree, "config", "branch.feat/env-903.gh-merge-base"], { encoding: "utf8" }).stdout.trim();
+    check("wt-add 재사용: --base 없으면 기존 base 유지", wr.code === 0 && wr.json?.reused === true && wr.json?.base === "release" && kept === "release", wr.all + " kept=" + kept);
+    spawnSync("git", ["-C", we.json.worktree, "config", "--unset", "branch.feat/env-903.gh-merge-base"]);
+    const wn = flowRun(["wt-add", "--branch", "feat/env-903"]);
+    const unset = spawnSync("git", ["-C", we.json.worktree, "config", "branch.feat/env-903.gh-merge-base"], { encoding: "utf8" }).stdout.trim();
+    check("wt-add 재사용: base 설정이 없으면 기본 base 를 알려주되 설정은 쓰지 않는다", wn.code === 0 && !!wn.json?.base && unset === "", wn.all);
+    // story-eval: Notion 상태가 완료인 Task 는 선행 Task 가 끝나지 않았어도 Done
+    const se = flowRun(["story-eval", "--out-dir", join(ROOT, "story-eval"), "--input", JSON.stringify({ source: "notion", story: { title: "S" }, tasks: [{ notion_task_id: "t1", name: "완료된 Task", status: "완료", issue_url: "", parent_task_ids: ["p1"], parents: [] }] })]);
+    const seTasks = JSON.parse(readFileSync(join(ROOT, "story-eval", "summary.json"), "utf8")).tasks;
+    check("story-eval: 완료 상태는 선행 Task 와 무관하게 Done", se.code === 0 && seTasks[0].state === "Done", se.all);
     // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (예전 bash workflow-env.sh 와 같은 규칙)
     const codexScripts = join(HOME, ".codex", "scripts");
     mkdirSync(join(codexScripts, "lib"), { recursive: true });
