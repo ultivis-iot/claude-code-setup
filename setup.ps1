@@ -270,7 +270,12 @@ if (Test-Path $HooksSource) {
 Write-Host "7-2. settings.json 업데이트..."
 if (Get-Command node -ErrorAction SilentlyContinue) {
     $SettingsFile = Join-Path $ClaudeDir "settings.json"
-    $SettingsResult = (& node (Join-Path $ScriptDir "scripts\install-settings.mjs") $SettingsFile "node ~/.claude/hooks/copy-plan-on-accept.mjs" 2>&1 | Out-String).Trim()
+    # Windows PowerShell 5.1 은 $ErrorActionPreference = "Stop" 에서 2>&1 로 받은 stderr(깨진 JSON 경고)를 종료 오류로 바꾸므로 try 로 감싼다
+    try {
+        $SettingsResult = (& node (Join-Path $ScriptDir "scripts\install-settings.mjs") $SettingsFile "node ~/.claude/hooks/copy-plan-on-accept.mjs" 2>&1 | Out-String).Trim()
+    } catch {
+        $SettingsResult = "error"
+    }
     if ($SettingsResult -eq "created") {
         Write-Host "   settings.json 생성 완료" -ForegroundColor Green
     } elseif ($SettingsResult -eq "added") {
