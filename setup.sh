@@ -133,6 +133,17 @@ if [ -d "$SCRIPT_DIR/scripts" ]; then
             echo -e "${GREEN}   ✓ $filename${NC}"
         fi
     done
+    # Node 스크립트가 쓰는 공용 모듈 (scripts/lib/*.mjs)
+    if [ -d "$SCRIPT_DIR/scripts/lib" ]; then
+        mkdir -p "$CLAUDE_DIR/scripts/lib"
+        for file in "$SCRIPT_DIR/scripts/lib"/*.mjs; do
+            if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                cp "$file" "$CLAUDE_DIR/scripts/lib/$filename"
+                echo -e "${GREEN}   ✓ lib/$filename${NC}"
+            fi
+        done
+    fi
 fi
 
 # 구버전 파일 정리
@@ -153,6 +164,19 @@ STALE_FILES=(
     "scripts/isaac-weekly-collect.sh"
     "scripts/isaac-weekly-publish.sh"
     "scripts/isaac-wt-add.sh"
+    "scripts/issue.sh"
+    "scripts/notion-api.sh"
+    "scripts/ult-my-tasks.sh"
+    "scripts/ult-task-note.sh"
+    "scripts/ult-task-status.sh"
+    "scripts/ult-task-link-issue.sh"
+    "scripts/ult-sync-task.sh"
+    "scripts/ult-weekly-collect.sh"
+    "scripts/ult-weekly-publish.sh"
+    "scripts/ult-story-create-exec.sh"
+    "scripts/ult-task-create.sh"
+    "scripts/ult-story-run.sh"
+    "scripts/ult-cache-refresh.sh"
 )
 STALE_REMOVED=0
 for rel_path in "${STALE_FILES[@]}"; do
@@ -391,7 +415,7 @@ else
 fi
 
 echo "11. Notion cache 준비..."
-CACHE_REFRESH_OUTPUT=$("$CLAUDE_DIR/scripts/ult-cache-refresh.sh" --quiet 2>&1 || true)
+CACHE_REFRESH_OUTPUT=$(node "$CLAUDE_DIR/scripts/ult-notion.mjs" cache-refresh --quiet 2>&1 || true)
 if printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^DONE:'; then
     echo -e "${GREEN}   ✓ ~/.claude/notion-cache 준비 완료${NC}"
 elif printf '%s\n' "$CACHE_REFRESH_OUTPUT" | grep -q '^SKIP:'; then
@@ -436,7 +460,7 @@ echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
 echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
 echo "  ~/.claude/settings.json (hooks 설정 포함)"
-echo "  ~/.claude/scripts/*.sh, *.mjs (workflow 실행 스크립트)"
+echo "  ~/.claude/scripts/*.sh, *.mjs, lib/*.mjs (workflow 실행 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
 echo "  ~/.claude/dev-tools/.env (사용자별 경로 설정)"
 echo "  ~/.claude/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
