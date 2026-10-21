@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(${HOME}/.claude/scripts/ult-weekly-collect.sh:*), Bash(${HOME}/.claude/scripts/ult-weekly-publish.sh:*), Read, Write, AskUserQuestion
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read, Write, AskUserQuestion
 description: Notion Week 기간의 작업을 집계해 Weekly Review 초안을 만들고 발행 여부를 확인받음
 argument-hint: [week] [--publish]
 ---
@@ -12,15 +12,17 @@ argument-hint: [week] [--publish]
   - 보고서 구조 예시가 필요할 때
   - 어떤 항목을 강조해야 하는지 애매할 때
 
+인자: `$ARGUMENTS` (`[week 날짜] [--team] [--publish]`)
+
 ## 목적
 
 Notion Week 기간 기준으로 작업을 집계하고, LLM이 Weekly Review 초안으로 정리한 뒤 발행 여부를 사용자에게 확인받는다.
 
 ## 책임 분리
 
-- 데이터 수집: `scripts/ult-weekly-collect.sh`
-- 리뷰 작성: 이 명령
-- 발행: `scripts/ult-weekly-publish.sh`
+- 데이터 수집: `node ~/.claude/scripts/ult-notion.mjs weekly-collect`
+- 리뷰 작성: 이 명령 (LLM)
+- 발행: `node ~/.claude/scripts/ult-notion.mjs weekly-publish`
 
 ## 기본 원칙
 
@@ -30,8 +32,11 @@ Notion Week 기간 기준으로 작업을 집계하고, LLM이 Weekly Review 초
 
 ## 수행 절차
 
-1. `scripts/ult-weekly-collect.sh --week <직전 Week의 DateFrom>`으로 주간 데이터를 JSON으로 수집한다
-   - 수집 실패 시 발행 단계로 가지 않고 즉시 중단한다
+1. 직전 Week 의 `DateFrom` 을 구한다. `weekly-collect` 를 한 번 실행해 현재 Week 의 `week.date_from` 을 얻고, 그 7일 전 날짜로 다시 실행하면 직전 Week 데이터가 나온다.
+   ```bash
+   node ~/.claude/scripts/ult-notion.mjs weekly-collect --week <직전 Week의 DateFrom>
+   ```
+   - 수집 실패(`{"error": ...}`) 시 발행 단계로 가지 않고 즉시 중단한다
 2. JSON을 읽고 Weekly Review `마케팅` 템플릿 형식으로 정리한다
    - `새로 추가된 기능`: 사용자에게 의미 있는 기능/신규 항목만
    - `기타 업데이트 내용`: 사용자 체감 수정, 업데이트, 리팩토링, UX 개선, 운영 변경. 통계로 채우지 않는다
@@ -40,7 +45,7 @@ Notion Week 기간 기준으로 작업을 집계하고, LLM이 Weekly Review 초
 3. 마크다운 초안을 사용자에게 보여준다
 4. 사용자 액션을 받는다
    - `s` 또는 `publish`: Notion 발행
-   - `c`: 클립보드 복사
+   - `c`: 클립보드 복사용 텍스트 출력
    - Enter: 종료
 
 ## 작성 규칙
@@ -55,23 +60,32 @@ Notion Week 기간 기준으로 작업을 집계하고, LLM이 Weekly Review 초
   - `ProjectShort`는 선택한 Project에서, `WW`는 Week DB `DateFrom` 날짜의 월중 주차
   - 예: Project `Ultivis CRM` + Week `2026-05-18 ~ 2026-05-24` → `CRM-26-05-03`
 - 여러 Project를 아우르는 전체 리뷰: `Weekly-YY-MM-WW`
+- 제목을 따로 주지 않으면 `weekly-publish` 가 위 규칙으로 만든다
 
 ## 발행
 
-- 사용자가 명시적으로 발행을 요청한 경우에만 `scripts/ult-weekly-publish.sh`를 사용한다
+- 사용자가 명시적으로 발행을 요청한 경우에만 `weekly-publish` 를 사용한다. 마크다운은 표준입력으로 넘긴다.
+  ```bash
+  node ~/.claude/scripts/ult-notion.mjs weekly-publish <YYYY-MM-DD> [--project <Project name|page id|URL>] <<'MD'
+  ## 새로 추가된 기능
+  - ...
+  MD
+  ```
+  (Windows PowerShell 처럼 heredoc 이 없는 환경에서는 `tmp/weekly.md` 에 Write 한 뒤 `node ... weekly-publish <날짜> < tmp/weekly.md` 로 넘긴다.)
+- 첫 번째 위치 인자는 Weekly Review 가 속할 Week 를 정하는 날짜(`YYYY-MM-DD`)다. 제목을 직접 정하려면 `weekly-publish "<제목>" <날짜>` 순서로 쓴다.
 - 기본 템플릿은 `마케팅`이고, Project가 템플릿 기본값과 다르면 `--project <Project name|Notion page id|URL>`을 쓴다
 - 다른 Weekly Review 템플릿으로 발행할 때만 `--template <이름|template id>`을 쓴다
 - `Task 보기`의 linked database 필터는 Notion 템플릿/뷰 소관이다. 현재 Notion API 도구는 페이지 생성과 `❤️‍🔥 Week`/`🛡️ Project` relation 설정까지만 가능하고, linked view 필터 수정은 현재 환경에서 검증되기 전에는 가능하다고 안내하지 않는다
 
 ## 옵션
 
-수집 (`ult-weekly-collect.sh`):
+수집 (`weekly-collect`):
 
-- 기본: 직전 주, 본인
+- 기본: 오늘이 속한 주, 본인 (이 명령의 기본 대상은 직전 주이므로 위 절차대로 `--week` 를 준다)
 - `--week <YYYY-MM-DD>`: 해당 날짜 포함 주
 - `--team`: 팀 전체
 
-발행 (`ult-weekly-publish.sh`):
+발행 (`weekly-publish`):
 
 - 마크다운은 표준입력으로 넘긴다
 - `--project <name|page id|URL>`: Weekly Review의 `🛡️ Project` relation

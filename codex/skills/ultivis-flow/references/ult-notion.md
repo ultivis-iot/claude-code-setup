@@ -17,23 +17,35 @@ Use the globally installed workflow scripts, not repository-local `scripts/`.
 - Do not try `./scripts/...` or `scripts/...` in the target repository unless the user explicitly points at this setup repository.
 - The Notion cache is global per install under `${WORKFLOW_CACHE_DIR:-${CODEX_HOME:-$HOME/.codex}/notion-cache}`. Do not create repository-local Notion caches.
 
-Global scripts:
+Global scripts (Node.js >= 20 only; no bash, jq or curl needed, so they also run on Windows):
 
-- `issue.sh`
-- `ult-cache-refresh.sh`
-- `ult-my-tasks.sh`
-- `ult-story-create-exec.sh`
-- `ult-story-run.sh`
-- `ult-sync-task.sh`
-- `ult-task-create.sh`
-- `ult-task-link-issue.sh`
-- `ult-task-note.sh`
-- `ult-task-status.sh`
-- `ult-weekly-collect.sh`
-- `ult-weekly-publish.sh`
-- `ult-wt-add.sh`
+- Notion: `node <scripts-dir>/ult-notion.mjs <subcommand> ...`
+- gh / git / worktree / handoff helpers used by it: `node <scripts-dir>/ult-flow.mjs <subcommand> ...` (shared module: `<scripts-dir>/lib/notion.mjs`)
+- The Notion token is resolved from `NOTION_TOKEN`, then `<install-home>/dev-tools/.env`, then the `notion-api` MCP registration in `~/.claude.json`.
+- The install home is the parent of the scripts directory (`~/.claude` or `~/.codex`), so the Notion cache and `dev-tools/.env` follow the install.
 
-If Notion integration is required, verify credentials and the available MCP/tooling in the current environment before promising automation.
+Former bash script -> `ult-notion.mjs` subcommand:
+
+| Former script | Subcommand |
+|---|---|
+| `issue.sh` | `issue` |
+| `ult-my-tasks.sh` | `my-tasks [--week\|--all] [--select N]` |
+| `ult-task-status.sh` | `task-status` |
+| `ult-task-note.sh` | `task-note` |
+| `ult-task-link-issue.sh` | `task-link-issue` |
+| `ult-sync-task.sh` | `sync-task` |
+| `ult-weekly-collect.sh` | `weekly-collect` |
+| `ult-weekly-publish.sh` | `weekly-publish` |
+| `ult-story-create-exec.sh` | `story-create` |
+| `ult-task-create.sh` | `task-create` |
+| `ult-story-run.sh` | `story-run` (Notion fallback input: `story-run-fetch`) |
+| `ult-cache-refresh.sh` | `cache-refresh` |
+
+`ult-wt-add.sh` is still a bash script (`ult-flow.mjs wt-add` is its Node counterpart).
+
+Task and Story lookup uses the exact GitHub Issue URL only; an issue number alone is never used to guess a Task because numbers collide across repositories.
+
+If the Notion token is missing or the integration is not shared with the Task/Story/Project/Repository/Week/Member databases, the script says so in Korean; relay that to the user instead of promising automation.
 
 ## Weekly Review Rules
 
@@ -41,7 +53,7 @@ Use these rules when the user asks for `weekly-review` or asks to review the wee
 
 - `weekly-review` means review/draft only. Do not publish to Notion unless the user explicitly says `publish` or asks to create the Notion page.
 - The default target is the previous Week DB row. Resolve the current Week from Week DB first, then choose the immediately preceding Week by `DateFrom`.
-- Use `ult-weekly-collect.sh --week <previous-week-DateFrom>` to collect all tasks assigned to the current user for that Week. Do not filter to one Project unless the user explicitly asks for a Project-specific review.
+- Use `ult-notion.mjs weekly-collect --week <previous-week-DateFrom>` to collect all tasks assigned to the current user for that Week. Do not filter to one Project unless the user explicitly asks for a Project-specific review.
 - Format the review to match the Weekly Review `마케팅` template, with these sections: `새로 추가된 기능`, `기타 업데이트 내용`, and `Task 보기`. If multiple Projects appear, group or label the content by Project only when it improves readability.
 - `새로 추가된 기능` should contain only feature/new-capability items that are meaningful to users.
 - `기타 업데이트 내용` should contain user-facing fixes, updates, refactors, UX improvements, and operational changes. Do not fill this section with raw stats.
@@ -49,7 +61,7 @@ Use these rules when the user asks for `weekly-review` or asks to review the wee
 - Keep the review concise and short-phrase oriented. Weekly Review bullets should read like brief Notion bullets, not explanatory sentences. Include only important follow-up/overdue items when they affect completion or next-week action.
 - `Task 보기` is the template's linked database/view area. Do not manually duplicate the full task list in the written review unless the user asks for it.
 - For Project-specific Weekly Review titles, use `<ProjectShort>-YY-MM-WW`, where `ProjectShort` comes from the selected Project and `WW` is the week-of-month from the Week DB `DateFrom` date. Example: Project `Ultivis CRM` and Week `2026-05-18 ~ 2026-05-24` becomes `CRM-26-05-03`. For all-task reviews spanning multiple Projects, use `Weekly-YY-MM-WW` unless the user asks for a different naming rule.
-- If publishing is explicitly requested, use `ult-weekly-publish.sh`. The default template is `마케팅`; allow `--project <Project name|Notion page id|URL>` when the Project should differ from the template default.
+- If publishing is explicitly requested, use `ult-notion.mjs weekly-publish`. The default template is `마케팅`; allow `--project <Project name|Notion page id|URL>` when the Project should differ from the template default.
 - The `Task 보기` linked database filter belongs to the Notion template/view. Current Notion API tooling can create the page and set `❤️‍🔥 Week`/`🛡️ Project` relations, but should not claim it can patch the linked view filter unless verified in the current environment.
 
 ## Story and Project Rules
@@ -81,7 +93,7 @@ Use this model for multi-task Story work. These rules are the operating checklis
 - Maintain `tmp/story-handoff.md` and `tmp/story-handoff.json` in each Task worktree. Publish the initial handoff to the Notion Story, then record execution updates in the local handoff and Notion Story comments.
 - Run review-cycle for each Task PR. After all Task PRs are merged, run Story-level integration validation without creating a Story PR.
 - Story/Task Notion pages must use configured templates; appended markdown must render as Notion blocks, not raw markdown.
-- Before assigning Task work, run the global `ult-story-run.sh` to classify Ready/Blocked Tasks and generate subagent prompts.
+- Before assigning Task work, run the global `ult-notion.mjs story-run` to classify Ready/Blocked Tasks and generate subagent prompts.
 - During Task execution, do not create additional Notion Tasks, GitHub Issues, branches, or worktrees unless the user explicitly approves that new Task creation. Record out-of-scope follow-up work as Story carryover instead.
 
 Branch flow:
@@ -113,9 +125,9 @@ The handoff should include:
 
 After creation, the local handoff files and Notion Story comments are the mutable handoff sources.
 
-Use the global `ult-story-run.sh` to generate a current run summary and Ready Task prompts. It reads local handoff first and falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
+Use the global `ult-notion.mjs story-run` to generate a current run summary and Ready Task prompts. It reads local handoff first and falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
 
-When adding a Task to an existing Story, prefer passing the Notion Story URL or running from a Task worktree with local handoff. The global `ult-task-create.sh` resolves Story context from local handoff, the current GitHub Task Issue, and then active Notion title search. It must not resolve Story context from stale branch base config or old worktrees. New Task branches should base on the latest remote base, and new Tasks should be appended to Story handoff when available.
+When adding a Task to an existing Story, prefer passing the Notion Story URL or running from a Task worktree with local handoff. The global `ult-notion.mjs task-create` resolves Story context from local handoff, the current GitHub Task Issue, and then active Notion title search. It must not resolve Story context from stale branch base config or old worktrees. New Task branches should base on the latest remote base, and new Tasks should be appended to Story handoff when available.
 
 ## Task Dependency Rules
 
@@ -162,7 +174,7 @@ Story-based work runs review-cycle at the Task PR layer.
 
 ## Repository Project Relation Gaps
 
-If `ult-task-create.sh` fails with `Repository에서 Project relation을 찾을 수 없습니다`, do not continue with an unscoped Story guess.
+If `ult-notion.mjs task-create` fails with `Repository에서 Project relation을 찾을 수 없습니다`, do not continue with an unscoped Story guess.
 
 Use this recovery order:
 
