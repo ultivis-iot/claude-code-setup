@@ -25,8 +25,9 @@ done
 
 mkdir -p "$HOOKS/workflow/scripts" "$HOOKS/workflow/schemas"
 cp "$SCRIPT_DIR/../scripts/validation-gate.mjs" "$HOOKS/workflow/scripts/"
-cp "$SCRIPT_DIR/../scripts/graft-refresh.sh" "$HOOKS/workflow/scripts/"
-chmod +x "$HOOKS/workflow/scripts/graft-refresh.sh"
+cp "$SCRIPT_DIR/../scripts/graft.mjs" "$HOOKS/workflow/scripts/"
+# 예전 설치본의 bash 갱신 스크립트는 더 이상 쓰지 않는다
+rm -f "$HOOKS/workflow/scripts/graft-refresh.sh"
 cp "$SCRIPT_DIR/../schemas/validation-status.schema.json" "$HOOKS/workflow/schemas/"
 for name in pre-commit pre-push post-merge; do
     target="$HOOKS/$name"

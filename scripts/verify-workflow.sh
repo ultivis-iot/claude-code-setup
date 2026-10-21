@@ -35,7 +35,10 @@ if [ "$MODE" = "repo" ]; then
     check_script "$WORKFLOW_ROOT/hooks/pre-push"
     check_script "$WORKFLOW_ROOT/hooks/post-merge"
     check_script "$WORKFLOW_ROOT/hooks/install-hooks.sh"
-    check_script "$WORKFLOW_ROOT/hooks/copy-plan-on-accept.sh"
+    check_file "$WORKFLOW_ROOT/hooks/copy-plan-on-accept.mjs"
+    node --check "$WORKFLOW_ROOT/hooks/copy-plan-on-accept.mjs"
+    check_file "$WORKFLOW_ROOT/plugins/security-guidance/hooks/security-reminder.mjs"
+    node --check "$WORKFLOW_ROOT/plugins/security-guidance/hooks/security-reminder.mjs"
     for command_file in "$WORKFLOW_ROOT"/commands/*.md; do
         command_name="$(basename "$command_file")"
         plugin_command="$WORKFLOW_ROOT/codex/plugins/dev-workflow/commands/$command_name"
@@ -77,12 +80,8 @@ else
     exit 1
 fi
 
-check_script "$WORKFLOW_ROOT/scripts/ult-wt-add.sh"
-check_script "$WORKFLOW_ROOT/scripts/graft-refresh.sh"
-check_script "$WORKFLOW_ROOT/scripts/ensure-graft-cli.sh"
-check_script "$WORKFLOW_ROOT/scripts/check-validation-status.sh"
 check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"
-for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs; do
+for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs install-settings.mjs; do
     check_file "$WORKFLOW_ROOT/scripts/$node_script"
     node --check "$WORKFLOW_ROOT/scripts/$node_script"
 done
@@ -92,8 +91,9 @@ check_file "$WORKFLOW_ROOT/docs/references/create-pr-contract.md"
 check_file "$WORKFLOW_ROOT/templates/cli-sync.json"
 
 if [ "$MODE" = "repo" ]; then
-    "$WORKFLOW_ROOT/scripts/check-validation-status.sh" "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
+    node "$WORKFLOW_ROOT/scripts/validation-gate.mjs" check "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
     node "$WORKFLOW_ROOT/scripts/test-validation-gate.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-install-settings.mjs"
     node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"

@@ -1,5 +1,5 @@
 ---
-allowed-tools: Bash(${HOME}/.claude/scripts/review-cycle-ralph-loop.sh:*), Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
+allowed-tools: Bash(node:*), Bash(gh:*), Bash(git:*), Bash(cargo:*), Bash(npm:*), Bash(pnpm:*), Read, Grep, Glob, Edit, Write, Agent
 description: PR의 AI 리뷰를 Ralph Loop로 반복 확인하고 반영
 argument-hint: [PR번호] [--once]
 ---
@@ -26,7 +26,7 @@ argument-hint: [PR번호] [--once]
 `$ARGUMENTS`에 `--once`가 없으면 이 명령은 직접 리뷰를 처리하지 않는다. 먼저 아래 bootstrap을 실행해 Ralph Loop를 시작하고, 반복 prompt는 `/review-cycle ... --once`로 설정한다.
 
 ```!
-"${HOME}/.claude/scripts/review-cycle-ralph-loop.sh" $ARGUMENTS
+node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
 ```
 
 - bootstrap이 실행된 호출에서는 리뷰 처리, 코드 수정, commit, push를 직접 수행하지 않는다

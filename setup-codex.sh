@@ -36,7 +36,11 @@ echo "==================================="
 echo ""
 
 echo "0-1. Graft CLI 확인..."
-"$SCRIPT_DIR/scripts/ensure-graft-cli.sh"
+if command -v node > /dev/null 2>&1; then
+    node "$SCRIPT_DIR/scripts/graft.mjs" ensure || true
+else
+    echo "[graft] Node.js가 없어 Graft 설치를 건너뜁니다. Node.js 20 이상을 설치하세요."
+fi
 echo ""
 
 echo "1. 디렉토리 생성..."
@@ -153,8 +157,8 @@ for file in "$SCRIPT_DIR/scripts/lib"/*.mjs; do
         echo -e "${GREEN}   ✓ ~/.codex/scripts/lib/$filename${NC}"
     fi
 done
-# Node 로 대체되어 제거된 구버전 Notion bash 스크립트 정리 (이 저장소가 설치했던 파일만)
-for stale in issue.sh notion-api.sh ult-my-tasks.sh ult-task-note.sh ult-task-status.sh ult-task-link-issue.sh ult-sync-task.sh ult-weekly-collect.sh ult-weekly-publish.sh ult-story-create-exec.sh ult-task-create.sh ult-story-run.sh ult-cache-refresh.sh ; do
+# Node 로 대체되어 제거된 구버전 bash 스크립트 정리 (이 저장소가 설치했던 파일만)
+for stale in issue.sh notion-api.sh ult-my-tasks.sh ult-task-note.sh ult-task-status.sh ult-task-link-issue.sh ult-sync-task.sh ult-weekly-collect.sh ult-weekly-publish.sh ult-story-create-exec.sh ult-task-create.sh ult-story-run.sh ult-cache-refresh.sh graft-refresh.sh ensure-graft-cli.sh ult-wt-add.sh review-cycle-ralph-loop.sh check-validation-status.sh workflow-env.sh ; do
     if [ -f "$SCRIPTS_DEST/$stale" ]; then
         rm "$SCRIPTS_DEST/$stale"
         echo -e "${GREEN}   ✓ 제거: ~/.codex/scripts/$stale${NC}"
