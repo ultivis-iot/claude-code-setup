@@ -52,7 +52,7 @@ export const P = {
 
 // ---------------------------------------------------------------- 경로 / env 파일
 // 설치 루트 결정: WORKFLOW_HOME > APP_HOME > 이 파일이 설치본(~/.claude 또는 ~/.codex 또는 CODEX_HOME)의
-// scripts/lib 아래에 있으면 그 루트 > CODEX_HOME > ~/.claude. workflow-env.sh 와 같은 규칙이라
+// scripts/lib 아래에 있으면 그 루트 > CODEX_HOME > ~/.claude. 예전 bash workflow-env.sh 와 같은 규칙이라
 // Codex 설치본은 ~/.codex/notion-cache·dev-tools/.env 를 그대로 쓴다.
 function installHome() {
   const norm = (p) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));

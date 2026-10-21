@@ -218,7 +218,15 @@ $StaleFiles = @(
     "scripts\ult-story-create-exec.sh",
     "scripts\ult-task-create.sh",
     "scripts\ult-story-run.sh",
-    "scripts\ult-cache-refresh.sh"
+    "scripts\ult-cache-refresh.sh",
+    "scripts\graft-refresh.sh",
+    "scripts\ensure-graft-cli.sh",
+    "scripts\ult-wt-add.sh",
+    "scripts\review-cycle-ralph-loop.sh",
+    "scripts\check-validation-status.sh",
+    "scripts\workflow-env.sh",
+    "hooks\copy-plan-on-accept.sh",
+    "plugins\security-guidance\hooks\security_reminder_hook.py"
 )
 $StaleRemoved = 0
 foreach ($RelPath in $StaleFiles) {
@@ -244,6 +252,38 @@ if (Test-Path $PluginsSource) {
         Copy-Item $_.FullName -Destination $DestPluginPath -Recurse -Force
         Write-Host "   $($_.Name)" -ForegroundColor Green
     }
+}
+
+# Hooks 설치 (Claude Code hook 은 Node 스크립트)
+Write-Host "7-1. Hooks 설치..."
+$HooksSource = Join-Path $ScriptDir "hooks"
+$HooksDest = Join-Path $ClaudeDir "hooks"
+if (Test-Path $HooksSource) {
+    New-Item -ItemType Directory -Force -Path $HooksDest | Out-Null
+    Get-ChildItem -Path (Join-Path $HooksSource "*.mjs") -File | ForEach-Object {
+        Copy-Item $_.FullName -Destination $HooksDest -Force
+        Write-Host "   $($_.Name)" -ForegroundColor Green
+    }
+}
+
+# settings.json: Plan accept hook 추가, 예전 .sh hook 경로는 Node hook 으로 변경
+Write-Host "7-2. settings.json 업데이트..."
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    $SettingsFile = Join-Path $ClaudeDir "settings.json"
+    $SettingsResult = (& node (Join-Path $ScriptDir "scripts\install-settings.mjs") $SettingsFile "node ~/.claude/hooks/copy-plan-on-accept.mjs" 2>&1 | Out-String).Trim()
+    if ($SettingsResult -eq "created") {
+        Write-Host "   settings.json 생성 완료" -ForegroundColor Green
+    } elseif ($SettingsResult -eq "added") {
+        Write-Host "   settings.json에 hooks 추가" -ForegroundColor Green
+    } elseif ($SettingsResult -like "migrated:*") {
+        Write-Host "   settings.json의 예전 copy-plan-on-accept.sh hook을 Node hook으로 변경" -ForegroundColor Green
+    } elseif ($SettingsResult -eq "unchanged") {
+        Write-Host "   hooks 설정이 이미 존재함. 건너뜀" -ForegroundColor Yellow
+    } else {
+        Write-Host "   settings.json을 갱신하지 못했습니다. PostToolUse(ExitPlanMode) hook을 수동으로 설정하세요: node ~/.claude/hooks/copy-plan-on-accept.mjs" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   Node.js가 없어 settings.json 갱신을 건너뜁니다." -ForegroundColor Yellow
 }
 
 # Notion MCP 설정
@@ -344,6 +384,7 @@ Write-Host "  ~/.claude/agents/code-simplifier.md"
 Write-Host "  ~/.claude/skills/*/SKILL.md"
 Write-Host "  ~/.claude/schemas/validation-status.schema.json"
 Write-Host "  ~/.claude/plugins/security-guidance/ (보안 검사 Hook)"
+Write-Host "  ~/.claude/hooks/copy-plan-on-accept.mjs (Plan Accept Hook)"
 Write-Host "  ~/.claude/scripts/*.sh, *.mjs, lib/*.mjs (workflow 실행 스크립트)"
 Write-Host "  ~/.claude/notion-cache/ (Notion token 사용 가능 시 자동 준비)"
 Write-Host "  notion-api MCP (Notion 토큰 입력 시 user scope 등록)"

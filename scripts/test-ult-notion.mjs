@@ -526,7 +526,19 @@ try {
     check("unknown subcommand exit 1", r.code === 1);
     r = await cli(["my-tasks"], { env: { FAKE_GH_LOGIN: "stranger" } });
     check("gh user not in Member DB -> Korean error", r.code === 1 && /Member DB에 Github 계정\(stranger\)이 등록되지 않았습니다/.test(r.err), r.err);
-    // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (workflow-env.sh 와 같은 규칙)
+    // dev-commands.sh 의 wa 가 쓰는 _wt_add: ult-flow.mjs wt-add 의 JSON 에서 worktree 경로만 뽑는다 (bash 가 있을 때만)
+    if (spawnSync("bash", ["-c", "true"]).status === 0) {
+      cpSync(join(REPO_ROOT, "dev-tools"), join(INSTALLED, "dev-tools"), { recursive: true });
+      writeFileSync(join(INSTALLED, "dev-tools", ".env"), `WORKTREE_ROOT="${WT.replace(/\\/g, "/")}"\n`);
+      const sh = (script) => spawnSync("bash", ["-c", `source "$HOME/.claude/dev-tools/dev-commands.sh" >/dev/null 2>&1; ${script}`], { cwd: REPO, env: baseEnv(), encoding: "utf8" });
+      const w1 = sh("_wt_add feat/wa-901");
+      check("dev-commands _wt_add: worktree 경로를 stdout 으로 출력", w1.status === 0 && w1.stdout.trim() === join(WT, "d-901") && existsSync(w1.stdout.trim()), w1.stdout + w1.stderr);
+      const w2 = sh("_wt_add feat/wa-901 -r \"" + REPO + "\"");
+      check("dev-commands _wt_add: 같은 브랜치 재호출은 같은 경로(idempotent)", w2.status === 0 && w2.stdout.trim() === join(WT, "d-901"), w2.stdout + w2.stderr);
+      const w3 = sh("_wt_add feat/wa-902 -r /nonexistent/path");
+      check("dev-commands _wt_add: 오류는 한국어 메시지 + 비정상 종료", w3.status !== 0 && /저장소 경로를 찾을 수 없습니다/.test(w3.stderr), w3.stdout + w3.stderr);
+    }
+    // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (예전 bash workflow-env.sh 와 같은 규칙)
     const codexScripts = join(HOME, ".codex", "scripts");
     mkdirSync(join(codexScripts, "lib"), { recursive: true });
     cpSync(join(INSTALLED, "scripts"), codexScripts, { recursive: true });

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -148,15 +148,20 @@ try {
   ok(run(process.execPath, [gate, 'snapshot', '--repo', linked, '--base', 'main', '--out', 'tmp/snapshot.json'], linked));
   ok(run(process.execPath, [gate, 'record', '--repo', linked, '--snapshot', 'tmp/snapshot.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json'], linked));
   ok(run('git', ['push', 'origin', 'linked'], linked));
+  // post-merge 는 sh 래퍼가 Node 의 graft.mjs 를 호출한다(Graft CLI 가 없어도 종료 코드 0). 예전 bash 갱신 스크립트는 정리된다.
+  const customHooks = path.join(temporary, 'custom-hooks');
+  assert.ok(existsSync(path.join(customHooks, 'workflow/scripts/graft.mjs')));
+  assert.ok(!existsSync(path.join(customHooks, 'workflow/scripts/graft-refresh.sh')));
+  ok(spawnSync('sh', [path.join(customHooks, 'post-merge')], { cwd: linked, encoding: 'utf8', env: { ...process.env, GRAFT_PACKAGE: '@nanonets/graft@0.0.0' } }));
   const plan = fixture();
-  const planHook = path.join(root, 'hooks/copy-plan-on-accept.sh');
+  const planHook = path.join(root, 'hooks/copy-plan-on-accept.mjs');
   const hookInput = JSON.stringify({ tool_name: 'ExitPlanMode', cwd: plan.repo, session_id: 'fixture-session' });
   const planEnv = { ...process.env, WORKFLOW_APPROVED_PLAN: '' };
-  ok(spawnSync('bash', [planHook], { cwd: plan.repo, encoding: 'utf8', input: hookInput, env: planEnv }));
+  ok(spawnSync(process.execPath, [planHook], { cwd: plan.repo, encoding: 'utf8', input: hookInput, env: planEnv }));
   assert.equal(readFileSync(path.join(plan.repo, 'tmp/current-plan.md'), 'utf8'), '# Approved fixture plan\n');
   const approved = path.join(temporary, 'explicit-plan.md');
   writeFileSync(approved, '# Explicit approved plan\n');
-  ok(spawnSync('bash', [planHook], { cwd: plan.repo, encoding: 'utf8', input: hookInput, env: { ...planEnv, WORKFLOW_APPROVED_PLAN: approved } }));
+  ok(spawnSync(process.execPath, [planHook], { cwd: plan.repo, encoding: 'utf8', input: hookInput, env: { ...planEnv, WORKFLOW_APPROVED_PLAN: approved } }));
   assert.equal(readFileSync(path.join(plan.repo, 'tmp/current-plan.md'), 'utf8'), '# Explicit approved plan\n');
   console.log(`OK: validation gate, stale-state rejection and real push hooks (${count} isolated repositories)`);
 } finally {

@@ -164,7 +164,7 @@ cmds["wt-add"] = ({ opt }) => {
   // --repo-slug 를 줬는데 로컬에서 못 찾았으면 현재 저장소로 대체하지 않는다(다른 저장소에 worktree 가 생기는 것을 막음)
   if (!repoPath && !opt["repo-slug"]) { const t = git(["rev-parse", "--show-toplevel"]); if (t.ok) repoPath = t.out; }
   if (!repoPath) fail("저장소 로컬 체크아웃을 찾지 못했습니다", { repo_slug: opt["repo-slug"] || "" });
-  repoPath = realpathSync(repoPath);
+  try { repoPath = realpathSync(repoPath); } catch { fail("저장소 경로를 찾을 수 없습니다", { path: repoPath }); }
 
   const main = git(["worktree", "list", "--porcelain"], repoPath).out.split(/\r?\n/).find((l) => l.startsWith("worktree "))?.slice(9) || repoPath;
   const abbr = basename(main).split("-").map((s) => (s[0] || "").toLowerCase()).join("");

@@ -25,7 +25,7 @@ argument-hint: [story-or-task-context]
    - `/ult-my-tasks` 절차(`ult-notion.mjs my-tasks`)로 본인 Task 목록을 보여주고 선택을 진행한다.
 
 2. 기존 Task/Issue(번호·URL·제목)가 지목되었거나 그 구현을 시작하는 상황이면:
-   - **새 Task/Issue/Story를 만들지 않는다.** 해당 Issue 기준 브랜치를 만들고(`scripts/ult-wt-add.sh`, 브랜치명은 이슈 번호 기반) 그 브랜치/worktree에서 바로 구현한다.
+   - **새 Task/Issue/Story를 만들지 않는다.** 해당 Issue 기준 브랜치를 만들고(`node ~/.claude/scripts/ult-flow.mjs wt-add --branch <b>`, 브랜치명은 `branch-name` 으로 이슈 번호 기반) 그 브랜치/worktree에서 바로 구현한다.
    - wayfinder 티켓처럼 확정 스펙이 이슈 코멘트에 있으면 그 스펙이 곧 Plan이다 — 재발행 없이 코멘트를 읽고 구현하며, PR은 이 이슈를 참조하고 머지 시 이슈를 닫는다.
 
 3. Task 목록을 아직 쓸 수 없고, 선후 관계가 있는 미결 결정이 여러 개이며, 한 세션에 결론까지 갈 수 없는 작업이면:

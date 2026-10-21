@@ -200,15 +200,44 @@ wt() {
     echo ""
 }
 
+# _wt_add: ult-flow.mjs wt-add 호출 (jq 없이 node 로 JSON 의 worktree 경로만 뽑아 stdout 으로 낸다)
+#   _wt_add <branch> [-r|--repo <repo_path>] [--base <base_branch>]
+_wt_add() {
+    local branch="" repo="" base="" args=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -r|--repo) repo="$2"; shift 2 ;;
+            --base)    base="$2"; shift 2 ;;
+            --quiet)   shift ;;
+            -*) echo "알 수 없는 옵션: $1" >&2; return 1 ;;
+            *)  branch="$1"; shift ;;
+        esac
+    done
+    [ -z "$branch" ] && { echo "Usage: wa <branch> [-r <repo>] [--base <branch>]" >&2; return 1; }
+    args=(wt-add --branch "$branch")
+    [ -n "$repo" ] && args+=(--repo-path "$repo")
+    [ -n "$base" ] && args+=(--base "$base")
+    node "$WORKFLOW_SCRIPTS_DIR/ult-flow.mjs" "${args[@]}" | node -e '
+let s = "";
+process.stdin.on("data", (d) => (s += d)).on("end", () => {
+  try {
+    const j = JSON.parse(s);
+    if (j.worktree) { console.log(j.worktree); return; }
+    console.error("ERROR: " + (j.error || "worktree 생성 실패") + (j.detail ? "\n" + j.detail : ""));
+  } catch { console.error("ERROR: ult-flow.mjs wt-add 출력을 해석하지 못했습니다"); }
+  process.exit(1);
+});'
+}
+
 # wa: Worktree 추가
 #   wa              — 대화형 (원격 브랜치 중 선택)
 #   wa <branch>     — 지정 브랜치로 바로 생성 (비대화형)
 #   wa -r <repo> <branch>  — 다른 repo 지정
 wa() {
-    # 인자 있으면 비대화형 — ult-wt-add.sh로 위임
+    # 인자 있으면 비대화형 — ult-flow.mjs wt-add 로 위임
     if [ $# -gt 0 ]; then
         local wt_path
-        wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$@") || return 1
+        wt_path=$(_wt_add "$@") || return 1
         echo "✅ $wt_path"
         cd "$wt_path" 2>/dev/null
         return 0
@@ -260,7 +289,7 @@ wa() {
     [ -z "$branch" ] && { echo "취소"; return 1; }
 
     local wt_path
-    wt_path=$("$WORKFLOW_SCRIPTS_DIR/ult-wt-add.sh" "$branch") || return 1
+    wt_path=$(_wt_add "$branch") || return 1
     echo ""
     echo "✅ $wt_path"
     cd "$wt_path"

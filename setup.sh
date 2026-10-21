@@ -78,7 +78,11 @@ fi
 echo ""
 
 echo "0-1. Graft CLI 확인..."
-"$SCRIPT_DIR/scripts/ensure-graft-cli.sh"
+if command -v node > /dev/null 2>&1; then
+    node "$SCRIPT_DIR/scripts/graft.mjs" ensure || true
+else
+    echo "[graft] Node.js가 없어 Graft 설치를 건너뜁니다. Node.js 20 이상을 설치하세요."
+fi
 echo ""
 
 # 디렉토리 생성
@@ -177,6 +181,14 @@ STALE_FILES=(
     "scripts/ult-task-create.sh"
     "scripts/ult-story-run.sh"
     "scripts/ult-cache-refresh.sh"
+    "scripts/graft-refresh.sh"
+    "scripts/ensure-graft-cli.sh"
+    "scripts/ult-wt-add.sh"
+    "scripts/review-cycle-ralph-loop.sh"
+    "scripts/check-validation-status.sh"
+    "scripts/workflow-env.sh"
+    "hooks/copy-plan-on-accept.sh"
+    "plugins/security-guidance/hooks/security_reminder_hook.py"
 )
 STALE_REMOVED=0
 for rel_path in "${STALE_FILES[@]}"; do
@@ -233,8 +245,8 @@ if [ -d "$SCRIPT_DIR/plugins" ]; then
         if [ -d "$plugin_dir" ]; then
             plugin_name=$(basename "$plugin_dir")
             cp -r "$plugin_dir" "$CLAUDE_DIR/plugins/"
-            # Python 스크립트에 실행 권한 부여
-            find "$CLAUDE_DIR/plugins/$plugin_name" -name "*.py" -exec chmod +x {} \;
+            # Node 스크립트에 실행 권한 부여
+            find "$CLAUDE_DIR/plugins/$plugin_name" -name "*.mjs" -exec chmod +x {} \;
             echo -e "${GREEN}   ✓ $plugin_name${NC}"
         fi
     done
@@ -244,81 +256,32 @@ fi
 echo "7. Hooks 설치..."
 if [ -d "$SCRIPT_DIR/hooks" ]; then
     mkdir -p "$CLAUDE_DIR/hooks"
-    for file in "$SCRIPT_DIR/hooks"/*.sh; do
+    # Claude Code hook(.mjs). git hook(pre-commit 등)과 install-hooks.sh 는 저장소별로 hooks/install-hooks.sh 가 설치한다
+    for file in "$SCRIPT_DIR/hooks"/*.mjs; do
         if [ -f "$file" ]; then
             filename=$(basename "$file")
-            # install-hooks.sh는 git hook용이므로 제외
-            if [ "$filename" != "install-hooks.sh" ]; then
-                cp "$file" "$CLAUDE_DIR/hooks/$filename"
-                chmod +x "$CLAUDE_DIR/hooks/$filename"
-                echo -e "${GREEN}   ✓ $filename${NC}"
-            fi
+            cp "$file" "$CLAUDE_DIR/hooks/$filename"
+            chmod +x "$CLAUDE_DIR/hooks/$filename"
+            echo -e "${GREEN}   ✓ $filename${NC}"
         fi
     done
 fi
 
-# settings.json에 hooks 설정 추가
+# settings.json에 hooks 설정 추가 (예전 .sh hook 경로는 Node hook 으로 옮긴다)
 echo "8. settings.json 업데이트..."
 SETTINGS_FILE="$CLAUDE_DIR/settings.json"
-if [ -f "$SETTINGS_FILE" ]; then
-    # hooks 설정이 있는지 확인
-    if grep -q '"hooks"' "$SETTINGS_FILE" 2>/dev/null; then
-        echo -e "${YELLOW}   hooks 설정이 이미 존재함. 건너뜀${NC}"
-    else
-        # jq가 있으면 사용, 없으면 수동 처리
-        if command -v jq &> /dev/null; then
-            jq '. + {"hooks": {"PostToolUse": [{"matcher": "ExitPlanMode", "hooks": [{"type": "command", "command": "~/.claude/hooks/copy-plan-on-accept.sh", "timeout": 10}]}]}}' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp" && mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
-            echo -e "${GREEN}   ✓ settings.json에 hooks 추가 (jq 사용)${NC}"
-        else
-            # jq 없이 수동 처리 - 전체 파일 재작성
-            cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
-{
-  "enabledPlugins": {
-    "security-guidance@claude-plugins-official": true
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/copy-plan-on-accept.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
-}
-SETTINGS_EOF
-            echo -e "${GREEN}   ✓ settings.json 재생성 완료${NC}"
-        fi
-    fi
+if command -v node &> /dev/null; then
+    SETTINGS_RESULT=$(node "$SCRIPT_DIR/scripts/install-settings.mjs" "$SETTINGS_FILE" "node ~/.claude/hooks/copy-plan-on-accept.mjs" 2>&1) || SETTINGS_RESULT="error"
+    case "$SETTINGS_RESULT" in
+        created)           echo -e "${GREEN}   ✓ settings.json 생성 완료${NC}" ;;
+        added)             echo -e "${GREEN}   ✓ settings.json에 hooks 추가${NC}" ;;
+        migrated:*)        echo -e "${GREEN}   ✓ settings.json의 예전 copy-plan-on-accept.sh hook ${SETTINGS_RESULT#migrated:}개를 Node hook 으로 변경${NC}" ;;
+        unchanged)         echo -e "${YELLOW}   hooks 설정이 이미 존재함. 건너뜀${NC}" ;;
+        *)                 echo -e "${YELLOW}   ⚠ settings.json을 갱신하지 못했습니다. hook 을 수동으로 설정하세요:${NC}"
+                           echo "     PostToolUse(ExitPlanMode) → node ~/.claude/hooks/copy-plan-on-accept.mjs" ;;
+    esac
 else
-    # settings.json이 없으면 새로 생성
-    cat > "$SETTINGS_FILE" << 'SETTINGS_EOF'
-{
-  "enabledPlugins": {
-    "security-guidance@claude-plugins-official": true
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/copy-plan-on-accept.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
-}
-SETTINGS_EOF
-    echo -e "${GREEN}   ✓ settings.json 생성 완료${NC}"
+    echo -e "${YELLOW}   Node.js가 없어 settings.json 갱신을 건너뜁니다. (Node.js 20 이상 설치 후 다시 실행)${NC}"
 fi
 
 # Dev-tools 설치
@@ -458,7 +421,7 @@ echo "  ~/.claude/skills/*/SKILL.md"
 echo "  ~/.claude/agents/cli-validator.md (CLI 동기화 검증 Agent)"
 echo "  ~/.claude/schemas/validation-status.schema.json"
 echo "  ~/.claude/plugins/security-guidance/ (보안 검사 Plugin)"
-echo "  ~/.claude/hooks/copy-plan-on-accept.sh (Plan Accept Hook)"
+echo "  ~/.claude/hooks/copy-plan-on-accept.mjs (Plan Accept Hook)"
 echo "  ~/.claude/settings.json (hooks 설정 포함)"
 echo "  ~/.claude/scripts/*.sh, *.mjs, lib/*.mjs (workflow 실행 스크립트)"
 echo "  ~/.claude/dev-tools/dev-commands.sh (개발 환경 셸 명령어)"
