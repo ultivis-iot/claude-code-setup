@@ -171,7 +171,8 @@ git pull
 ├── hooks/
 │   └── copy-plan-on-accept.mjs # 명시적으로 연결된 승인 Plan만 복사 (Node)
 ├── plugins/
-│   └── security-guidance/      # 실시간 보안 검사 Plugin
+│   ├── security-guidance/      # 실시간 보안 검사 Plugin
+│   └── ultivis-delegate/       # 사내 모델(Pi) 위임 Plugin — 설정은 plugins/ultivis-delegate/README.md
 ├── scripts/
 │   ├── ult-notion.mjs          # Notion 명령 (Task/Story/주간 리뷰/cache 갱신, Node 20+)
 │   ├── ult-flow.mjs            # gh/git/worktree/handoff 보조 (ult-notion.mjs 가 호출, `wt-add` 가 worktree 생성)

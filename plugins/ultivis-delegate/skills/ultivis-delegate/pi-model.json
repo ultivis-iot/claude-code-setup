@@ -1,0 +1,40 @@
+{
+  "id": "ultivis-vl",
+  "name": "Ultivis VL (사내)",
+  "reasoning": true,
+  "thinkingLevelMap": {
+    "minimal": null,
+    "low": "low",
+    "medium": "medium",
+    "high": null,
+    "xhigh": "xhigh",
+    "max": null
+  },
+  "input": ["text", "image"],
+  "contextWindow": 262144,
+  "maxTokens": 65536,
+  "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+  "samplingParams": {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "top_k": 20,
+    "presence_penalty": 0.0,
+    "repetition_penalty": 1.0,
+    "chat_template_kwargs": { "enable_thinking": true, "preserve_thinking": true }
+  },
+  "samplingParamsByThinkingLevel": {
+    "off": {
+      "temperature": 0.7,
+      "top_p": 0.8,
+      "presence_penalty": 1.5,
+      "chat_template_kwargs": { "enable_thinking": false, "preserve_thinking": true }
+    }
+  },
+  "compat": {
+    "supportsStore": false,
+    "supportsDeveloperRole": false,
+    "supportsReasoningEffort": true,
+    "maxTokensField": "max_tokens",
+    "thinkingFormat": "openai"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "description": "리뷰·탐색처럼 보이는 요청에 ultivis-delegate 위임 안내를 붙인다",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/nudge.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

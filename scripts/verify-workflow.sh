@@ -39,6 +39,9 @@ if [ "$MODE" = "repo" ]; then
     node --check "$WORKFLOW_ROOT/hooks/copy-plan-on-accept.mjs"
     check_file "$WORKFLOW_ROOT/plugins/security-guidance/hooks/security-reminder.mjs"
     node --check "$WORKFLOW_ROOT/plugins/security-guidance/hooks/security-reminder.mjs"
+    check_file "$WORKFLOW_ROOT/plugins/ultivis-delegate/skills/ultivis-delegate/scripts/delegate.mjs"
+    node --check "$WORKFLOW_ROOT/plugins/ultivis-delegate/skills/ultivis-delegate/scripts/delegate.mjs"
+    node --check "$WORKFLOW_ROOT/plugins/ultivis-delegate/hooks/nudge.mjs"
     for command_file in "$WORKFLOW_ROOT"/commands/*.md; do
         command_name="$(basename "$command_file")"
         plugin_command="$WORKFLOW_ROOT/codex/plugins/dev-workflow/commands/$command_name"
@@ -94,6 +97,8 @@ if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/validation-gate.mjs" check "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
     node "$WORKFLOW_ROOT/scripts/test-validation-gate.mjs"
     node "$WORKFLOW_ROOT/scripts/test-install-settings.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-ultivis-delegate.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-ultivis-delegate-nudge.mjs"
     node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"
