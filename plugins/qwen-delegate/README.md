@@ -40,7 +40,7 @@ node "$PLUGIN/skills/qwen-delegate/scripts/delegate.mjs" check --ping
 
 ## effort 고르기
 
-`low`(instant)는 받지 않습니다. 기준과 실측은 [SKILL.md](skills/qwen-delegate/SKILL.md) 의 난이도 표에 있습니다. 요약하면 결함을 찾는 리뷰와 파일을 건너는 추적은 `xhigh`, 명세가 분명한 작은 구현과 탐색은 `medium` 입니다.
+`low`(instant)는 받지 않습니다. 기준과 실측은 [qwen-worker.md](agents/qwen-worker.md) 의 난이도 표에 있습니다. 요약하면 결함을 찾는 리뷰와 파일을 건너는 추적은 `xhigh`, 구현과 탐색은 `medium` 입니다. 같은 1 파일 구현을 비교하면 `medium` 9분·+92줄, `xhigh` 41분·+486줄로 둘 다 숨은 회귀 시험을 통과했습니다.
 
 ## 운영 서버와 같은 자원을 씁니다
 
