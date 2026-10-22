@@ -13,7 +13,17 @@ description: Hand a bounded code review or repository exploration to the interna
 
 - **파일을 열거나 검색하지 않는다.** 브리프는 이 대화에 이미 있는 정보와 사용자 요청으로만 쓴다. 대상 경로를 모르면 사용자가 말한 이름 그대로 적는다 — 위치는 서브에이전트가 찾는다.
 - **돌아온 지적을 다시 추적하지 않는다.** 서브에이전트가 확인함·틀림·미확인으로 나눠 온다. 그대로 전한다. 사용자가 특정 지적을 더 보자고 할 때만 그 자리를 연다.
-- `delegate.mjs` 를 직접 돌리지 않는다.
+- 위임 작업으로 `delegate.mjs` 를 직접 돌리지 않는다(설정만 예외 — 0절).
+
+## 0. 설정 요청이면
+
+사용자가 설정·설치를 요청하면(예: `/qwen-delegate 설정해줘`) 위임하지 않고 이 대화에서 실행한다:
+
+```bash
+node ${CLAUDE_SKILL_DIR}/scripts/delegate.mjs setup
+```
+
+Node 22.19 이상을 확인하고, Pi 를 검증한 고정 버전으로 설치하고, `~/.pi/agent/models.json` 에 사내 모델을 병합한 뒤 연결을 점검한다. `ULTIVIS_ENDPOINT`·`ULTIVIS_API_KEY` 가 없다고 나오면 사용자에게 셸 프로필에 넣고 Claude Code 를 다시 시작하라고 안내한다(사내 OpenCode 배포와 같은 값). 출력의 `problems` 를 그대로 전한다.
 
 ## 1. 맡길지 정한다
 
@@ -21,7 +31,7 @@ description: Hand a bounded code review or repository exploration to the interna
 
 | 종류 | 상한 | 실측 (Claude 로 간 토큰, 직접 → 위임) |
 |---|---|---|
-| 리뷰 | 대상과 시나리오를 정해 줄 수 있으면 함수 1개부터 5~6 파일과 관련 SQL 추적까지 | 81만 → 39만, 98만 → 36만 |
+| 리뷰 | 대상과 시나리오를 정해 줄 수 있으면 함수 1개부터 5~6 파일과 관련 SQL 추적까지 | 81만 → 30만, 98만 → 24만, 66만 → 26만 (Opus 는 각 9만) |
 | 탐색 | "X 가 어디서 쓰이나", 모듈 구조 요약 | — |
 
 직접 하는 일:

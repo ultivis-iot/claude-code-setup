@@ -5,10 +5,10 @@
 //   node delegate.mjs wait  --run-dir <dir> [--max-wait 540]   start 의 결과를 기다림(아직이면 running)
 //   node delegate.mjs run   (start 와 같은 인자, 끝날 때까지 붙잡고 기다림)
 //   node delegate.mjs check [--ping]     실행 준비 상태(pi·models.json·엔드포인트) 점검
-//   node delegate.mjs setup              ~/.pi/agent/models.json 에 사내 provider 를 병합
+//   node delegate.mjs setup [--endpoint <url>]   Node 확인, Pi 고정 버전 설치, models.json 병합, 연결 점검
 //
 // effort 는 호출자가 난이도로 고른다. low(instant)는 품질이 떨어져 받지 않는다.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, copyFileSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -40,7 +40,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (!a.startsWith("--")) { out._.push(a); continue; }
     const key = a.slice(2);
-    if (["ping", "help"].includes(key)) { out[key] = true; continue; }
+    if (["ping", "help", "skip-pi-install", "skip-ping"].includes(key)) { out[key] = true; continue; }
     if (i + 1 >= argv.length) fail(`--${key} 에 값이 필요합니다`);
     out[key] = argv[++i];
   }
@@ -329,9 +329,46 @@ export function mergeProvider(doc, endpoint) {
   return next;
 }
 
-function setup() {
-  const endpoint = process.env.ULTIVIS_ENDPOINT;
-  if (!endpoint) fail("ULTIVIS_ENDPOINT 환경변수가 필요합니다 (예: http://<사내 vLLM 주소>:8000/v1)");
+// Pi 가 요구하는 Node 하한과, 이 실행기의 이벤트 해석을 검증한 Pi 버전.
+const MIN_NODE = [22, 19, 0];
+export const PI_PACKAGE = "@earendil-works/pi-coding-agent";
+export const PI_VERSION = "1.4.0";
+
+function piVersion() {
+  const pi = which("pi");
+  if (!pi) return null;
+  const r = spawnSync(pi, ["--version"], { encoding: "utf8", timeout: 30000 });
+  return r.status === 0 ? r.stdout.trim() : "unknown";
+}
+
+// Pi 가 없거나 다른 버전이면 고정 버전을 npm 으로 전역 설치한다. 실패하면 설정 파일을 건드리기 전에 멈춘다.
+function ensurePi(want) {
+  const have = piVersion();
+  if (have && (want === "latest" ? true : have === want)) {
+    process.stderr.write(`Pi ${have} 확인\n`);
+    return;
+  }
+  const npm = which("npm");
+  if (!npm) fail("npm 이 PATH 에 없습니다. Node.js 22.19 이상을 설치하세요");
+  const spec = `${PI_PACKAGE}@${want}`;
+  process.stderr.write(`Pi ${have ? `${have} → ` : ""}${want} 설치: npm install -g --ignore-scripts ${spec}\n`);
+  const r = spawnSync(npm, ["install", "-g", "--ignore-scripts", spec], { encoding: "utf8", timeout: 600000 });
+  if (r.status !== 0) {
+    fail(`Pi 설치 실패 (npm 종료 코드 ${r.status}):\n${(r.stderr || "").slice(-1500)}\n` +
+      "전역 설치 권한이 없으면 `npm config set prefix ~/.local` 후 ~/.local/bin 을 PATH 에 넣고 다시 실행하세요");
+  }
+  const now = piVersion();
+  if (!now) fail("Pi 를 설치했지만 PATH 에서 찾을 수 없습니다. `npm config get prefix` 의 bin 을 PATH 에 넣으세요");
+  process.stderr.write(`Pi ${now} 설치됨\n`);
+}
+
+async function setup(opts) {
+  const node = process.versions.node.split(".").map(Number);
+  const nodeOk = node[0] !== MIN_NODE[0] ? node[0] > MIN_NODE[0] : node[1] !== MIN_NODE[1] ? node[1] > MIN_NODE[1] : node[2] >= MIN_NODE[2];
+  if (!nodeOk) fail(`Node.js ${MIN_NODE.join(".")} 이상이 필요합니다 (현재 ${process.versions.node})`);
+  const endpoint = opts.endpoint || process.env.ULTIVIS_ENDPOINT;
+  if (!endpoint) fail("ULTIVIS_ENDPOINT 환경변수 또는 --endpoint 가 필요합니다 (예: http://<사내 vLLM 주소>:8000/v1)");
+  if (!opts["skip-pi-install"]) ensurePi(opts["pi-version"] || PI_VERSION);
   const path = piModelsPath();
   let doc = {};
   if (existsSync(path)) {
@@ -342,10 +379,14 @@ function setup() {
   } else {
     mkdirSync(join(path, ".."), { recursive: true, mode: 0o700 });
   }
-  writeFileSync(path, JSON.stringify(mergeProvider(doc, endpoint), null, 2) + "\n");
+  const merged = mergeProvider(doc, endpoint);
+  writeFileSync(path, JSON.stringify(merged, null, 2) + "\n");
   chmodSync(path, 0o600);
-  process.stdout.write(`${path} 에 ${MODEL} 를 설정했습니다. 키는 ULTIVIS_API_KEY 환경변수에서 읽습니다.\n`);
-  return 0;
+  const keySource = /^\$\{?ULTIVIS_API_KEY\}?$/.test(merged.providers[PROVIDER].apiKey)
+    ? "ULTIVIS_API_KEY 환경변수에서 읽습니다" : "기존 파일에 있던 값을 그대로 둡니다";
+  process.stdout.write(`${path} 에 ${MODEL} 를 설정했습니다. 키는 ${keySource}.\n`);
+  // 마지막에 실제 상태를 점검해 무엇이 남았는지(키·연결) 바로 보여 준다.
+  return check({ ping: !opts["skip-ping"] });
 }
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);

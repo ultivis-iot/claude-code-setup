@@ -16,27 +16,22 @@
 
 조직 관리자가 claude.ai Organization library 에 이 폴더를 플러그인으로 올리면, 각자 Claude Code 의 `/plugin` 화면에서 `qwen-delegate` 를 골라 설치합니다. 아래 설정이 없는 사람에게는 동작하지 않으므로 자동 설치가 아닌 선택 설치로 둡니다.
 
-## 각자 해야 하는 설정 (플러그인이 대신하지 않음)
+## 각자 해야 하는 설정
 
-Linux/macOS 전용입니다. 사내망 또는 VPN 이 필요합니다.
+Linux/macOS, 사내망 또는 VPN, Node.js 22.19 이상이 필요합니다. 나머지는 `setup` 이 합니다.
 
-```bash
-# 1) Pi 설치 (Node.js 22.19 이상)
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+1. 셸 프로필(`~/.bashrc`·`~/.zshrc`)에 사내 엔드포인트와 키를 넣고 Claude Code 를 다시 시작합니다. 사내 OpenCode 배포(`setup-opencode.sh`)와 같은 값입니다.
+   ```bash
+   export ULTIVIS_ENDPOINT=http://<사내 vLLM 주소>:8000/v1
+   export ULTIVIS_API_KEY=<발급받은 키>
+   ```
+2. Claude Code 에서 `/qwen-delegate 설정해줘` 라고 하면 Claude 가 `delegate.mjs setup` 을 실행합니다. 직접 돌릴 때는 `node <플러그인 경로>/skills/qwen-delegate/scripts/delegate.mjs setup`.
+   - Node 버전 확인
+   - Pi(`@earendil-works/pi-coding-agent`)를 검증한 고정 버전 1.4.0 으로 설치(`npm install -g --ignore-scripts`). 이미 같은 버전이면 건너뜁니다. 다른 버전은 `--pi-version` 으로 지정
+   - `~/.pi/agent/models.json` 을 백업한 뒤 사내 모델만 병합(다른 provider 유지, 키는 파일에 쓰지 않고 `${ULTIVIS_API_KEY}` 참조, 응답 한도 65536)
+   - 엔드포인트 연결 점검 — `ready: true` 가 나오면 끝
 
-# 2) 사내 엔드포인트와 키 — OpenCode 배포(setup-opencode.sh)와 같은 변수
-export ULTIVIS_ENDPOINT=http://<사내 vLLM 주소>:8000/v1
-export ULTIVIS_API_KEY=<발급받은 키>     # 셸 프로필에 넣어 둡니다
-
-# 3) ~/.pi/agent/models.json 에 사내 모델 병합 (기존 파일은 백업, 다른 provider 는 유지)
-PLUGIN=<플러그인 설치 경로>              # /plugin 화면 또는 ~/.claude/plugins 아래
-node "$PLUGIN/skills/qwen-delegate/scripts/delegate.mjs" setup
-
-# 4) 점검 — ready: true 가 나오면 끝
-node "$PLUGIN/skills/qwen-delegate/scripts/delegate.mjs" check --ping
-```
-
-`setup` 은 키를 파일에 쓰지 않고 `${ULTIVIS_API_KEY}` 참조만 남깁니다. 응답 한도(`maxTokens`)는 65536 으로 둡니다 — 32768 이면 `xhigh` 구현에서 생각 도중 잘립니다.
+전역 npm 설치 권한이 없다고 나오면 `npm config set prefix ~/.local` 후 `~/.local/bin` 을 PATH 에 넣고 다시 실행합니다. 응답 한도 65536 은 `xhigh` 에 필요합니다 — 32768 이면 생각 도중 잘립니다.
 
 ## 무엇을 맡기나 — Claude 토큰 실측
 

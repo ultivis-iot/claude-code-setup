@@ -19,6 +19,7 @@ mkdirSync(bin); mkdirSync(work); mkdirSync(piDir);
 // 시나리오별로 Pi 의 JSON 이벤트를 흉내 낸다. 받은 인자는 argv.json 에 남긴다.
 writeFileSync(path.join(bin, 'pi'), `#!${process.execPath}
 const fs = require('node:fs');
+if (process.argv[2] === '--version') { process.stdout.write((process.env.FAKE_PI_VERSION || '1.4.0') + '\\n'); process.exit(0); }
 fs.writeFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)));
 const s = process.env.FAKE_PI;
 const say = (o) => process.stdout.write(JSON.stringify(o) + '\\n');
@@ -151,9 +152,10 @@ try {
     other: { baseUrl: 'http://o', models: [{ id: 'm' }] },
     ultivis: { baseUrl: 'http://old', apiKey: 'KEEP', models: [{ id: 'small' }, { id: 'ultivis-vl', maxTokens: 32768 }] },
   } }));
-  assert.equal(call(['setup'], { ULTIVIS_ENDPOINT: '' }).status, 2);
-  r = call(['setup'], { ULTIVIS_ENDPOINT: 'http://new/v1' });
-  assert.equal(r.status, 0, r.stderr);
+  assert.equal(call(['setup', '--skip-ping'], { ULTIVIS_ENDPOINT: '' }).status, 2);
+  r = call(['setup', '--skip-ping'], { ULTIVIS_ENDPOINT: 'http://new/v1', ULTIVIS_API_KEY: 'k' });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stderr, /Pi 1\.4\.0 확인/);
   let doc = JSON.parse(readFileSync(models, 'utf8'));
   assert.deepEqual(doc.providers.other, { baseUrl: 'http://o', models: [{ id: 'm' }] });
   assert.equal(doc.providers.ultivis.baseUrl, 'http://new/v1'); assert.equal(doc.providers.ultivis.apiKey, 'KEEP');
@@ -162,18 +164,49 @@ try {
   assert.equal(statSync(models).mode & 0o777, 0o600);
   assert.ok(readdirSync(piDir).some((f) => f.startsWith('models.json.bak.')));
   const once = readFileSync(models, 'utf8');
-  call(['setup'], { ULTIVIS_ENDPOINT: 'http://new/v1' });
+  call(['setup', '--skip-ping'], { ULTIVIS_ENDPOINT: 'http://new/v1', ULTIVIS_API_KEY: 'k' });
   assert.equal(readFileSync(models, 'utf8'), once);
   rmSync(models);
-  call(['setup'], { ULTIVIS_ENDPOINT: 'http://new/v1' });
+  call(['setup', '--skip-ping'], { ULTIVIS_ENDPOINT: 'http://new/v1', ULTIVIS_API_KEY: 'k' });
   doc = JSON.parse(readFileSync(models, 'utf8'));
   assert.equal(doc.providers.ultivis.apiKey, '${ULTIVIS_API_KEY}');
   ok();
 
   // 10. 깨진 models.json 은 건드리지 않는다
   writeFileSync(models, '{ broken');
-  r = call(['setup'], { ULTIVIS_ENDPOINT: 'http://new/v1' });
+  r = call(['setup', '--skip-ping'], { ULTIVIS_ENDPOINT: 'http://new/v1', ULTIVIS_API_KEY: 'k' });
   assert.equal(r.status, 2); assert.equal(readFileSync(models, 'utf8'), '{ broken');
+  ok();
+
+  // 11. setup 이 Pi 를 고정 버전으로 설치한다 — 없으면 설치, 다른 버전이면 맞춤, npm 실패면 설정을 건드리지 않고 멈춤
+  const npmBin = path.join(dir, 'npmbin');
+  const npmLog = path.join(dir, 'npm.json');
+  mkdirSync(npmBin);
+  writeFileSync(path.join(npmBin, 'npm'), `#!${process.execPath}
+const fs = require('node:fs'); const p = require('node:path');
+fs.writeFileSync(${JSON.stringify(npmLog)}, JSON.stringify(process.argv.slice(2)));
+if (process.env.FAKE_NPM_FAIL) { process.stderr.write('EACCES: permission denied'); process.exit(1); }
+const v = process.argv.at(-1).split('@').at(-1);
+const pi = p.join(${JSON.stringify(npmBin)}, 'pi');
+fs.writeFileSync(pi, '#!/bin/sh\\necho ' + v + '\\n'); fs.chmodSync(pi, 0o755);
+`);
+  chmodSync(path.join(npmBin, 'npm'), 0o755);
+  const noPi = { PATH: npmBin, ULTIVIS_ENDPOINT: 'http://new/v1', ULTIVIS_API_KEY: 'k' };
+  writeFileSync(models, '{}');
+  r = call(['setup', '--skip-ping'], { ...noPi, FAKE_NPM_FAIL: '1' });
+  assert.equal(r.status, 2); assert.match(r.stderr, /Pi 설치 실패[\s\S]*EACCES/); assert.equal(readFileSync(models, 'utf8'), '{}');
+  r = call(['setup', '--skip-ping'], noPi);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(npmLog, 'utf8')), ['install', '-g', '--ignore-scripts', '@earendil-works/pi-coding-agent@1.4.0']);
+  assert.match(r.stderr, /Pi 1\.4\.0 설치됨/);
+  rmSync(npmLog);
+  r = call(['setup', '--skip-ping'], noPi);
+  assert.equal(r.status, 0); assert.ok(!existsSync(npmLog), '같은 버전이면 다시 설치하지 않는다');
+  r = call(['setup', '--skip-ping', '--pi-version', '1.5.0'], noPi);
+  assert.equal(r.status, 0); assert.match(JSON.parse(readFileSync(npmLog, 'utf8')).at(-1), /@1\.5\.0$/);
+  // 마지막 점검이 남은 문제(키 없음)를 알리면 setup 도 실패로 끝난다
+  r = call(['setup', '--skip-ping', '--skip-pi-install'], { ...noPi, ULTIVIS_API_KEY: '' });
+  assert.equal(r.status, 1); assert.match(r.stdout, /ULTIVIS_API_KEY/);
   ok();
 
   console.log(`OK: qwen-delegate ${count} groups passed`);
