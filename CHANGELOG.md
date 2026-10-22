@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `plugins/qwen-delegate` 플러그인 추가: 범위를 정한 리뷰·탐색·구현을 사내 vLLM 의 Qwen(`ultivis/ultivis-vl`)에 Pi 하네스로 맡겨 Claude 토큰을 아낀다. 스킬 `qwen-delegate`(메인 대화에서 맡길지 판단하고 브리프만 작성), 에이전트 `qwen-worker`(Sonnet — 난이도별 effort 선택, Qwen 실행, 지적·diff 검증 후 요약 반환. Qwen 보고서와 검증용 파일 읽기가 메인 컨텍스트에 쌓이지 않게 분리), 의존성 없는 Node 실행기 `delegate.mjs`(`run`·`check`·`setup`). effort 는 `medium`·`xhigh` 중 호출자가 반드시 고르고 `low` 는 받지 않는다. 응답 한도에서 잘린 실행은 완료가 아니라 `output_limit` 으로 보고하고, `xhigh` 인데 Pi `maxTokens` 가 65536 미만이면 경고를 남긴다(32768 에서 xhigh 구현이 생각 도중 잘려 빈 답으로 끝난 실측). `setup` 은 `~/.pi/agent/models.json` 을 백업한 뒤 사내 provider 만 병합하고 키는 `${ULTIVIS_API_KEY}` 참조로 둔다. 하네스는 Pi 만 지원(사내 배포 OpenCode 는 리뷰 모드의 읽기 전용 제한을 유지할 수 없음). `scripts/test-qwen-delegate.mjs`(가짜 pi 로 상태 판정·인자·시간 초과·설정 병합 검사)를 `verify-workflow.sh` 에 연결.
+- `plugins/qwen-delegate` 플러그인 추가: 범위를 정한 리뷰·탐색을 사내 vLLM 의 Qwen(`ultivis/ultivis-vl`)에 Pi 하네스로 맡겨 Claude 로 가는 토큰을 줄인다. 스킬 `qwen-delegate`(메인 대화는 파일을 열지 않고 브리프만 쓰고, 돌아온 요약을 다시 추적하지 않음), 에이전트 `qwen-worker`(Sonnet — Qwen 실행, 지적한 file:line 만 열어 확인·요약), 의존성 없는 Node 실행기 `delegate.mjs`(`start`·`wait`·`run`·`check`·`setup`). 같은 리뷰 3건 실측에서 Claude 토큰이 직접 대비 −67%(Opus −89%), 비용 환산 −32%였고, 구현 위임은 오히려 늘어 대상에서 뺐다. effort 는 `medium`·`xhigh` 중 고르고 `low` 는 받지 않는다. 응답 한도에서 잘린 실행은 `output_limit`, 실행기가 결과 없이 사라지면 `lost` 로 보고하고, `xhigh` 인데 Pi `maxTokens` 가 65536 미만이면 경고한다. `start`/`wait` 는 셸 도구의 10분 상한에서 xhigh 리뷰가 끊기던 문제를 막는다. `setup` 은 `~/.pi/agent/models.json` 을 백업한 뒤 사내 provider 만 병합하고 키는 `${ULTIVIS_API_KEY}` 참조로 둔다. 하네스는 Pi 만 지원(사내 배포 OpenCode 는 리뷰 모드의 읽기 전용 제한을 유지할 수 없음). `scripts/test-qwen-delegate.mjs`(가짜 pi 로 상태 판정·인자·시간 초과·start/wait·설정 병합 검사)를 `verify-workflow.sh` 에 연결.
 
 ## v1.1.0 (2026-10-22)
 

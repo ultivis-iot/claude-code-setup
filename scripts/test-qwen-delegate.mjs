@@ -91,6 +91,37 @@ try {
   assert.equal(code, 124); assert.equal(res.status, 'timed_out'); assert.ok(Date.now() - started < 15000);
   ok();
 
+  // 5b. start 는 곧바로 run_dir 을 돌려주고, wait 가 결과를 받는다. 아직이면 running, 실행기가 결과 없이
+  //     사라졌으면 lost
+  const startRun = (scenario, args = []) => {
+    const r = call(['start', '--cwd', work, '--effort', 'xhigh', '--task', '검토해줘', ...args], { FAKE_PI: scenario });
+    assert.equal(r.status, 0, r.stderr);
+    return JSON.parse(r.stdout).run_dir;
+  };
+  const waitRun = (runDir, maxWait) => {
+    const r = call(['wait', '--run-dir', runDir, '--max-wait', String(maxWait)]);
+    return { code: r.status, res: JSON.parse(r.stdout) };
+  };
+  let rd = startRun('ok');
+  ({ code, res } = waitRun(rd, 30));
+  assert.equal(code, 0); assert.equal(res.status, 'completed'); assert.equal(res.report, '보고서 본문'); assert.equal(res.run_dir, rd);
+  rd = startRun('hang', ['--timeout', '3']);
+  ({ code, res } = waitRun(rd, 0));
+  assert.equal(code, 0); assert.equal(res.status, 'running');
+  ({ code, res } = waitRun(rd, 30));
+  assert.equal(code, 124); assert.equal(res.status, 'timed_out');
+  const lostDir = path.join(dir, 'state', 'lost');
+  mkdirSync(lostDir, { recursive: true });
+  const dead = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], { encoding: 'utf8' }).stdout;
+  writeFileSync(path.join(lostDir, 'pid'), dead);
+  writeFileSync(path.join(lostDir, 'runner.log'), 'crashed here');
+  ({ code, res } = waitRun(lostDir, 30));
+  assert.equal(code, 1); assert.equal(res.status, 'lost'); assert.match(res.runner_log_tail, /crashed here/);
+  // start 도 run 과 같은 검사를 거친다 — 잘못된 인자는 띄우기 전에 거절
+  const bad = call(['start', '--cwd', work, '--effort', 'low', '--task', 't']);
+  assert.equal(bad.status, 2);
+  ok();
+
   // 6. effort 는 필수이고 low 는 받지 않는다
   for (const args of [['--effort', 'low'], []]) {
     const r = spawnSync(process.execPath, [tool, 'run', '--cwd', work, '--task', 't', ...args], { encoding: 'utf8', env: env({ FAKE_PI: 'ok' }) });

@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 // 사내 Qwen(Pi 하네스)에게 범위가 정해진 리뷰·구현 작업을 맡기고 결과를 JSON 한 줄로 돌려준다.
 //
-//   node delegate.mjs run   --cwd <dir> --mode review|implement --effort medium|xhigh --task-file <file>
+//   node delegate.mjs start --cwd <dir> --mode review|implement --effort medium|xhigh --task-file <file>
+//   node delegate.mjs wait  --run-dir <dir> [--max-wait 540]   start 의 결과를 기다림(아직이면 running)
+//   node delegate.mjs run   (start 와 같은 인자, 끝날 때까지 붙잡고 기다림)
 //   node delegate.mjs check [--ping]     실행 준비 상태(pi·models.json·엔드포인트) 점검
 //   node delegate.mjs setup              ~/.pi/agent/models.json 에 사내 provider 를 병합
 //
 // effort 는 호출자가 난이도로 고른다. low(instant)는 품질이 떨어져 받지 않는다.
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { chmodSync, copyFileSync, createWriteStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const PROVIDER = "ultivis";
 export const MODEL_ID = "ultivis-vl";
@@ -129,7 +132,8 @@ function killTree(child) {
   setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch { /* 이미 끝남 */ } }, 5000).unref();
 }
 
-async function run(opts) {
+// run·start 가 같은 검사를 거친다 — start 가 받은 작업을 백그라운드 run 이 거절하는 일이 없게.
+function prepare(opts) {
   if (process.platform === "win32") fail("Linux/macOS 전용입니다");
   const mode = opts.mode || "review";
   if (!["review", "implement"].includes(mode)) fail("--mode 는 review 또는 implement 입니다");
@@ -143,9 +147,74 @@ async function run(opts) {
   const timeout = Number(opts.timeout ?? DEFAULT_TIMEOUT[opts.effort]);
   const maxReport = Number(opts["max-report-chars"] ?? 12000);
   if (!(timeout > 0) || !(maxReport > 0)) fail("--timeout 과 --max-report-chars 는 양수입니다");
-
   const pi = which("pi");
   if (!pi) fail("pi 가 PATH 에 없습니다. `node delegate.mjs check` 로 설치 상태를 확인하세요");
+  let runDir = opts["run-dir"];
+  if (!runDir) {
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+    runDir = join(stateRoot(), `${stamp}-${randomBytes(4).toString("hex")}`);
+  }
+  mkdirSync(runDir, { recursive: true, mode: 0o700 });
+  return { mode, effort: opts.effort, cwd, task, timeout, maxReport, pi, runDir };
+}
+
+// 호출자의 셸 도구에 시간 상한(예: 10분)이 있어도 xhigh 리뷰가 끝까지 돌도록, run 을 떼어 내 띄우고
+// 곧바로 run_dir 을 돌려준다. 결과는 wait 로 받는다.
+function start(opts) {
+  const p = prepare(opts);
+  const taskPath = join(p.runDir, "task-input.txt");
+  writeFileSync(taskPath, p.task);
+  const args = [fileURLToPath(import.meta.url), "run", "--cwd", p.cwd, "--mode", p.mode, "--effort", p.effort,
+    "--task-file", taskPath, "--timeout", String(p.timeout), "--max-report-chars", String(p.maxReport), "--run-dir", p.runDir];
+  const log = openSync(join(p.runDir, "runner.log"), "a");
+  const child = spawn(process.execPath, args, { cwd: p.cwd, stdio: ["ignore", "ignore", log], detached: true });
+  writeFileSync(join(p.runDir, "pid"), String(child.pid));
+  child.unref();
+  process.stdout.write(JSON.stringify({ event: "started", run_dir: p.runDir, pid: child.pid, effort: p.effort, mode: p.mode }) + "\n");
+  return 0;
+}
+
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; }
+}
+
+const EXIT_BY_STATUS = { completed: 0, timed_out: 124, cancelled: 130 };
+
+// 결과가 나오거나 --max-wait 초가 지날 때까지 기다린다. 아직이면 status=running 을 돌려주므로
+// 호출자는 같은 명령을 다시 부른다. 실행기가 결과 없이 사라졌으면 lost 로 알린다.
+async function waitFor(opts) {
+  const runDir = opts["run-dir"];
+  if (!runDir || !existsSync(runDir)) fail("--run-dir 에 start 가 돌려준 경로를 넘깁니다");
+  const maxWait = Number(opts["max-wait"] ?? 540);
+  if (!(maxWait >= 0)) fail("--max-wait 는 0 이상입니다");
+  const resultPath = join(runDir, "result.json");
+  const pidPath = join(runDir, "pid");
+  const deadline = Date.now() + maxWait * 1000;
+  for (;;) {
+    if (existsSync(resultPath)) {
+      const text = readFileSync(resultPath, "utf8");
+      process.stdout.write(JSON.stringify(JSON.parse(text)) + "\n");
+      return EXIT_BY_STATUS[JSON.parse(text).status] ?? 1;
+    }
+    const pid = existsSync(pidPath) ? Number(readFileSync(pidPath, "utf8")) : null;
+    if (pid && !alive(pid)) {
+      // 결과 쓰기와 프로세스 종료 사이의 틈을 한 번 더 확인한다.
+      if (existsSync(resultPath)) continue;
+      const logPath = join(runDir, "runner.log");
+      const tail = existsSync(logPath) ? readFileSync(logPath, "utf8").slice(-2000) : "";
+      process.stdout.write(JSON.stringify({ status: "lost", run_dir: runDir, runner_log_tail: tail }) + "\n");
+      return 1;
+    }
+    if (Date.now() >= deadline) {
+      process.stdout.write(JSON.stringify({ status: "running", run_dir: runDir, hint: "같은 wait 명령을 다시 부릅니다" }) + "\n");
+      return 0;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
+
+async function run(opts) {
+  const { mode, cwd, task, timeout, maxReport, pi, runDir } = prepare(opts);
   const warnings = [];
   const cfg = readPiModel();
   if (cfg.error) warnings.push(`${cfg.path}: ${cfg.error}`);
@@ -153,9 +222,6 @@ async function run(opts) {
     warnings.push(`maxTokens=${cfg.maxTokens} — xhigh 는 ${XHIGH_MIN_MAX_TOKENS} 이상이 아니면 생각 도중 잘릴 수 있습니다 (node delegate.mjs setup)`);
   }
 
-  const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
-  const runDir = join(stateRoot(), `${stamp}-${randomBytes(4).toString("hex")}`);
-  mkdirSync(runDir, { recursive: true, mode: 0o700 });
   const prompt = buildPrompt({ cwd, mode, task });
   writeFileSync(join(runDir, "task.txt"), prompt);
   const eventsPath = join(runDir, "events.jsonl");
@@ -208,7 +274,7 @@ async function run(opts) {
   if (status !== "completed" && existsSync(stderrPath)) result.stderr_tail = readFileSync(stderrPath, "utf8").slice(-2000);
   writeFileSync(join(runDir, "result.json"), JSON.stringify(result, null, 2) + "\n");
   process.stdout.write(JSON.stringify(result) + "\n");
-  return status === "completed" ? 0 : status === "timed_out" ? 124 : status === "cancelled" ? 130 : 1;
+  return EXIT_BY_STATUS[status] ?? 1;
 }
 
 async function ping(cfg) {
@@ -282,13 +348,13 @@ function setup() {
   return 0;
 }
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname);
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const opts = parseArgs(process.argv.slice(2));
   const cmd = opts._[0];
-  const handlers = { run, check, setup };
+  const handlers = { run, start, wait: waitFor, check, setup };
   if (opts.help || !handlers[cmd]) {
-    process.stdout.write(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 8).map((l) => l.replace(/^\/\/ ?/, "")).join("\n") + "\n");
+    process.stdout.write(readFileSync(new URL(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n") + "\n");
     process.exit(opts.help ? 0 : 2);
   }
   process.exit(await handlers[cmd](opts));
