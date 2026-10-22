@@ -1,6 +1,6 @@
 {
   "id": "ultivis-vl",
-  "name": "Qwen3.8 27B FP8 (사내)",
+  "name": "Ultivis VL (사내)",
   "reasoning": true,
   "thinkingLevelMap": {
     "minimal": null,

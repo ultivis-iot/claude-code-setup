@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 사내 Qwen(Pi 하네스)에게 범위가 정해진 리뷰·구현 작업을 맡기고 결과를 JSON 한 줄로 돌려준다.
+// 사내 모델(Ultivis vLLM, Pi 하네스)에게 범위가 정해진 리뷰·탐색 작업을 맡기고 결과를 JSON 한 줄로 돌려준다.
 //
 //   node delegate.mjs start --cwd <dir> --mode review|implement --effort medium|xhigh --task-file <file>
 //   node delegate.mjs wait  --run-dir <dir> [--max-wait 540]   start 의 결과를 기다림(아직이면 running)
@@ -27,10 +27,10 @@ const REVIEW_TOOLS = "read,grep,find,ls";
 
 const home = () => process.env.HOME || homedir();
 const piModelsPath = () => join(process.env.PI_CODING_AGENT_DIR || join(home(), ".pi", "agent"), "models.json");
-const stateRoot = () => join(process.env.XDG_STATE_HOME || join(home(), ".local", "state"), "qwen-delegate", "runs");
+const stateRoot = () => join(process.env.XDG_STATE_HOME || join(home(), ".local", "state"), "ultivis-delegate", "runs");
 
 function fail(message) {
-  process.stderr.write(`qwen-delegate: ${message}\n`);
+  process.stderr.write(`ultivis-delegate: ${message}\n`);
   process.exit(2);
 }
 
@@ -47,7 +47,7 @@ function parseArgs(argv) {
   return out;
 }
 
-function which(name) {
+export function which(name) {
   for (const dir of (process.env.PATH || "").split(delimiter)) {
     const p = join(dir, name);
     try { if (statSync(p).isFile()) return p; } catch { /* PATH 의 다음 항목 */ }
@@ -74,7 +74,7 @@ export function buildPiArgs({ mode, effort, prompt }) {
 
 export function buildPrompt({ cwd, mode, task }) {
   return [
-    `You are a delegated local Qwen coding worker. Workspace: ${cwd}`,
+    `You are a delegated internal-model coding worker. Workspace: ${cwd}`,
     `Mode: ${mode}. Stay within the supplied task and workspace. Do not launch another agent or delegate this task again. ` +
       "Report blockers instead of expanding the assignment. " +
       (mode === "review" ? "Use only read/search tools; leave files unchanged. "

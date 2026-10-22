@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// plugins/qwen-delegate 실행기(delegate.mjs) 테스트 — 가짜 pi 로 상태 판정·인자·설정 병합을 검사한다.
+// plugins/ultivis-delegate 실행기(delegate.mjs) 테스트 — 가짜 pi 로 상태 판정·인자·설정 병합을 검사한다.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -8,8 +8,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const tool = path.join(root, 'plugins/qwen-delegate/skills/qwen-delegate/scripts/delegate.mjs');
-const dir = mkdtempSync(path.join(os.tmpdir(), 'qwen-delegate-'));
+const tool = path.join(root, 'plugins/ultivis-delegate/skills/ultivis-delegate/scripts/delegate.mjs');
+const dir = mkdtempSync(path.join(os.tmpdir(), 'ultivis-delegate-'));
 const bin = path.join(dir, 'bin');
 const work = path.join(dir, 'work');
 const piDir = path.join(dir, 'pi');
@@ -209,7 +209,7 @@ fs.writeFileSync(pi, '#!/bin/sh\\necho ' + v + '\\n'); fs.chmodSync(pi, 0o755);
   assert.equal(r.status, 1); assert.match(r.stdout, /ULTIVIS_API_KEY/);
   ok();
 
-  console.log(`OK: qwen-delegate ${count} groups passed`);
+  console.log(`OK: ultivis-delegate ${count} groups passed`);
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
