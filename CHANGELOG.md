@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `plugins/qwen-delegate` 플러그인 추가: 범위를 정한 리뷰·탐색·구현을 사내 vLLM 의 Qwen(`ultivis/ultivis-vl`)에 Pi 하네스로 맡겨 Claude 토큰을 아낀다. 스킬 `qwen-delegate`(메인 대화에서 맡길지 판단하고 브리프만 작성), 에이전트 `qwen-worker`(Sonnet — 난이도별 effort 선택, Qwen 실행, 지적·diff 검증 후 요약 반환. Qwen 보고서와 검증용 파일 읽기가 메인 컨텍스트에 쌓이지 않게 분리), 의존성 없는 Node 실행기 `delegate.mjs`(`run`·`check`·`setup`). effort 는 `medium`·`xhigh` 중 호출자가 반드시 고르고 `low` 는 받지 않는다. 응답 한도에서 잘린 실행은 완료가 아니라 `output_limit` 으로 보고하고, `xhigh` 인데 Pi `maxTokens` 가 65536 미만이면 경고를 남긴다(32768 에서 xhigh 구현이 생각 도중 잘려 빈 답으로 끝난 실측). `setup` 은 `~/.pi/agent/models.json` 을 백업한 뒤 사내 provider 만 병합하고 키는 `${ULTIVIS_API_KEY}` 참조로 둔다. 하네스는 Pi 만 지원(사내 배포 OpenCode 는 리뷰 모드의 읽기 전용 제한을 유지할 수 없음). `scripts/test-qwen-delegate.mjs`(가짜 pi 로 상태 판정·인자·시간 초과·설정 병합 검사)를 `verify-workflow.sh` 에 연결.
+
 ## v1.1.0 (2026-10-22)
 
 - Notion 연동 스크립트를 bash 에서 Node.js(20 이상, 의존성 없음)로 교체해 Windows 에서도 bash·jq·curl 없이 동작하게 함. 새 `scripts/ult-notion.mjs`(Notion REST API 직접 호출)·`scripts/lib/notion.mjs`(클라이언트 공용 모듈)·`scripts/ult-flow.mjs`(gh/git/worktree/handoff/story 판정)·`scripts/graft.mjs`를 추가하고, `notion-api.sh`·`ult-my-tasks.sh`·`ult-task-note.sh`·`ult-task-status.sh`·`ult-task-link-issue.sh`·`ult-sync-task.sh`·`issue.sh`·`ult-weekly-collect.sh`·`ult-weekly-publish.sh`·`ult-story-create-exec.sh`·`ult-task-create.sh`·`ult-story-run.sh`·`ult-cache-refresh.sh` 13개를 제거. 각 스크립트는 `ult-notion.mjs` 의 서브커맨드(`my-tasks`·`task-note`·`task-status`·`task-link-issue`·`sync-task`·`issue`·`weekly-collect`·`weekly-publish`·`story-create`·`task-create`·`story-run`·`cache-refresh`)로 대응한다. 토큰 위치(`NOTION_TOKEN` 환경변수, `dev-tools/.env`, `~/.claude.json` 의 `notion-api` MCP 등록값)는 그대로.

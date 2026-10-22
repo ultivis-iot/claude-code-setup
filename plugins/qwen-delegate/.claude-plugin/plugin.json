@@ -1,0 +1,8 @@
+{
+  "name": "qwen-delegate",
+  "version": "0.1.0",
+  "description": "범위를 정한 리뷰·구현을 사내 Qwen(Pi 하네스)에 맡겨 Claude 토큰을 아낀다. 난이도에 따라 medium/xhigh 를 고르고, 결과는 부모가 검증한다.",
+  "author": { "name": "이삭엔지니어링 AX연구소" },
+  "repository": "https://github.com/ultivis-iot/claude-code-setup",
+  "keywords": ["qwen", "pi", "delegate", "vllm", "review"]
+}
