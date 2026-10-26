@@ -1,0 +1,8 @@
+{
+  "name": "ultivis-delegate",
+  "version": "0.1.0",
+  "description": "읽을 파일이 많은 리뷰·탐색을 사내 모델(Ultivis vLLM, Pi 하네스)에 맡겨 Claude 로 가는 토큰을 줄인다. 요청하지 않아도 절감된다고 판단하면 스스로 위임하고, 지적은 Sonnet 이 확인한다.",
+  "author": { "name": "이삭엔지니어링 AX연구소" },
+  "repository": "https://github.com/ultivis-iot/claude-code-setup",
+  "keywords": ["ultivis", "pi", "delegate", "vllm", "review", "tokens"]
+}
