@@ -4,8 +4,8 @@
 // 캐시하지 않는다. 캐시는 오프라인에서 껍데기라도 뜨게 하는 용도로만 쓴다.
 // 오리진을 다른 앱과 나눠 쓸 수 있다. 캐시 정리는 반드시 우리 접두사 안에서만 한다.
 const PREFIX = 'ux-review-';
-const VERSION = PREFIX + 'v1';
-const SHELL = ['/', '/ui/ui.css', '/ui/tokens.css', '/ui/base.css', '/ui/components.css'];
+const VERSION = PREFIX + 'v3';
+const SHELL = ['/ui/ui.css', '/ui/tokens.css', '/ui/base.css', '/ui/components.css'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -32,8 +32,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  // 데이터와 산출물은 늘 서버에서 받는다. 오래된 목록을 보여주는 쪽이 더 나쁘다.
-  if (url.pathname.startsWith('/api/')
+  // 데이터·산출물·HTML 페이지는 늘 서버에서 받는다. 오래된 캐시를 보여주는 쪽이 더 나쁘다.
+  if (url.pathname === '/'
+    || url.pathname === '/index.html'
+    || url.pathname.startsWith('/api/')
     || url.pathname.startsWith('/files/')
     || url.pathname.startsWith('/download/')) return;
 

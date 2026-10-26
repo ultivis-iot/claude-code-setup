@@ -22,13 +22,15 @@ Every path stored in a manifest is relative to the Git repository root containin
 │   ├── <id>-review-mutation-ledger.json
 │   ├── <id>-review-terminal.json          # failed or blocked only
 │   ├── <id>-review-terminal-NN-<slug>.png # best-effort terminal state
-│   ├── <id>-review-01-<slug>.png
+│   ├── <id>-review-review-01-<slug>.png   # PRIMARY: caption+highlight included
+│   ├── <id>-review-video-01-<slug>.png    # clean, WebM evidence frame
 │   ├── <id>-review-<recovery>.webm
 │   ├── <id>-review-<recovery>.srt
 │   ├── <id>-review-<recovery>-execution.json
 │   ├── <id>-review-<recovery>-observations.json
 │   ├── <id>-review-<recovery>-mutation-ledger.json
-│   ├── <id>-review-<recovery>-01-<slug>.png
+│   ├── <id>-review-<recovery>-review-01-<slug>.png  # PRIMARY
+│   ├── <id>-review-<recovery>-video-01-<slug>.png   # clean
 │   └── <id>-ux-review.md
 └── guide-01/
     ├── <id>-scenario.json
@@ -45,6 +47,8 @@ Every path stored in a manifest is relative to the Git repository root containin
 ```
 
 A completed review pass contains the critical journey and every recovery journey. A failed or blocked review preserves every journey reached and declares missing recovery coverage. A guide pass contains only a completed critical journey. The allocator creates numbered directories atomically; the recorder refuses to overwrite an existing journey prefix.
+
+Review passes produce two screenshot types per step: `-review-NN-<slug>.png` (caption and target highlight included, the **primary deliverable** for UX evaluation) and `-video-NN-<slug>.png` (clean, no caption or highlight, the WebM evidence frame). Guide passes produce a single `-NN-<slug>.png` clean result screenshot per step.
 
 ## Approval chain
 
@@ -97,8 +101,8 @@ Every journey supplies:
 - A caption never occupies more than two rendered lines at once. The recorder measures the caption against the live viewport and splits a longer one at word boundaries into consecutive cues, held at a fixed 18 px; the step's existing caption time is divided between them rather than the type being shrunk.
 - Visible guide actions use the recorder interaction helpers. The WebM shows an amber pulse around the active control before slow typing, selection, or click; execution JSON records pacing and helper counts.
 - A step owns one or more ordered SRT cues. Joining a step's cue texts with single spaces must reproduce its approved caption, and every cue must be ordered and positive in duration. Observations record the split as `captionSegments`. A review cue starts when its post-action caption is actually shown, after the clean result screenshot.
-- Screenshots are caption- and target-highlight-free PNGs named from their exact journey step and evidence slug.
-- WebM is the source artifact. Validation requires a valid container, positive duration and dimensions, and readable first/middle/last frames.
+- Review screenshots: `-review-NN-<slug>.png` includes the caption and target highlight (primary deliverable). `-video-NN-<slug>.png` is a clean, caption-free result frame for WebM evidence. Guide screenshots: `-NN-<slug>.png` is a clean result frame.
+- WebM remains the source video artifact for evidence. Validation requires a valid container, positive duration and dimensions, and readable first/middle/last frames.
 - Guide chapters are one per step and start at that step's first SRT cue.
 
 ## Storage and publication

@@ -37,6 +37,17 @@ function sanitize(value) {
     .slice(0, 500);
 }
 
+/**
+ * 스크린샷을 페이지 전체로 찍을지.
+ *
+ * 전체로 찍으면 Chromium 이 렌더 영역을 **페이지 높이만큼 늘렸다 되돌린다.** 녹화 중에는
+ * 그 순간이 영상에 들어가 화면이 쪼그라들었다 돌아오는 것처럼 보인다 — 단계마다 한 번씩.
+ * 리뷰 스크린샷은 캡션·강조 포함의 뷰포트 캡처가 기본(주요 산출물)이므로
+ * `UX_REVIEW_SCROLL_FULL_PAGE=true` 로 명시적으로 켜야만 전체 페이지를 찍는다.
+ * 가이드 phase 도 그대로 뷰포트 캡처를 쓴다.
+ */
+const SCREENSHOT_FULL_PAGE = process.env.UX_REVIEW_SCROLL_FULL_PAGE === 'true';
+
 async function showCaption(page, text, placement) {
   await page.evaluate(
     ({
@@ -46,6 +57,7 @@ async function showCaption(page, text, placement) {
       maxLines,
       maxFontSize,
       minFontSize,
+      fontSize,
       lineHeightRatio,
     }) => {
       const fullBleed = window.innerWidth <= fullBleedMaxViewportWidth;
@@ -174,24 +186,59 @@ async function hideCaption(page) {
 
 const targetAttribute = 'data-ux-journey-target';
 
-async function installTargetHighlightStyle(page) {
-  await page.evaluate(({ styleId, attribute }) => {
-    if (document.getElementById(styleId)) return;
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
+/**
+ * 누를 대상을 얼마나 눈에 띄게 표시할지.
+ *
+ * 기본(`full`)은 가이드용이다 — 두꺼운 테두리와 계속 도는 펄스, 그리고 `z-index` 를 최대로
+ * 올려 어디를 누르는지 분명히 보여 준다. 그런데 그 z-index 승격은 요소를 제 카드 밖으로
+ * 끌어올려 **화면이 튀는 것처럼** 보이게 하고, 무한 펄스는 계속 반짝인다. 제품을 보여 주는
+ * 시연 영상에서는 그 장식이 제품보다 눈에 띈다.
+ *
+ *   UX_REVIEW_HIGHLIGHT=soft  얇은 테두리 한 번만 — 튀지 않고 어디인지는 보인다
+ *   UX_REVIEW_HIGHLIGHT=off   표시하지 않는다(설명은 말이나 자막으로 한다)
+ */
+const HIGHLIGHT_MODE = process.env.UX_REVIEW_HIGHLIGHT || 'full';
+
+const HIGHLIGHT_CSS = {
+  full: `
       @keyframes ux-journey-target-pulse {
         0%, 100% { outline-offset: 3px; box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.28), 0 0 24px rgba(245, 158, 11, 0.42); }
         50% { outline-offset: 6px; box-shadow: 0 0 0 11px rgba(245, 158, 11, 0.14), 0 0 34px rgba(245, 158, 11, 0.56); }
       }
-      [${attribute}="active"] {
+      [ATTR="active"] {
         z-index: 2147483646 !important;
         outline: 4px solid #f59e0b !important;
         animation: ux-journey-target-pulse 850ms ease-in-out infinite !important;
       }
-    `;
-    document.head.append(style);
-  }, { styleId: 'ux-journey-target-style', attribute: targetAttribute });
+  `,
+  // z-index 를 건드리지 않는다 — 요소가 제자리에 머물러야 튀지 않는다. 펄스도 한 번만 돈다.
+  soft: `
+      @keyframes ux-journey-target-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+        100% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+      }
+      [ATTR="active"] {
+        outline: 2px solid rgba(245, 158, 11, 0.9) !important;
+        outline-offset: 2px !important;
+        animation: ux-journey-target-pulse 600ms ease-out 1 !important;
+      }
+  `,
+  off: '',
+};
+
+async function installTargetHighlightStyle(page) {
+  const css = HIGHLIGHT_CSS[HIGHLIGHT_MODE] ?? HIGHLIGHT_CSS.full;
+  if (!css) return;
+  await page.evaluate(
+    ({ styleId, attribute, styleText }) => {
+      if (document.getElementById(styleId)) return;
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = styleText.split('ATTR').join(attribute);
+      document.head.append(style);
+    },
+    { styleId: 'ux-journey-target-style', attribute: targetAttribute, styleText: css }
+  );
 }
 
 async function clearTargetHighlight(page) {
@@ -520,8 +567,10 @@ export function createJourneyRecorder({
       `${prefix}-terminal.json`,
     ]);
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // review 스크린샷(-review-NN-), clean screenshot(review: -video-NN-, guide: -NN-),
+    // terminal 스크린샷(-terminal-NN-)
     const screenshotPattern = new RegExp(
-      `^${escapedPrefix}-(?:\\d{2}|terminal-\\d{2})-`
+      `^${escapedPrefix}-(?:review-\\d{2}|video-\\d{2}|video-terminal-\\d{2}|\\d{2}|terminal-\\d{2})-`
     );
     const collisions = (await readdir(outputDirectory)).filter(
       (entry) => exactOutputs.has(entry) || screenshotPattern.test(entry)
@@ -539,6 +588,22 @@ export function createJourneyRecorder({
       runtimeCursor[key] = runtime[key].length;
     }
     return delta;
+  }
+
+  /**
+   * 리뷰 스크린샷: action 직후에 캡션·강조 포함으로 찍는다(주요 산출물).
+   * action 완료 시점의 화면 + 캡션으로 그 단계를 한눈에 보여 준다.
+   * 파일명: <prefix>-review-NN-<slug>.png
+   */
+  async function captureReviewScreenshot(expectedStep) {
+    await showCaption(page, expectedStep.caption, resolvedCaptionPlacement);
+    const seq = String(sequence).padStart(2, '0');
+    const name = `${prefix}-review-${seq}-${expectedStep.evidenceSlug}.png`;
+    await page.screenshot({
+      path: path.join(outputDirectory, name),
+      fullPage: SCREENSHOT_FULL_PAGE,
+    });
+    await hideCaption(page);
   }
 
   async function observe(expectedStep, cueStart, cueEnd, captionSegments) {
@@ -575,12 +640,15 @@ export function createJourneyRecorder({
       cueEndMs: cueEnd,
       captionSegments,
     });
+    // review phase: clean screenshot 은 WebM 증거 용도. 파일명 -video- 접두사로
+    // 리뷰 스크린샷(-review-)과 구분한다. guide phase: 그대로.
+    const shotPrefix = phase === 'review' ? `${prefix}-video` : prefix;
     await page.screenshot({
       path: path.join(
         outputDirectory,
-        `${prefix}-${String(sequence).padStart(2, '0')}-${expectedStep.evidenceSlug}.png`
+        `${shotPrefix}-${String(sequence).padStart(2, '0')}-${expectedStep.evidenceSlug}.png`
       ),
-      fullPage: true,
+      fullPage: SCREENSHOT_FULL_PAGE,
     });
   }
 
@@ -623,9 +691,10 @@ export function createJourneyRecorder({
       Object.assign(terminal, runtimeDelta(), { graphqlErrors: [] });
       terminal.captureErrors.push(`runtime-evidence: ${sanitize(error.message)}`);
     }
-    const screenshotFile = `${prefix}-terminal-${String(terminalSequence).padStart(2, '0')}-${expectedStep?.evidenceSlug || 'unknown-step'}.png`;
+    const terminalShotPrefix = phase === 'review' ? `${prefix}-video` : prefix;
+    const screenshotFile = `${terminalShotPrefix}-terminal-${String(terminalSequence).padStart(2, '0')}-${expectedStep?.evidenceSlug || 'unknown-step'}.png`;
     try {
-      await page.screenshot({ path: path.join(outputDirectory, screenshotFile), fullPage: true });
+      await page.screenshot({ path: path.join(outputDirectory, screenshotFile), fullPage: SCREENSHOT_FULL_PAGE });
       terminal.screenshotFile = screenshotFile;
     } catch (error) {
       terminal.screenshotFile = null;
@@ -688,16 +757,17 @@ export function createJourneyRecorder({
       } else {
         await action(expectedStep, ui);
         await clearTargetHighlight(page);
+        // 리뷰 스크린샷은 action 직후에 캡션·강조 포함으로 찍는다(주요 산출물).
+        // WebM 은 증빙: caption 표시 후 clean result screenshot 이 영상에 담긴다.
         sequence += 1;
-        await observe(expectedStep, null, null, segments);
+        await captureReviewScreenshot(expectedStep);
         for (const segment of segments) {
           const cueStart = Date.now() - startedAt;
           await showCaption(page, segment, resolvedCaptionPlacement);
           await page.waitForTimeout(dwell ?? 1_200);
           pushCue(cueStart, segment);
         }
-        observations.at(-1).cueStartMs = cues.at(-segments.length).start;
-        observations.at(-1).cueEndMs = cues.at(-1).end;
+        await observe(expectedStep, cues.at(-segments.length).start, cues.at(-1).end, segments);
       }
     },
 

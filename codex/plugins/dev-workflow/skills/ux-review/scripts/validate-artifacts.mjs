@@ -311,16 +311,28 @@ async function validateJourney(
     execution.status
   );
 
+  // review phase: -review-NN- (캡션·강조 포함, 주요 산출물) + -video-NN- (clean, WebM 증거)
+  // guide phase:  -NN- (clean result screenshot)
+  const shotPrefix = phase === 'review' ? `${prefix}-video` : prefix;
   for (let index = 0; index < recordedSteps.length; index += 1) {
-    const screenshot = `${prefix}-${String(index + 1).padStart(2, '0')}-${recordedSteps[index].evidenceSlug}.png`;
-    if (!entries.includes(screenshot)) throw new Error(`${prefix}: missing ${screenshot}`);
-    await validatePng(path.join(directory, screenshot));
+    const cleanShot = `${shotPrefix}-${String(index + 1).padStart(2, '0')}-${recordedSteps[index].evidenceSlug}.png`;
+    if (!entries.includes(cleanShot)) throw new Error(`${prefix}: missing ${cleanShot}`);
+    await validatePng(path.join(directory, cleanShot));
+    if (phase === 'review') {
+      const reviewShot = `${prefix}-review-${String(index + 1).padStart(2, '0')}-${recordedSteps[index].evidenceSlug}.png`;
+      if (!entries.includes(reviewShot)) throw new Error(`${prefix}: missing ${reviewShot}`);
+      await validatePng(path.join(directory, reviewShot));
+    }
   }
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const screenshotPattern = new RegExp(`^${escapedPrefix}-\\d{2}-.+\\.png$`);
+  const screenshotPattern =
+    phase === 'review'
+      ? new RegExp(`^${escapedPrefix}-(?:review-|video-)(?:\\d{2}|terminal-\\d{2})-.+\\.png$`)
+      : new RegExp(`^${escapedPrefix}-(?:\\d{2}|terminal-\\d{2})-.+\\.png$`);
   const unexpectedScreenshots = entries.filter((entry) => screenshotPattern.test(entry));
-  if (unexpectedScreenshots.length !== recordedSteps.length) {
-    throw new Error(`${prefix}: unexpected screenshot count ${unexpectedScreenshots.length}`);
+  const expectedShotCount = recordedSteps.length * (phase === 'review' ? 2 : 1);
+  if (unexpectedScreenshots.length !== expectedShotCount) {
+    throw new Error(`${prefix}: unexpected screenshot count ${unexpectedScreenshots.length} (expected ${expectedShotCount})`);
   }
 
   let terminal = null;

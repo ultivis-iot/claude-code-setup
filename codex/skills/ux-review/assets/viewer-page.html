@@ -164,34 +164,38 @@ a.badge:hover{color:var(--text);border-color:var(--hover-line)}
 .pass .k,.jbtn .k{color:var(--muted);font-family:var(--mono);font-size:10px;margin-left:5px}
 .pass.approved::after{content:"\2713";color:var(--done);font-weight:700;margin-left:5px}
 .pass.failed{border-color:color-mix(in srgb,var(--danger) 55%,var(--line));color:var(--danger)}
-.actions{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap;align-items:center}
+.actions{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap;align-items:center}
 
-/* ── 영상 ────────────────────────────────────────────────────────── */
+/* ── 영상 / 스크린샷 ────────────────────────────────────────────── */
 video{width:100%;aspect-ratio:16/9;background:var(--terminal-bg);
   border:1px solid var(--line);border-radius:var(--radius-panel);object-fit:contain}
-.vsplit{display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
+img#vp{width:100%;max-height:65vh;background:var(--terminal-bg);
+  border:1px solid var(--line);border-radius:var(--radius-panel);object-fit:contain}
+.vsplit{display:grid;grid-template-columns:1fr;gap:6px;align-items:start}
 .vstep-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;
   scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
 .vstep-strip::-webkit-scrollbar{height:6px}
 .vstep-strip::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:3px}
 .vstep-strip::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:3px}
-.vstep{flex:0 0 240px;max-width:240px;border:1px solid var(--line);
-  border-bottom:2px solid var(--line);
-  padding:8px 10px;border-radius:var(--radius-control);background:var(--surface);
+.vstep{flex:0 0 290px;max-width:290px;border:1px solid var(--line);
+  padding:12px 14px;border-radius:var(--radius-control);background:var(--surface);
   min-width:0}
 .vstep.seekable{cursor:pointer}
-.vstep.seekable:hover{background:var(--hover-surface);border-bottom-color:var(--hover-line)}
-.vstep.now{border-bottom-color:var(--accent);background:var(--selected-surface)}
-.vstep-h{display:flex;align-items:center;gap:6px;margin-bottom:3px}
-.vn{flex-shrink:0;width:18px;height:18px;border-radius:999px;background:var(--surface-raised);
-  color:var(--muted);font-family:var(--mono);font-size:9.5px;
+.vstep.seekable:hover{background:var(--hover-surface)}
+.vstep.now{border:2px solid var(--accent);background:var(--surface);padding:11px 13px}
+.vstep-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.vn{flex-shrink:0;width:22px;height:22px;border-radius:999px;background:var(--surface-raised);
+  color:var(--text);font-family:var(--mono);font-size:11px;font-weight:700;
   display:flex;align-items:center;justify-content:center}
-.ts{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--accent);
+.ts{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--accent);
   font-variant-numeric:tabular-nums}
-.vstep .goal{font-size:12px;font-weight:500;margin:2px 0 3px;
+.vstep .goal{font-size:14px;font-weight:600;margin:2px 0 6px;line-height:1.35;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.vstep .line{font-size:11px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
-.vstep .cap{font-size:10.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vstep .line{font-size:12.5px;line-height:1.45;margin:2px 0;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vstep .line .lb{width:30px;font-size:10.5px}
+.vstep .cap{font-size:12px;color:var(--accent);margin-top:6px;line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* ── 스크린샷 ────────────────────────────────────────────────────── */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
@@ -362,7 +366,7 @@ video{width:100%;aspect-ratio:16/9;background:var(--terminal-bg);
 <script>
 // 라우팅:  #/<repo>/<worktree>/<date>/<scenario>[/<pass>[/<tab>]]
 let INDEX=null, SC=null, CACHE={}, LOADING=false;
-const TABS=[['video','영상'],['plan','Plan'],['review','리뷰 결과'],['scenario','시나리오'],['shots','스크린샷'],['findings','발견사항']];
+const TABS=[['shots','스크린샷'],['video','영상'],['plan','Plan'],['review','리뷰 결과'],['scenario','시나리오'],['findings','발견사항']];
 const $=s=>document.querySelector(s);
 const mb=b=>b==null?'':b>=1048576?(b/1048576).toFixed(1)+'MB':(b/1024).toFixed(0)+'KB';
 const dur=ms=>ms==null?'':(ms/1000).toFixed(1)+'초';
@@ -606,7 +610,7 @@ function currentPassName(){
 }
 function renderDetail(r){
   const passName=currentPassName();
-  const tab=r.tab&&TABS.some(t=>t[0]===r.tab)?r.tab:'video';
+  const tab=r.tab&&TABS.some(t=>t[0]===r.tab)?r.tab:'shots';
   const pass=SC.passes.find(p=>p.name===passName)||null;
   const o=SC.origin||{},b=[];
   b.push('<span class="badge">'+esc(SC.path.split('/').slice(0,2).join(' / '))+'</span>');
@@ -732,14 +736,14 @@ async function renderBody(tab,pass){
         +'<span class="k" aria-hidden="true">'+(x.durationMs?dur(x.durationMs):'')+'</span></a>';
     }).join('')+'</div>';
 
-    // 영상(위) + 단계 카드 가로 스트립(아래)
-    h+='<div class="vsplit">'
-      +'<video id="vp" controls preload="metadata" src="/files/'+enc(base+'/'+jn.video)+'"'
-      +'></video>'
-      +'<div class="actions"><a class="badge" href="/download/'+enc(base+'/'+jn.video)+'">다운로드</a>'
-      +(jn.srt?'<a class="badge" href="/files/'+enc(base+'/'+jn.srt)+'" target="_blank">자막(srt)</a>':'')
-      +'<span class="dim" style="font-size:12px">'+esc(jn.video)+'</span></div>'
-      +(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'');
+    // 영상(위) + 단계 카드 가로 스트립(아래). webm 이 없으면 안내 문구.
+    h+='<div class="vsplit">';
+    if(jn.video){
+      h+='<video id="vp" controls preload="metadata" src="/files/'+enc(base+'/'+jn.video)+'"></video>';
+    } else {
+      h+='<div class="empty" style="padding:30px">이 여정에 영상이 없습니다 · 스크린샷 탭을 이용하세요</div>';
+    }
+    h+=(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'');
 
     const rows=jn.steps.length?jn.steps:jn.cues.map((c,i)=>({step:i+1,sequence:i+1}));
     if(!rows.length){
@@ -798,11 +802,85 @@ async function renderBody(tab,pass){
     return;
   }
   if(tab==='shots'){
-    if(!pass||!pass.screenshots.length){el.innerHTML='<div class="empty">스크린샷이 없습니다</div>';return;}
-    el.innerHTML='<div class="dim" style="margin-bottom:10px">'+pass.screenshots.length+'장</div><div class="grid">'
-      +pass.screenshots.map(f=>'<figure style="margin:0"><img alt="" loading="lazy" src="/files/'+enc(base+'/'+f)
-      +'" data-image="/files/'+enc(base+'/'+f)+'"><figcaption class="dim" style="font-size:11px;margin-top:4px;word-break:break-all">'
-      +esc(f.replace(/^.*?-(\d\d-)/,'$1'))+'</figcaption></figure>').join('')+'</div>';
+    if(!pass||!pass.journeys.length){
+      el.innerHTML='<div class="empty">스크린샷이 없습니다</div>';
+      return;
+    }
+    const r=parseRoute();
+    const jn=pass.journeys.find(x=>x.journeyId===r.jn)
+      ||pass.journeys.find(x=>x.journeyKind==='critical')||pass.journeys[0];
+    const def=(SC.journeyDefs||[]).find(d=>d.id===jn.journeyId);
+    const isReview=pass.kind==='review';
+    // review: -review- (캡션·강조 포함, 주요). guide: -NN- (clean)
+    const shots=isReview
+      ? jn.reviewScreenshots||[]
+      : jn.screenshots||[];
+
+    if(!shots.length){
+      el.innerHTML='<div class="empty">이 여정에 스크린샷이 없습니다</div>';
+      return;
+    }
+
+    // 여정 선택
+    let h='';
+    h+='<div class="jsel">'+pass.journeys.map(x=>{
+      const name=x.journeyId||x.base;
+      const shotCount=(x.reviewScreenshots&&x.reviewScreenshots.length)||(x.screenshots&&x.screenshots.length)||0;
+      const label=[name,x.journeyKind,shotCount+'장 스크린샷'].filter(Boolean).join(', ');
+      return '<a class="ghost-button jbtn" aria-label="'+esc(label)+'"'
+        +' aria-pressed="'+(x===jn?'true':'false')+'"'+(x===jn?' aria-current="true"':'')
+        +' href="#/'+enc(SC.path)+'/'+pass.name+'/shots/'+encodeURIComponent(name)+'">'
+        +esc(name)
+        +'<span class="jk '+(x.journeyKind==='critical'?'crit':'rec')+'" aria-hidden="true">'+esc(x.journeyKind||'')+'</span>'
+        +'<span class="k" aria-hidden="true">'+shotCount+'장</span></a>';
+    }).join('')+'</div>';
+
+    // 스크린샷(위) + 단계 카드 가로 스트립(아래) — video 탭과 동일한 레이아웃
+    const firstShot=shots[0];
+    h+='<div class="vsplit">'
+      +'<img id="vp" style="cursor:zoom-in" '
+      +'src="/files/'+enc(base+'/'+firstShot)+'" data-image="/files/'+enc(base+'/'+firstShot)+'" alt="">'
+      +(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'');
+
+    const rows=jn.steps.length?jn.steps:shots.map((f,i)=>({step:i+1,sequence:i+1}));
+    if(!rows.length){
+      h+='<div class="dim" style="font-size:12.5px">단계 정보가 없습니다</div>';
+    } else {
+      h+='<div class="vstep-strip">';
+      h+=rows.map((st,i)=>{
+        const spec=(def&&def.steps||[]).find(x=>x.step===st.step)||{};
+        const shot=shots[i];
+        const hasShot=!!shot;
+        return '<div class="vstep'+(hasShot?' seekable':'')+'"'+(hasShot?' data-shot="/files/'+enc(base+'/'+shot)+'"':'')+'>'
+          +'<div class="vstep-h"><span class="vn">'+esc(st.step??i+1)+'</span>'
+          +(hasShot?'<span class="ts">📷</span>':'')+'</div>'
+          +(spec.goal?'<div class="goal">'+esc(spec.goal)+'</div>':'')
+          +(spec.action?'<div class="line"><span class="lb">행동</span>'+esc(spec.action)+'</div>':'')
+          +(spec.expected?'<div class="line"><span class="lb">기대</span>'+esc(spec.expected)+'</div>':'')
+          +(spec.caption?'<div class="cap">“'+esc(spec.caption)+'”</div>':'')
+          +'</div>';
+      }).join('');
+      h+='</div>';
+    }
+    h+='</div>';
+    el.innerHTML=h;
+
+    revealSelected();
+
+    // 단계 클릭 → 해당 스크린샷으로 전환 (이벤트 위임)
+    const img=el.querySelector('#vp');
+    if(img) console.log('[shots] img src:', img.src, 'natural:', img.naturalWidth, 'x', img.naturalHeight);
+    el.addEventListener('click',e=>{
+      const card=e.target.closest('[data-shot]');
+      if(!card||!img)return;
+      img.src=card.dataset.shot;
+      img.dataset.image=card.dataset.shot;
+      el.querySelectorAll('.vstep').forEach(n=>n.classList.remove('now'));
+      card.classList.add('now');
+    });
+    // 첫 번째 스텝을 현재로 표시
+    const firstStep=el.querySelector('.vstep.seekable');
+    if(firstStep)firstStep.classList.add('now');
     return;
   }
   if(tab==='findings'){
@@ -976,7 +1054,7 @@ window.addEventListener('hashchange',route);
   }
   route();
 })();
-// PWA: HTTPS(또는 localhost)에서만 등록된다. 평문 HTTP 면 아무 일도 하지 않는다.
+// PWA: HTTPS(또는 localhost)에서만 등록된다. HTML은 캐시하지 않으므로 구버전 문제가 없다.
 if(navigator.serviceWorker){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/sw.js').catch(()=>{});

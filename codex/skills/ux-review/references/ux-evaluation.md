@@ -66,8 +66,9 @@ Where evidence permits, report task success, elapsed time, action count, route/c
 
 ## Evidence rules
 
-- Cite the exact journey, scenario step, and video timestamp.
-- Link the matching screenshot and route.
+- Evaluate primarily from the **review screenshots** (`…-review-NN-…png`, caption and highlight included). The WebM is supporting evidence for time-dependent behavior (loading, transitions, error timing).
+- Cite the exact journey, scenario step, and the matching review screenshot filename.
+- Link the matching review screenshot and route. For time-dependent findings, also cite the WebM timestamp.
 - For consistency claims, cite the comparable baseline route, screenshot, shared component, or interaction and state why it is analogous.
 - State what is observed before interpreting it.
 - Explain impact in the audience role's job language.
@@ -83,7 +84,7 @@ Where evidence permits, report task success, elapsed time, action count, route/c
 
 - 차원: Findability
 - 시나리오/단계: operator-request-to-approval / 2
-- 증거: 00:18–00:25, `...-02-create-request.png`, `/requests/new`
+- 증거: `...-review-02-create-request.png`, `/requests/new` (WebM 00:18–00:25)
 - 관찰: 저장 후 상세가 열렸지만 승인 대기 상태와 다음 담당자가 첫 화면에 표시되지 않는다.
 - 사용자 영향: 운영 담당자는 등록 성공과 인계 여부를 판단하기 위해 목록으로 돌아가야 한다.
 - 권고: 저장 완료 영역에 현재 상태와 다음 담당자를 함께 표시한다.

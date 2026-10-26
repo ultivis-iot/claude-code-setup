@@ -198,17 +198,38 @@ async function buildScenario(relative) {
     const passDirectory = path.join(absolute, passName);
     let passFiles = [];
     try { passFiles = await readdir(passDirectory); } catch { continue; }
-    // webm 하나가 여정 하나다. 같은 이름의 srt / execution.json 이 짝을 이룬다.
+    // execution.json 하나가 여정 하나다. webm이 없어도 스크린샷 여정으로 만든다.
+    const isReviewPass = passName.startsWith('review');
+    // 새 형식 감지: <base>-video- 접두사가 있는 파일이 있으면 새 형식.
+    // (기존 형식의 <id>-review-NN- 은 base 자체가 <id>-review 이므로 -review- 접두사가 아니다)
+    const hasNewFormat = passFiles.some(f => f.includes('-video-'));
     const journeys = [];
     const recording = [];
-    for (const video of passFiles.filter((f) => f.endsWith('.webm')).sort()) {
-      // 녹화가 끝나기 전 파일은 크기가 0이다. 재생하면 416 이 되므로 목록에서 빼둔다.
-      try {
-        if ((await stat(path.join(passDirectory, video))).size === 0) { recording.push(video); continue; }
-      } catch { continue; }
-      const base = video.replace(/\.webm$/, '');
-      const execution = await readJson(path.join(passDirectory, `${base}-execution.json`));
+    const execFiles = passFiles.filter((f) => f.endsWith('-execution.json')).sort();
+    for (const execFile of execFiles) {
+      const base = execFile.replace(/-execution\.json$/, '');
+      const videoFile = base + '.webm';
+      let video = null;
+      if (passFiles.includes(videoFile)) {
+        try {
+          if ((await stat(path.join(passDirectory, videoFile))).size > 0) video = videoFile;
+          else recording.push(videoFile);
+        } catch {}
+      }
+      const execution = await readJson(path.join(passDirectory, execFile));
       const srtName = `${base}.srt`;
+      // 기존 형식: <base>-NN-slug.png
+      // 새 형식:   <base>-review-NN-slug.png (주요) / <base>-video-NN-slug.png (clean)
+      const allShots = passFiles.filter(f => f.startsWith(`${base}-`) && f.endsWith('.png')
+        && !f.includes('-terminal-')).sort();
+      const reviewShots = isReviewPass
+        ? (hasNewFormat
+            ? allShots.filter(f => f.startsWith(`${base}-review-`))
+            : allShots)
+        : [];
+      const videoShots = isReviewPass && hasNewFormat
+        ? allShots.filter(f => f.startsWith(`${base}-video-`))
+        : [];
       journeys.push({
         base, video,
         srt: passFiles.includes(srtName) ? srtName : null,
@@ -219,7 +240,8 @@ async function buildScenario(relative) {
         failure: execution?.failure ?? null,
         steps: execution?.steps ?? [],
         cues: passFiles.includes(srtName) ? await readSrt(path.join(passDirectory, srtName)) : [],
-        screenshots: passFiles.filter((f) => f.startsWith(`${base}-`) && f.endsWith('.png')).sort(),
+        screenshots: isReviewPass ? (hasNewFormat ? videoShots : allShots) : allShots,
+        reviewScreenshots: reviewShots,
       });
     }
     const primary = journeys.find((j) => j.journeyKind === 'critical') ?? journeys[0] ?? null;
@@ -231,7 +253,15 @@ async function buildScenario(relative) {
       durationMs: primary?.durationMs ?? null,
       failure: journeys.find((j) => j.failure)?.failure ?? null,
       journeys, recording,
-      screenshots: passFiles.filter((f) => f.endsWith('.png')).sort(),
+      // terminal 스크린샷 제외.
+      screenshots: passFiles
+        .filter((f) => f.endsWith('.png') && !f.includes('-terminal-'))
+        .sort(),
+      reviewScreenshots: passName.startsWith('review')
+        ? (hasNewFormat
+            ? passFiles.filter((f) => f.includes('-review-') && f.endsWith('.png') && !f.includes('-terminal-')).sort()
+            : passFiles.filter((f) => f.endsWith('.png') && !f.includes('-terminal-')).sort())
+        : [],
       reviewDoc: passFiles.find((f) => f.endsWith('-ux-review.md')) ?? null,
       size: await directorySize(passDirectory),
       approved: decision?.reviewDirectory ? decision.reviewDirectory.endsWith(passName) : false,

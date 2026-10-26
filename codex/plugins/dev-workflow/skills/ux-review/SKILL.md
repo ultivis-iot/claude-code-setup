@@ -77,13 +77,13 @@ node "$UX/scripts/record-guide-request.mjs" \
 
 Allocate `review-NN`, then import [assets/playwright-journey-recorder.mjs](assets/playwright-journey-recorder.mjs) with `phase: 'review'`. Record the critical journey and every recovery journey separately under the same pass. The recorder enforces the approved scenario, repository path, source revision, viewport, locale, base URL, non-overwrite behavior, runtime evidence arrays, and mutation ledger.
 
-Review captures perform the action first, then save a caption-free result screenshot and show the caption. Harness limitations become evidence gaps, not product findings.
+Review captures perform the action first, then immediately save a **caption-and-highlight-included** review screenshot (the primary deliverable, `…-review-NN-…png`). The WebM recording continues with the caption displayed for the viewer (evidence), and a clean result screenshot is also saved (`…-video-NN-…png`) as the WebM evidence frame. The review is evaluated primarily from the review screenshots, not the video. Harness limitations become evidence gaps, not product findings.
 
 Always preserve review evidence. Finalize a fully executed journey with `status: 'completed'`; if the product fails, use `status: 'failed'`; if environment, permission, data, or harness limitations stop it, use `status: 'blocked'` with a category and message. Failed and blocked review bundles keep the partial SRT, completed-step observations, terminal evidence, mutation ledger, and WebM. They may have explicit recovery-coverage gaps and cannot authorize a reviewed guide.
 
 ## 3. Evaluate and record the user's decision
 
-Read [references/ux-evaluation.md](references/ux-evaluation.md). Evaluate the approved scenario against the WebM, SRT, screenshots, observations, runtime errors, mutation ledger, and product baseline. Write `<id>-ux-review.md` in the review pass and cite every finding to its journey, step, timestamp, route, and screenshot.
+Read [references/ux-evaluation.md](references/ux-evaluation.md). Evaluate the approved scenario against the **review screenshots** (primary), WebM (evidence), SRT, observations, runtime errors, mutation ledger, and product baseline. Write `<id>-ux-review.md` in the review pass and cite every finding to its journey, step, review screenshot, and route.
 
 Copy [assets/review-decision.template.json](assets/review-decision.template.json) and present all finding dispositions and hard-gate statuses to the user. Only after explicit confirmation run:
 
@@ -123,7 +123,7 @@ node "$UX/scripts/validate-artifacts.mjs" <review-NN> --phase review
 node "$UX/scripts/validate-artifacts.mjs" <guide-NN> --phase guide
 ```
 
-The validator checks semantic step/caption/evidence correspondence, recovery coverage, SRT and chapter timing, PNG/WebM validity, media metadata, environment/source consistency, mutation policy, and approval hashes. Inspect each final WebM at normal speed and verify first/middle/last frames and caption placement.
+The validator checks semantic step/caption/evidence correspondence, recovery coverage, SRT and chapter timing, review and video PNG validity, WebM validity, media metadata, environment/source consistency, mutation policy, and approval hashes. For review passes, verify both `…-review-NN-…png` (caption-included, primary) and `…-video-NN-…png` (clean, WebM evidence) exist per step. Inspect each final WebM at normal speed and verify first/middle/last frames and caption placement.
 
 Start the viewer and return links that open in a browser instead of filesystem paths:
 
@@ -136,13 +136,13 @@ node "$UX/scripts/viewer.mjs" --ensure --host 0.0.0.0
 The banner lists every reachable address. When `tailscale serve` or `tailscale funnel` publishes the viewer port on an external port, that address is listed first and marked `→`; hand the reader that origin and no other. Localhost, `.local` and LAN addresses only open on this machine, so fall back to them only when the banner shows no `→` entry. Deep-link the reviewed pass from the chosen origin:
 
 ```text
-<viewer-origin>/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
+<viewer-origin>/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/shots
 ```
 
 Example with a `tailscale serve` mapping of `https://<machine>.<tailnet>.ts.net:8443` onto the viewer port:
 
 ```text
-https://<machine>.<tailnet>.ts.net:8443/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/video
+https://<machine>.<tailnet>.ts.net:8443/#/<parent-repository>/<worktree>/<YYYY-MM-DD>/<NN>.<scenario-id>/<review-NN>/shots
 ```
 
 Also state the P-level counts. P0 blocks or makes work unsafe/inaccessible, P1 causes major primary-path friction, and P2 covers measurable consistency or polish issues.
