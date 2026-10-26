@@ -80,7 +80,7 @@ html,body{height:100%;overflow:hidden}
 #main>.empty{padding:40px 24px}
 #tree{overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none}
 #tree::-webkit-scrollbar{width:0;height:0}
-#main,.vright{scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);scrollbar-width:thin}
+#main,.vstep-strip{scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);scrollbar-width:thin}
 a{color:inherit;text-decoration:none}
 .dim{color:var(--muted)}
 .empty{color:var(--muted);padding:40px 0;text-align:center}
@@ -167,30 +167,31 @@ a.badge:hover{color:var(--text);border-color:var(--hover-line)}
 .actions{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap;align-items:center}
 
 /* ── 영상 ────────────────────────────────────────────────────────── */
-video{width:100%;max-height:min(70vh,560px);background:var(--terminal-bg);
+video{width:100%;aspect-ratio:16/9;background:var(--terminal-bg);
   border:1px solid var(--line);border-radius:var(--radius-panel);object-fit:contain}
-.vsplit{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);
-  gap:16px;align-items:start}
-.vsplit.portrait{grid-template-columns:minmax(0,0.72fr) minmax(320px,1.28fr)}
-.vleft{position:sticky;top:0}
-.vright{min-width:0}
-.vstep{border:1px solid var(--line);border-left:2px solid var(--line);
-  padding:9px 11px;margin-bottom:6px;border-radius:var(--radius-control);background:var(--surface)}
+.vsplit{display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
+.vstep-strip{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;
+  scrollbar-width:thin;scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track)}
+.vstep-strip::-webkit-scrollbar{height:6px}
+.vstep-strip::-webkit-scrollbar-track{background:var(--scrollbar-track);border-radius:3px}
+.vstep-strip::-webkit-scrollbar-thumb{background:var(--scrollbar-thumb);border-radius:3px}
+.vstep{flex:0 0 240px;max-width:240px;border:1px solid var(--line);
+  border-bottom:2px solid var(--line);
+  padding:8px 10px;border-radius:var(--radius-control);background:var(--surface);
+  min-width:0}
 .vstep.seekable{cursor:pointer}
-.vstep.seekable:hover{background:var(--hover-surface);border-left-color:var(--hover-line)}
-.vstep.now{border-left-color:var(--accent);background:var(--selected-surface)}
-.vstep-h{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.vn{flex-shrink:0;width:20px;height:20px;border-radius:999px;background:var(--surface-raised);
-  color:var(--muted);font-family:var(--mono);font-size:10px;
+.vstep.seekable:hover{background:var(--hover-surface);border-bottom-color:var(--hover-line)}
+.vstep.now{border-bottom-color:var(--accent);background:var(--selected-surface)}
+.vstep-h{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.vn{flex-shrink:0;width:18px;height:18px;border-radius:999px;background:var(--surface-raised);
+  color:var(--muted);font-family:var(--mono);font-size:9.5px;
   display:flex;align-items:center;justify-content:center}
-.ts{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent);
+.ts{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--accent);
   font-variant-numeric:tabular-nums}
-.vright .goal{font-size:13px;font-weight:500;margin:2px 0 4px}
-.vright .line{font-size:12px}
-.vright .cap{font-size:11.5px}
-/* 사이드바를 뺀 실제 본문 폭 기준으로 접는다 */
-@container (max-width:700px){.vsplit{grid-template-columns:1fr}
-.vleft{position:static}}
+.vstep .goal{font-size:12px;font-weight:500;margin:2px 0 3px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vstep .line{font-size:11px;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.vstep .cap{font-size:10.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
 /* ── 스크린샷 ────────────────────────────────────────────────────── */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
@@ -731,20 +732,20 @@ async function renderBody(tab,pass){
         +'<span class="k" aria-hidden="true">'+(x.durationMs?dur(x.durationMs):'')+'</span></a>';
     }).join('')+'</div>';
 
-    // 좌: 영상 / 우: 단계
-    h+='<div class="vsplit"><div class="vleft">'
+    // 영상(위) + 단계 카드 가로 스트립(아래)
+    h+='<div class="vsplit">'
       +'<video id="vp" controls preload="metadata" src="/files/'+enc(base+'/'+jn.video)+'"'
       +'></video>'
       +'<div class="actions"><a class="badge" href="/download/'+enc(base+'/'+jn.video)+'">다운로드</a>'
       +(jn.srt?'<a class="badge" href="/files/'+enc(base+'/'+jn.srt)+'" target="_blank">자막(srt)</a>':'')
       +'<span class="dim" style="font-size:12px">'+esc(jn.video)+'</span></div>'
-      +(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'')
-      +'</div><div class="vright">';
+      +(jn.failure?'<div class="find"><div class="h"><span class="pill p0">실패</span></div><div class="r">'+esc(jn.failure)+'</div></div>':'');
 
     const rows=jn.steps.length?jn.steps:jn.cues.map((c,i)=>({step:i+1,sequence:i+1}));
     if(!rows.length){
       h+='<div class="dim" style="font-size:12.5px">단계 정보가 없습니다</div>';
     } else {
+      h+='<div class="vstep-strip">';
       h+=rows.map((st,i)=>{
         const spec=(def&&def.steps||[]).find(x=>x.step===st.step)||{};
         const cue=jn.cues[i];
@@ -758,22 +759,14 @@ async function renderBody(tab,pass){
           +(cue&&cue.text?'<div class="cap">“'+esc(cue.text)+'”</div>':'')
           +'</div>';
       }).join('');
+      h+='</div>';
     }
-    h+='</div></div>';
+    h+='</div>';
     el.innerHTML=h;
 
     revealSelected();
 
-    // 세로 영상은 폭을 다 쓰지 못하므로 읽을 쪽에 공간을 넘긴다
     const video=el.querySelector('#vp');
-    if(video){
-      const fit=()=>{
-        if(!video.videoWidth)return;
-        el.querySelector('.vsplit')?.classList.toggle('portrait', video.videoHeight>video.videoWidth);
-      };
-      video.addEventListener('loadedmetadata',fit);
-      fit();
-    }
 
     // 단계 클릭 → 해당 시점으로 이동
     el.querySelectorAll('[data-seek]').forEach(node=>node.onclick=()=>{
@@ -783,13 +776,23 @@ async function renderBody(tab,pass){
       el.querySelectorAll('.vstep').forEach(n=>n.classList.remove('now'));
       node.classList.add('now');
     });
-    // 재생 위치에 맞춰 현재 단계를 표시
+    // 재생 위치에 맞춰 현재 단계를 표시 + 가로 스트립을 스크롤
     if(video&&jn.cues.length){
+      const strip=el.querySelector('.vstep-strip');
       video.ontimeupdate=()=>{
         let idx=-1;
         for(let i=0;i<jn.cues.length;i++){ if(video.currentTime>=(jn.cues[i].start??0)) idx=i; }
         const nodes=el.querySelectorAll('.vstep');
         nodes.forEach((n,i)=>n.classList.toggle('now',i===idx));
+        if(idx>=0&&strip){
+          const node=nodes[idx];
+          if(node){
+            const sr=strip.getBoundingClientRect(), nr=node.getBoundingClientRect();
+            if(nr.left<sr.left||nr.right>sr.right){
+              node.scrollIntoView({behavior:'smooth',block:'nearest',inline:'nearest'});
+            }
+          }
+        }
       };
     }
     return;
