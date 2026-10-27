@@ -1,0 +1,37 @@
+{
+  "$comment": [
+    "OCR(open-code-review) 리뷰 정책. 기계 리뷰 브리지의 기본 정책(llm-cli-bridge ocr/default-rule.json)을 복사해 이 저장소에 맞게 고친 것이다.",
+    "OCR 은 include/exclude 를 계층끼리 합치지 않으므로 기본 정책의 항목도 여기에 그대로 둔다. 기본 정책이 바뀌면 이 파일도 맞춘다.",
+    "PR 리뷰에는 merge-base 시점의 이 파일이 적용된다. 이 파일을 고친 PR 은 merge 된 다음 PR 부터 새 정책을 쓴다.",
+    "이 저장소는 agents/·commands/·스킬·템플릿·참조 문서의 Markdown 이 곧 동작이므로 리뷰한다.",
+    "codex/plugins/dev-workflow/ 는 scripts/sync-workflow.mjs 가 만드는 생성본이라 제외한다. 원본과의 일치는 sync-workflow.mjs --check 가 확인한다."
+  ],
+  "include": [
+    "**/CLAUDE.md",
+    "**/AGENTS.md",
+    "**/REVIEW.md",
+    "**/SKILL.md",
+    ".claude/**/*.md",
+    ".codex/**/*.md",
+    "**/*_test.go",
+    "**/*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs}",
+    "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,cjs}",
+    "**/test_*.py",
+    "**/*_test.py",
+    "**/tests/**/*.py",
+    "**/src/test/**/*.{java,kt,kts}",
+    "**/*{Test,Tests}.java",
+    "**/*_test.rs",
+    "**/*_spec.rb",
+    "agents/**/*.md",
+    "commands/**/*.md",
+    "codex/skills/**/*.md",
+    "templates/**/*.md",
+    "docs/references/**/*.md",
+    "plugins/**/*.md",
+    "README.md"
+  ],
+  "exclude": [
+    "codex/plugins/dev-workflow/**"
+  ]
+}

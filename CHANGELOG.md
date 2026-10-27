@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `scripts/test-ult-notion.mjs` 의 `collect: stats` 가 2026-10-26 부터 항상 실패하던 문제 수정(#17). 앞선 `story-create`·`task-create` 테스트가 예정일을 고정 날짜로 만들어, 그 날짜가 지나면 `weekly-collect` 가 기한 경과로 집계했다. 예정일을 실행일 기준 미래 날짜(`day(n)`)로 바꿔, `verify-workflow.sh` 가 날짜와 무관하게 통과한다.
+- 기계 PR 리뷰(OCR + Codex 브리지)의 리뷰 정책 `.opencodereview/rule.json` 추가. 지금까지 OCR 은 확장자 허용 목록에 없는 `.md` 를 모두 빼고 있었다(PR #5·#6·#7 에서 리뷰 대상 5/8, 24/78, 8/13). 이 저장소에서는 `agents/`·`commands/`·스킬·템플릿·참조 문서·플러그인의 Markdown 이 곧 동작이다. 브리지의 기본 정책(AI 지시 파일·테스트 파일 포함)을 복사해 이 저장소 경로를 더하고, 생성본 `codex/plugins/dev-workflow/` 는 제외한다(원본과 함께 두 번 리뷰되고 있었음. 일치는 `sync-workflow.mjs --check` 가 확인). OCR 선택 규칙 시뮬레이션으로 세 PR 의 리뷰 대상은 7/8, 41/78, 12/13 이 되고 남는 제외는 `CHANGELOG.md` 뿐이다. 브리지는 merge-base 시점의 이 파일을 쓰므로, 이 파일을 고친 PR 은 merge 된 다음 PR 부터 적용된다.
 
 ## v1.1.0 (2026-10-22)
 
