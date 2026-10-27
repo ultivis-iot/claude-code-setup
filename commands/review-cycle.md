@@ -31,7 +31,7 @@ node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
 
 - bootstrap이 실행된 호출에서는 리뷰 처리, 코드 수정, commit, push를 직접 수행하지 않는다
 - 이후 Ralph Loop가 `/review-cycle ... --once`를 반복 입력하면 그때 아래 단일 라운드를 수행한다
-- 반복 횟수 기본값은 15회이며, 필요하면 `REVIEW_CYCLE_MAX_ITERATIONS` 환경 변수로 조정한다
+- 반복 횟수 기본값은 15회이며, 필요하면 `REVIEW_CYCLE_MAX_ITERATIONS` 환경 변수로 조정한다. 이 횟수는 리뷰를 기다리는 반복까지 포함한 상한이고, **리뷰 라운드 상한(기본 3)은 따로** 지킨다(아래 라운드 종료)
 - Ralph Loop 완료 신호는 반드시 `<promise>REVIEW COMPLETE</promise>` 형식으로 출력한다
 
 ## 핵심 규칙
@@ -47,22 +47,43 @@ node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
 
 ## 수행 절차
 
-1. PR checks, 최신 comments, reviews, unresolved review threads를 확인한다
-2. AI 리뷰만 필터링하고 최신 actionable 항목을 추린다
-   - 우선순위는 comments → reviews → unresolved threads
+1. 기계 리뷰 상태를 읽는다. 기계 리뷰(`isaac-notion-bot` 의 "🤖 AI Code Review Report")는 이 도구로만 읽고 마크다운을 직접 파싱하지 않는다.
+
+   ```bash
+   node ~/.claude/scripts/review-findings.mjs status --pr <N>
+   ```
+
+   출력의 `state` 로 이번 라운드를 정한다.
+   - `no_review`·`waiting`: 현재 PR HEAD 를 리뷰한 보고서가 아직 없다. 아무것도 고치지 않고 `REVIEW ROUND COMPLETE — 현재 HEAD 리뷰 대기` 를 출력한다. 이전 HEAD 의 보고서로 완료를 판단하지 않는다.
+   - `legacy`: 블록 없는 예전 형식 보고서뿐이다. `needs_user` 의 지적을 참고로 사용자에게 보여 주고, 완료 증거로 쓰지 않는다.
+   - `needs_user`: 자동으로 고치지 않을 지적(반증을 거치지 않았거나 partial 보고서)만 남았다. 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
+   - `actionable`: `to_fix` 를 이번 라운드에 처리한다. `reopened` 가 붙은 지적은 고쳤다고 기록했는데 리뷰가 아직 남아 있다고 본 것이니 다시 확인한다.
+   - `clear`: 고칠 지적이 없다. `complete` 가 `true` 면 완료다.
+   - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다. `pre_existing` 은 아래 Story Flow 의 carryover 와 같은 방식으로 남긴다.
+2. 기계 리뷰 외의 AI 리뷰(다른 bot 의 reviews, unresolved review threads)가 있으면 함께 본다
    - bot 계정이거나 AI 리뷰 헤더/패턴이 명확한 항목만 대상으로 본다
    - unresolved thread만 보고, 이미 해결된 thread는 제외한다
-3. 항목을 아래 다섯 분류로 나눈다
+3. 항목을 아래 다섯 분류로 나눈다. 한 지적의 `locations` 가 여러 곳이면 같은 원인이므로 모든 위치를 한 번에 고친다
    - 실제 버그
    - 유효한 개선
    - 범위 밖 설계 개선
    - 반복 지적
    - 오탐
-4. PR 코멘트로 이번 라운드의 반영/미반영 계획을 남긴다
+4. PR 코멘트로 이번 라운드의 반영/미반영 계획을 남긴다. 기계 리뷰 지적은 `id` 를 함께 적는다
 5. 반영 항목만 수정한다
 6. 프로젝트에 맞는 검증 명령을 실행한다
 7. commit + push 한다
-8. 마지막 처리 리뷰 ID를 `tmp/last-review-id-{PR}.txt`에 기록한다
+8. 기계 리뷰 지적마다 처리 결과를 기록한다. 이 기록으로 같은 지적을 다시 고치지 않고, 오탐률을 센다.
+
+   ```bash
+   node ~/.claude/scripts/review-findings.mjs record --pr <N> --id <id> --decision fixed --reason "<무엇을 고쳤는지>" --commit <sha>
+   node ~/.claude/scripts/review-findings.mjs record --pr <N> --id <id> --decision wrong|intentional|irrelevant --reason "<근거>"
+   ```
+
+   - `fixed`: 고쳤다. 다음 리뷰가 그 지적을 `resolved` 로 판정하는지 확인한다
+   - `wrong`: 오탐(코드가 그 실패를 막는다는 근거와 함께)
+   - `intentional`: 의도된 동작(PR 본문·문서의 근거와 함께)
+   - `irrelevant`: 맞지만 이 PR 에서 고칠 가치가 낮다
 9. 라운드 결과를 출력하고 종료한다
 
 ## Story Flow 규칙
@@ -85,9 +106,15 @@ push 실패 시 한 번은 rebase 후 재시도하고, 다시 실패하면 중�
 
 ## 라운드 종료
 
-- 신규 actionable 리뷰가 없고 CI/checks가 clear면 완료로 본다
-- 반복 지적/설명 완료 항목만 남아도 완료로 본다
+- `status` 의 `complete` 가 `true` 일 때만 완료로 본다. 현재 HEAD 의 complete 보고서에 고칠 지적이 없고 checks 가 모두 통과한 상태다
+- 다른 AI 리뷰도 신규 actionable 항목이 없어야 한다. 반복 지적/설명 완료 항목만 남은 경우는 완료로 본다
 - 수정, 코멘트, commit, push를 수행했다면 다음 리뷰가 필요하므로 완료로 보지 않는다
+- **라운드 상한**: `round_cap_reached` 가 `true`(기계 리뷰 3번째 라운드 이상)면 더 고치지 않는다. 남은 지적, 현재 HEAD, 리뷰 라운드를 정리해 사용자에게 "접근 재검토 필요"로 보고하고 루프를 멈춘다. 수정-리뷰를 계속 반복하면 리뷰어가 이전부터 있던 코드의 문제를 하나씩 더 찾아낼 뿐 수렴하지 않는다
+- `needs_user`·라운드 상한으로 멈출 때는 완료 신호를 내지 않고 아래 명령으로 Ralph Loop 를 멈춘다
+
+  ```bash
+  node ~/.claude/scripts/review-findings.mjs stop-loop
+  ```
 
 완료 메시지는 아래 한 줄만 출력한다:
 
