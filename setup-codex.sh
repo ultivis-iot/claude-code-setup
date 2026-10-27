@@ -133,7 +133,7 @@ echo "5. Scripts 설치..."
 mkdir -p "$CODEX_DIR/schemas" "$CODEX_DIR/docs/references" "$CODEX_DIR/templates" "$CODEX_DIR/agents"
 cp "$SCRIPT_DIR"/schemas/*.json "$CODEX_DIR/schemas/"
 cp "$SCRIPT_DIR"/docs/references/*.md "$CODEX_DIR/docs/references/"
-cp "$SCRIPT_DIR/templates/cli-sync.json" "$CODEX_DIR/templates/"
+cp "$SCRIPT_DIR/templates/cli-sync.json" "$SCRIPT_DIR/templates/REVIEW.md" "$CODEX_DIR/templates/"
 # Review instructions are read as references; these files do not register Codex agents.
 cp "$SCRIPT_DIR"/agents/*.md "$CODEX_DIR/agents/"
 SCRIPTS_DEST="$CODEX_DIR/scripts"

@@ -360,7 +360,7 @@ Plan에 따라 코드를 구현합니다.
 /create-pr project-maker
 ```
 
-모든 검증 통과 시 Push 및 PR을 생성합니다.
+모든 검증 통과 시 Push 및 PR을 생성합니다. PR 본문에는 해결한 문제, 변경 후 동작, 실제 수행한 검증, **위험**, **되돌리는 방법**, 남은 제한이 들어갑니다. 위험과 되돌리는 방법은 에이전트가 초안을 쓰고, 변경을 요청한 사람이 확인합니다.
 
 ### 6. PR 리뷰 반영
 
@@ -397,6 +397,14 @@ mkdir -p tmp
 - `tmp/validation-status.json` - 검증 결과 기록
 - `tmp/review-findings-{PR}.json` - 기계 리뷰 지적별 처리 기록 (`review-findings.mjs record` 가 생성, `.gitignore` 권장)
 - `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
+
+### 리뷰 정책 `REVIEW.md` (선택)
+
+저장소 루트의 `REVIEW.md` 는 로컬 검증(`commit-and-verify`)과 PR 기계 리뷰가 같이 읽는 리뷰 정책입니다. 이 저장소에서 실패가 무엇인지, 지적에 요구하는 근거, 건너뛸 경로, Nit 상한, 요약 형식을 짧게 적습니다. `~/.claude/templates/REVIEW.md`(Codex 는 `~/.codex/templates/REVIEW.md`)를 복사해 고쳐 씁니다.
+
+- 기계 리뷰는 리뷰 브리지(`llm-cli-bridge`)가 merge-base 의 `REVIEW.md` 를 읽어 리뷰 프롬프트에 넣습니다. 보고서의 리뷰 범위 절에 `리뷰 지침` 출처가 나옵니다.
+- 정책으로는 PR base 쪽 파일을 씁니다. PR 이 `REVIEW.md` 를 바꾸면 그 변경은 리뷰 대상이고 정책으로는 merge 뒤부터 씁니다.
+- 리뷰에서 같은 지적이 되풀이되면 `review-cycle` 이 `REVIEW.md` 에 규칙으로 옮기자고 제안합니다.
 
 ### Git Hook 설치 (선택)
 

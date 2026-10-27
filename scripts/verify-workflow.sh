@@ -89,6 +89,7 @@ check_file "$WORKFLOW_ROOT/schemas/validation-status.schema.json"
 check_file "$WORKFLOW_ROOT/docs/references/validation-contract.md"
 check_file "$WORKFLOW_ROOT/docs/references/create-pr-contract.md"
 check_file "$WORKFLOW_ROOT/templates/cli-sync.json"
+check_file "$WORKFLOW_ROOT/templates/REVIEW.md"
 
 if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/validation-gate.mjs" check "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"

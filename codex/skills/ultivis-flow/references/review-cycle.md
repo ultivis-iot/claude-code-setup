@@ -41,6 +41,8 @@ After each round, record every machine finding you handled:
 node "$SCRIPTS/review-findings.mjs" record --pr <N> --id <id> --decision fixed|wrong|intentional|irrelevant --reason "<evidence>" [--commit <sha>]
 ```
 
+When the same kind of finding keeps coming back across PRs (especially `wrong` or `intentional`), suggest to the user that it become a rule in the repository's `REVIEW.md`. Do not edit `REVIEW.md` yourself.
+
 ## Required behavior
 
 1. Process one round when `--once` is requested. Otherwise continue within the current session, recording round number and PR head SHA in the local handoff. Count waiting separately from review rounds: stop when `state` is `round_cap` and report the remaining findings, current head and round as "approach needs rethinking". Reaching any limit is an incomplete result, never a completion signal.
