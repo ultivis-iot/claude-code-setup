@@ -14,18 +14,41 @@ Inspect the latest AI PR feedback and process follow-up rounds in the current Co
 - Repeated feedback
 - False positive
 
+## Machine review findings
+
+The machine review (`isaac-notion-bot`, "🤖 AI Code Review Report") ends each comment with an `<!-- ocr-review:v1 -->` block. Read it only through the helper, not by parsing the Markdown. Resolve the scripts directory as `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}`.
+
+```bash
+node "$SCRIPTS/review-findings.mjs" status --pr <N>
+```
+
+Act on `state`:
+
+- `no_review`, `waiting`: no report for the current PR head yet. Change nothing; wait. A report of an earlier head is never completion evidence.
+- `legacy`: only reports without a block. Show `needs_user` to the user as reference; never treat it as completion.
+- `needs_user`: only findings that are not to be fixed automatically remain (not verified, or a partial report). Report them to the user and stop.
+- `actionable`: fix `to_fix`. A finding with `reopened` was recorded as fixed but the review still sees it; check it again. A finding with several `locations` is one cause; fix every location together.
+- `clear`: nothing to fix. Completion requires `complete: true`.
+- Never fix `pre_existing` (code this PR did not change), `rejected` (judged a false positive), `resolved` or `declined` (already recorded as wrong, intentional or irrelevant). Carry `pre_existing` over like other out-of-scope feedback.
+
+After each round, record every machine finding you handled:
+
+```bash
+node "$SCRIPTS/review-findings.mjs" record --pr <N> --id <id> --decision fixed|wrong|intentional|irrelevant --reason "<evidence>" [--commit <sha>]
+```
+
 ## Required behavior
 
-1. Process one round when `--once` is requested. Otherwise continue within the current session, up to 15 rounds by default, recording round number and PR head SHA in the local handoff. Reaching the limit is an incomplete result, never a completion signal.
-2. Read PR checks and the latest comments, reviews, and unresolved review threads. Tie review/check evidence to the current PR head SHA. Independent read-only queries may run concurrently; writes remain ordered.
-3. Keep only AI review items: read comments first, then reviews, then unresolved threads; accept an item only when it comes from a bot account or carries an unmistakable AI review header or pattern; skip threads that are already resolved.
+1. Process one round when `--once` is requested. Otherwise continue within the current session, recording round number and PR head SHA in the local handoff. Count waiting separately from review rounds: stop after the machine review's 3rd round (`round_cap_reached`) and report the remaining findings, current head and round as "approach needs rethinking". Reaching any limit is an incomplete result, never a completion signal.
+2. Read machine review findings with the helper above, plus PR checks, other AI reviews and unresolved review threads. Tie review/check evidence to the current PR head SHA. Independent read-only queries may run concurrently; writes remain ordered.
+3. For reviews other than the machine review, keep only AI review items: accept an item only when it comes from a bot account or carries an unmistakable AI review header or pattern; skip threads that are already resolved.
 4. Record what will be addressed before editing code.
 5. Apply fixes only for actionable items inside scope.
 6. Run the project's relevant verification commands.
 7. Commit and push the follow-up changes.
-8. Record the last processed review ID in `tmp/last-review-id-{PR}.txt`.
+8. Record each handled machine finding with `review-findings.mjs record` (see above).
 9. End the round without printing `<promise>REVIEW COMPLETE</promise>` if code changes, comments, commits, or pushes were made.
-10. Report completion only when there are no new actionable findings and required checks for the current head have completed successfully. An absent, pending, inaccessible or stale check is not a successful check. If review completion cannot be established, report what is still pending.
+10. Report completion only when `review-findings.mjs status` reports `complete: true`, other AI reviews have no new actionable findings, and required checks for the current head have completed successfully. An absent, pending, inaccessible or stale check is not a successful check. If review completion cannot be established, report what is still pending.
 
 ## Story-based PRs
 

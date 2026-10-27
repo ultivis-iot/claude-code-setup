@@ -81,7 +81,7 @@ else
 fi
 
 check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"
-for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs install-settings.mjs; do
+for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs review-findings.mjs install-settings.mjs; do
     check_file "$WORKFLOW_ROOT/scripts/$node_script"
     node --check "$WORKFLOW_ROOT/scripts/$node_script"
 done
@@ -94,6 +94,7 @@ if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/validation-gate.mjs" check "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
     node "$WORKFLOW_ROOT/scripts/test-validation-gate.mjs"
     node "$WORKFLOW_ROOT/scripts/test-install-settings.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-review-findings.mjs"
     node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"
