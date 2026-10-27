@@ -56,10 +56,11 @@ node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
    출력의 `state` 로 이번 라운드를 정한다.
    - `no_review`·`waiting`: 현재 PR HEAD 를 리뷰한 보고서가 아직 없다. 아무것도 고치지 않고 `REVIEW ROUND COMPLETE — 현재 HEAD 리뷰 대기` 를 출력한다. 이전 HEAD 의 보고서로 완료를 판단하지 않는다.
    - `legacy`: 블록 없는 예전 형식 보고서뿐이다. `needs_user` 의 지적을 참고로 사용자에게 보여 주고, 완료 증거로 쓰지 않는다.
-   - `needs_user`: 자동으로 고치지 않을 지적(반증을 거치지 않았거나 partial 보고서)만 남았다. 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
+   - `needs_user`: 자동으로 고치지 않을 지적(반증을 거치지 않았거나, partial 보고서이거나, 출처가 비었거나 모르는 값)만 남았다. 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
+   - `round_cap`: 기계 리뷰 3번째 라운드인데 지적이 남았다. 고치지 않고 라운드 종료의 "라운드 상한" 대로 사용자에게 보고한다.
    - `actionable`: `to_fix` 를 이번 라운드에 처리한다. `reopened` 가 붙은 지적은 고쳤다고 기록했는데 리뷰가 아직 남아 있다고 본 것이니 다시 확인한다.
    - `clear`: 고칠 지적이 없다. `complete` 가 `true` 면 완료다.
-   - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다. `pre_existing` 은 아래 Story Flow 의 carryover 와 같은 방식으로 남긴다.
+   - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다. `declined` 는 코드가 바뀌어도 다시 열리지 않으니, 판단이 바뀌었으면 `record` 로 다시 기록한다. `pre_existing` 은 아래 Story Flow 의 carryover 와 같은 방식으로 남긴다.
 2. 기계 리뷰 외의 AI 리뷰(다른 bot 의 reviews, unresolved review threads)가 있으면 함께 본다
    - bot 계정이거나 AI 리뷰 헤더/패턴이 명확한 항목만 대상으로 본다
    - unresolved thread만 보고, 이미 해결된 thread는 제외한다
@@ -109,7 +110,7 @@ push 실패 시 한 번은 rebase 후 재시도하고, 다시 실패하면 중�
 - `status` 의 `complete` 가 `true` 일 때만 완료로 본다. 현재 HEAD 의 complete 보고서에 고칠 지적이 없고 checks 가 모두 통과한 상태다
 - 다른 AI 리뷰도 신규 actionable 항목이 없어야 한다. 반복 지적/설명 완료 항목만 남은 경우는 완료로 본다
 - 수정, 코멘트, commit, push를 수행했다면 다음 리뷰가 필요하므로 완료로 보지 않는다
-- **라운드 상한**: `round_cap_reached` 가 `true`(기계 리뷰 3번째 라운드 이상)면 더 고치지 않는다. 남은 지적, 현재 HEAD, 리뷰 라운드를 정리해 사용자에게 "접근 재검토 필요"로 보고하고 루프를 멈춘다. 수정-리뷰를 계속 반복하면 리뷰어가 이전부터 있던 코드의 문제를 하나씩 더 찾아낼 뿐 수렴하지 않는다
+- **라운드 상한**: `state` 가 `round_cap`(기계 리뷰 3번째 라운드 이상인데 지적이 남음)이면 더 고치지 않는다. 그 라운드에 지적이 하나도 없으면 `clear` 로 나오고 완료로 본다. 남은 지적, 현재 HEAD, 리뷰 라운드를 정리해 사용자에게 "접근 재검토 필요"로 보고하고 루프를 멈춘다. 수정-리뷰를 계속 반복하면 리뷰어가 이전부터 있던 코드의 문제를 하나씩 더 찾아낼 뿐 수렴하지 않는다
 - `needs_user`·라운드 상한으로 멈출 때는 완료 신호를 내지 않고 아래 명령으로 Ralph Loop 를 멈춘다
 
   ```bash

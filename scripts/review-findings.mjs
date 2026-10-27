@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 export const DEFAULT_BOT = "isaac-notion-bot";
 export const DEFAULT_ROUND_CAP = 3;
 const DECISIONS = new Set(["fixed", "wrong", "intentional", "irrelevant"]);
+const FIXABLE_PROVENANCE = new Set(["introduced", "ported", "uncertain"]);
 const BLOCK = /<!-- ocr-review:v1 (.*?) -->/gs;
 
 export function parseBlock(body) {
@@ -64,12 +65,15 @@ function ledgerDecision(ledger, finding) {
 
 /**
  * 현재 HEAD 에 대한 리뷰 상태를 판정한다.
- * state: no_review | waiting | legacy | needs_user | actionable | clear
+ * state: no_review | waiting | legacy | needs_user | actionable | round_cap | clear
  *   waiting   현재 HEAD 를 리뷰한 블록이 아직 없다(이전 HEAD 보고서만 있음).
  *   legacy    블록 없는 보고서만 있다. 지적은 참고용이고 완료 증거가 아니다.
- *   needs_user 자동으로 고치지 않을 지적(미검증·partial)만 남았다.
+ *   needs_user 자동으로 고치지 않을 지적(미검증·partial·출처 미상)만 남았다.
  *   actionable 이번 라운드에 고칠 지적이 있다.
+ *   round_cap 상한 라운드인데 지적이 남았다. 고치지 않고 사람에게 넘긴다.
  *   clear     고칠 지적이 없다. 완료하려면 checks 도 통과해야 한다(complete 필드).
+ * 틀림·의도됨·상관없음으로 기록한 지적은 코드가 바뀌어도 다시 열지 않는다. 판단을 바꾸려면
+ * record 로 다시 기록한다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다.
  */
 export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP }) {
   const reports = comments
@@ -105,11 +109,15 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
     const earlier = ledgerDecision(ledger, finding);
     if (earlier && earlier.decision !== "fixed") { out.declined.push({ ...entry, decision: earlier }); continue; }
     if (earlier) entry.reopened = earlier;  // 고쳤다고 기록했는데 리뷰는 아직 남아 있다고 본다
-    // 반증을 거친 지적만 자동으로 고친다. 미검증이나 partial 보고서의 지적은 사람에게 넘긴다.
-    if (partial || finding.verification !== "confirmed") out.needs_user.push(entry);
+    // 반증을 거치고 이 PR 의 책임으로 판정된 지적만 자동으로 고친다. 미검증, partial 보고서,
+    // 출처가 비었거나 모르는 값인 지적은 사람에게 넘긴다.
+    if (partial || finding.verification !== "confirmed" || !FIXABLE_PROVENANCE.has(finding.provenance)) out.needs_user.push(entry);
     else out.to_fix.push(entry);
   }
-  out.state = out.to_fix.length ? "actionable" : out.needs_user.length ? "needs_user" : "clear";
+  const remaining = out.to_fix.length + out.needs_user.length;
+  // 상한 라운드에 지적이 남았으면 더 고치지 않고 사람에게 넘긴다. 남은 것이 없으면 그대로 완료다.
+  if (out.round_cap_reached && remaining) out.state = "round_cap";
+  else out.state = out.to_fix.length ? "actionable" : out.needs_user.length ? "needs_user" : "clear";
   out.complete = out.state === "clear" && !partial && pendingChecks.length === 0;
   return out;
 }
