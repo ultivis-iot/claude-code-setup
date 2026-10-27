@@ -72,10 +72,10 @@ function ledgerDecision(ledger, finding) {
  *   actionable 이번 라운드에 고칠 지적이 있다.
  *   round_cap 상한 라운드인데 지적이 남았다. 고치지 않고 사람에게 넘긴다.
  *   clear     고칠 지적이 없다. 완료하려면 checks 도 통과해야 한다(complete 필드).
- * 틀림·의도됨·상관없음으로 기록한 지적은 코드가 바뀌어도 다시 열지 않는다. 판단을 바꾸려면
- * record 로 다시 기록한다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다.
+ * 틀림·의도됨·상관없음으로 기록한 지적은, 기록한 뒤 지적 위치의 파일이 바뀌었으면(changedSince) 다시
+ * 연다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다.
  */
-export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP }) {
+export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false }) {
   const reports = comments
     .filter((c) => c.login === bot)
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
@@ -107,8 +107,13 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
     if (finding.verification === "rejected") { out.rejected.push(entry); continue; }
     if (finding.provenance === "pre_existing") { out.pre_existing.push(entry); continue; }
     const earlier = ledgerDecision(ledger, finding);
-    if (earlier && earlier.decision !== "fixed") { out.declined.push({ ...entry, decision: earlier }); continue; }
-    if (earlier) entry.reopened = earlier;  // 고쳤다고 기록했는데 리뷰는 아직 남아 있다고 본다
+    if (earlier && earlier.decision !== "fixed") {
+      // 틀림·의도됨 판단은 그 뒤 지적 위치의 파일이 바뀌었으면 다시 연다. 판단 시점을 모르면 묻어 두지 않고 연다.
+      const files = [...new Set((finding.locations || []).map((l) => l.file).filter(Boolean))];
+      if (!earlier.head_sha) entry.reopened = { ...earlier, reason: "decision has no recorded head" };
+      else if (changedSince(earlier.head_sha, files)) entry.reopened = { ...earlier, reason: "files changed since decision" };
+      else { out.declined.push({ ...entry, decision: earlier }); continue; }
+    } else if (earlier) entry.reopened = earlier;  // 고쳤다고 기록했는데 리뷰는 아직 남아 있다고 본다
     // 반증을 거치고 이 PR 의 책임으로 판정된 지적만 자동으로 고친다. 미검증, partial 보고서,
     // 출처가 비었거나 모르는 값인 지적은 사람에게 넘긴다.
     if (partial || finding.verification !== "confirmed" || !FIXABLE_PROVENANCE.has(finding.provenance)) out.needs_user.push(entry);
@@ -144,6 +149,22 @@ function gh(argv) {
   if (r.error) fail(`gh 를 실행할 수 없습니다: ${r.error.message}`);
   if (r.status !== 0) fail(`gh ${argv.join(" ")}: ${r.stderr.trim()}`);
   return r.stdout;
+}
+
+function gitOk(argv) {
+  return spawnSync("git", argv, { encoding: "utf8" });
+}
+
+// 판단을 기록한 HEAD 부터 PR HEAD(로컬에 없으면 지금 체크아웃한 HEAD)까지 files 가 바뀌었는가.
+// 기록한 HEAD 를 로컬에서 찾지 못하면 바뀐 것으로 본다(지적을 묻어 두지 않는다).
+function gitChangedSince(headSha) {
+  const target = headSha && gitOk(["cat-file", "-e", `${headSha}^{commit}`]).status === 0 ? headSha : "HEAD";
+  return (recorded, files) => {
+    if (!files.length) return false;
+    if (gitOk(["cat-file", "-e", `${recorded}^{commit}`]).status !== 0) return true;
+    const r = gitOk(["diff", "--name-only", recorded, target, "--", ...files]);
+    return r.status !== 0 || r.stdout.trim() !== "";
+  };
 }
 
 function repoRoot() {
@@ -184,6 +205,7 @@ function main() {
     const result = assess({
       headSha: data.head_sha, comments: data.comments, checks: data.checks || [],
       bot: opt.bot || DEFAULT_BOT, ledger: readLedger(opt.pr), roundCap: Number(opt["round-cap"] || DEFAULT_ROUND_CAP),
+      changedSince: gitChangedSince(data.head_sha),
     });
     process.stdout.write(JSON.stringify({ pr: Number(opt.pr), ...result }, null, 2) + "\n");
     return;
@@ -193,7 +215,11 @@ function main() {
     if (!DECISIONS.has(opt.decision)) fail(`--decision 은 ${[...DECISIONS].join("|")} 중 하나입니다`);
     if (!opt.reason || opt.reason === true) fail("--reason 이 필요합니다");
     const ledger = readLedger(opt.pr);
-    ledger.decisions[opt.id] = { decision: opt.decision, reason: opt.reason, commit: opt.commit || null, at: new Date().toISOString() };
+    const head = gitOk(["rev-parse", "HEAD"]);
+    ledger.decisions[opt.id] = {
+      decision: opt.decision, reason: opt.reason, commit: opt.commit || null,
+      head_sha: head.status === 0 ? head.stdout.trim() : null, at: new Date().toISOString(),
+    };
     const f = ledgerPath(opt.pr);
     mkdirSync(dirname(f), { recursive: true });
     writeFileSync(f, JSON.stringify(ledger, null, 2) + "\n");
