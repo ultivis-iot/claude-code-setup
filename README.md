@@ -177,6 +177,7 @@ git pull
 │   ├── ult-flow.mjs            # gh/git/worktree/handoff 보조 (ult-notion.mjs 가 호출, `wt-add` 가 worktree 생성)
 │   ├── graft.mjs               # Graft CLI 확인(ensure)·그래프 갱신(refresh)
 │   ├── lib/notion.mjs          # Notion REST 클라이언트 공용 모듈
+│   ├── review-findings.mjs     # review-cycle 이 기계 리뷰 블록을 지적 단위로 읽고 기록 (status/record/stop-loop)
 │   └── ...                     # 그 외 workflow 실행 스크립트
 ├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
 └── dev-tools/
@@ -371,13 +372,14 @@ Plan에 따라 코드를 구현합니다.
 /review-cycle 23 --once
 ```
 
-사용자는 `/review-cycle`만 실행하면 됩니다. 이 명령이 Ralph Loop를 자동으로 시작하고, Ralph Loop는 내부적으로 `/review-cycle ... --once`를 반복 실행합니다. 수정/코멘트/푸시가 발생한 라운드에서는 완료 promise를 출력하지 않고, 새 actionable 리뷰가 없고 checks가 clear일 때만 `<promise>REVIEW COMPLETE</promise>`를 출력해 Ralph Loop가 종료됩니다.
+사용자는 `/review-cycle`만 실행하면 됩니다. 이 명령이 Ralph Loop를 자동으로 시작하고, Ralph Loop는 내부적으로 `/review-cycle ... --once`를 반복 실행합니다.
 
-AI 코드 리뷰어의 지적을 자동으로 분석하고:
-- **실제 버그/보안 문제** → 코드 수정 + 커밋 + push
-- **설계 개선** → PR 범위 초과 시 GitHub 이슈 생성
-- **오탐/반복 지적** → PR 코멘트로 사유 설명
-- **신규 지적 없음** → 사이클 종료
+기계 리뷰(OCR + Codex 브리지)의 보고서는 `scripts/review-findings.mjs status` 로 지적 단위로 읽습니다.
+- **현재 PR HEAD 를 리뷰한 보고서**만 판단 근거로 씁니다. 아직 없으면 기다립니다.
+- **자동으로 고치는 지적**: 반증을 거쳤고, 이 PR 이 만든(또는 옮겨 온) 문제이며, PR 이 바꾼 파일 안에 있는 것. 고친 뒤 commit + push 하고 `record` 로 처리 결과를 남깁니다.
+- **고치지 않는 지적**: 이 PR 이전 코드의 문제(carryover 로 기록), 오탐 판정, 해결됨, 이미 틀림·의도됨으로 기록한 것(그 파일이 바뀌면 다시 엽니다).
+- **사람에게 넘기는 경우**: 미검증·출처 미상 지적만 남았거나, 기계 리뷰 3라운드에도 지적이 남았거나, 블록 없는 예전 보고서뿐일 때. 이때는 완료 신호 없이 루프를 멈춥니다.
+- **완료**: `status` 의 `complete` 가 `true`(현재 HEAD 보고서에 고칠 지적이 없고 checks 통과)이고 다른 AI 리뷰에도 새 지적이 없을 때만 `<promise>REVIEW COMPLETE</promise>`를 출력해 Ralph Loop가 종료됩니다.
 
 ## 프로젝트별 설정
 
@@ -393,7 +395,7 @@ mkdir -p tmp
 - `tmp/current-plan.md` - 현재 대화에서 승인된 Plan
 - `tmp/validation-snapshot.json` - 검증 시작 시 코드·base·Plan의 식별값
 - `tmp/validation-status.json` - 검증 결과 기록
-- `tmp/last-review-id-{PR}.txt` - 리뷰 사이클 상태 (`.gitignore` 권장)
+- `tmp/review-findings-{PR}.json` - 기계 리뷰 지적별 처리 기록 (`review-findings.mjs record` 가 생성, `.gitignore` 권장)
 - `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
 
 ### Git Hook 설치 (선택)

@@ -11,7 +11,10 @@ import { assess, parseBlock, parseLegacy } from './review-findings.mjs';
 const tool = path.join(path.dirname(fileURLToPath(import.meta.url)), 'review-findings.mjs');
 const HEAD = 'b'.repeat(40), OLD = 'a'.repeat(40);
 let count = 0;
-const check = (name, fn) => { fn(); count++; void name; };
+const check = (name, fn) => {
+  try { fn(); } catch (e) { console.error(`FAIL: ${name}`); throw e; }
+  count++;
+};
 
 const block = (fields) => `## 🤖 AI Code Review Report\n\n<details>\n\n<!-- ocr-review:v1 ${JSON.stringify({ version: 1, completeness: 'complete', round: 1, findings: [], ...fields })} -->\n\n</details>`;
 const finding = (id, fields = {}) => ({
@@ -20,10 +23,11 @@ const finding = (id, fields = {}) => ({
 });
 const bot = (id, at, body) => ({ id, created_at: at, login: 'isaac-notion-bot', body });
 
-// Shape of a real production report (PR #20, bridge after A0–A5): <details> wraps the block.
+// 실제 운영 보고서의 모양(PR #20, A0–A5 적용 브리지): <details> 안에 블록이 있다.
 const PRODUCTION = '## 🤖 AI Code Review Report\n\n### 📝 Summary\n리뷰 대상 1개 파일의 변경 (+38/-0)을 검토했고 보고할 문제 0건을 확인했습니다.\n\n<details>\n<summary><b>💡 Detailed Review (Click to expand)</b></summary>\n\n## Codex PR 코드 리뷰\n\n보고할 문제를 발견하지 못했습니다.\n\n<!-- ocr-review:v1 {"version":1,"head_sha":"4fec245267abbfc4526a4c69e9d84be46b77f42d","round":1,"completeness":"complete","findings":[]} -->\n\n</details>';
-// Shape of a report from before the block existed (PR #7): summary list repeats the detailed one.
-const LEGACY = '## 🤖 AI Code Review Report\n\n### ⚠️ Potential Risks\n- [HIGH] x.mjs:65 요약에만 있는 줄\n\n<details>\n\n## Codex PR 코드 리뷰\n\n### 높음\n\n- `x.mjs:65` **설정을 검증하지 않음**\n  - 근거\n\n### 보통\n\n- `x.mjs:376` **백업을 덮어씀**\n  - 근거\n\n### 요약\n\n총 2건의 문제를 발견했습니다.\n\n</details>';
+// 블록이 생기기 전 보고서의 모양(PR #7): 요약 목록이 상세 리뷰를 되풀이한다. 요약 쪽에도 상세와 같은 형식의
+// 줄이 있어야 '상세 영역만 읽는다' 는 규칙을 실제로 검사한다.
+const LEGACY = '## 🤖 AI Code Review Report\n\n### ⚠️ Potential Risks\n- [HIGH] x.mjs:65 요약에만 있는 줄\n\n### 높음\n\n- `x.mjs:1` **요약 영역의 같은 형식 줄**\n\n<details>\n\n## Codex PR 코드 리뷰\n\n### 높음\n\n- `x.mjs:65` **설정을 검증하지 않음**\n  - 근거\n\n### 보통\n\n- `x.mjs:376` **백업을 덮어씀**\n  - 근거\n\n### 요약\n\n총 2건의 문제를 발견했습니다.\n\n</details>';
 
 check('parses the production block', () => {
   const b = parseBlock(PRODUCTION);
@@ -31,12 +35,13 @@ check('parses the production block', () => {
   assert.equal(b.completeness, 'complete');
   assert.equal(parseBlock('no block'), null);
   assert.equal(parseBlock('<!-- ocr-review:v1 {broken -->'), null);
+  assert.equal(parseBlock('<!-- ocr-review:v1 {"version":2,"head_sha":"x"} -->'), null);
 });
 
 check('legacy reports are read from the detailed section only', () => {
   const found = parseLegacy(LEGACY);
   assert.deepEqual(found.map((f) => [f.severity, f.locations[0].line]), [['high', 65], ['medium', 376]]);
-  assert.equal(found[0].id, parseLegacy(LEGACY)[0].id);  // stable across reads
+  assert.equal(found[0].id, parseLegacy(LEGACY)[0].id);  // 읽을 때마다 같은 id
 });
 
 check('no bot report yet', () => {
@@ -109,7 +114,7 @@ check('a declined finding reopens when its files changed since the decision', ()
   const ledger = { decisions: {
     same: { decision: 'wrong', reason: 'guarded', head_sha: OLD },
     touched: { decision: 'intentional', reason: 'by design', head_sha: OLD },
-    unknown: { decision: 'irrelevant', reason: 'minor' },  // recorded before head_sha was kept
+    unknown: { decision: 'irrelevant', reason: 'minor' },  // head_sha 를 저장하기 전의 기록
   } };
   const asked = [];
   const changedSince = (head, files) => { asked.push([head, files]); return files.includes('b.mjs'); };
@@ -133,12 +138,32 @@ check('only findings with a known provenance are fixed automatically', () => {
   assert.deepEqual(r.needs_user.map((f) => f.id), ['unlabelled', 'future']);
 });
 
+check('findings the review bot may have been steered to are held for the user', () => {
+  const r = assess({ headSha: HEAD, prFiles: ['a.mjs', '.github/workflows/ci.yml'], comments: [bot(1, 't', block({ head_sha: HEAD, findings: [
+    finding('in-pr'),
+    finding('elsewhere', { locations: [{ file: 'a.mjs', line: 1 }, { file: 'scripts/other.mjs', line: 2 }] }),
+    finding('workflow', { locations: [{ file: '.github/workflows/ci.yml', line: 3 }] }),
+    { id: 42, locations: [{ file: 'a.mjs' }] },
+    finding('option', { locations: [{ file: '--output=/tmp/x', line: 1 }] }),
+  ] }))] });
+  assert.deepEqual(r.to_fix.map((f) => f.id), ['in-pr']);
+  assert.deepEqual(r.needs_user.map((f) => f.hold), ['outside PR files', 'sensitive path', 'malformed finding', 'malformed finding']);
+  // PR 파일 목록이 없으면(테스트 입력 등) 그 검사만 건너뛴다
+  const noFiles = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [finding('elsewhere', { locations: [{ file: 'scripts/other.mjs', line: 2 }] })] }))] });
+  assert.deepEqual(noFiles.to_fix.map((f) => f.id), ['elsewhere']);
+});
+
+check('ledger lookups ignore inherited object keys', () => {
+  const r = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [finding('constructor')] }))] });
+  assert.equal(r.to_fix[0].reopened, undefined);
+});
+
 check('round cap stops fixing while findings remain; a clean report at the cap still completes', () => {
   const capped = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, round: 3, findings: [finding('left')] }))] });
   assert.equal(capped.round_cap_reached, true);
   assert.equal(capped.state, 'round_cap');
   assert.equal(capped.complete, false);
-  assert.deepEqual(capped.to_fix.map((f) => f.id), ['left']);  // listed for the report, not to be fixed
+  assert.deepEqual(capped.to_fix.map((f) => f.id), ['left']);  // 보고용 목록이고 고치지 않는다
   const clean = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, round: 3 }))] });
   assert.equal(clean.state, 'clear');
   assert.equal(clean.complete, true);
@@ -148,7 +173,7 @@ check('round cap stops fixing while findings remain; a clean report at the cap s
   assert.deepEqual(pending.checks.not_passed, ['ci']);
 });
 
-// CLI: status reads --input instead of gh, record writes the ledger under the repo's tmp/.
+// CLI: status 는 gh 대신 --input 을 읽고, record 는 저장소의 tmp/ 에 처리 이력을 쓴다.
 const dir = mkdtempSync(path.join(os.tmpdir(), 'review-findings-'));
 try {
   const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
@@ -188,6 +213,7 @@ try {
     assert.deepEqual(JSON.parse(run('stop-loop').stdout), { stopped: false });
   });
   check('cli rejects bad input', () => {
+    assert.equal(run('status', '--pr', '18', '--input', input, '--repo', 'a/b;rm').status, 1);
     assert.equal(run('record', '--pr', '18', '--id', 'f1', '--decision', 'maybe', '--reason', 'x').status, 1);
     assert.equal(run('record', '--pr', '18', '--id', 'f1', '--decision', 'fixed').status, 1);
     assert.equal(run('status', '--pr', 'x', '--input', input).status, 1);

@@ -57,10 +57,50 @@ export function parseLegacy(body) {
 }
 
 const idsOf = (finding) => [finding.id, ...(finding.aliases || [])];
+// 리뷰 봇이 PR 작성자의 diff 에 유도될 수 있으므로, 이 경로를 건드리는 지적은 자동으로 고치지 않는다.
+const SENSITIVE_PATH = /^(\.github|\.claude)\//;
 
 function ledgerDecision(ledger, finding) {
-  for (const id of idsOf(finding)) if (ledger.decisions?.[id]) return { id, ...ledger.decisions[id] };
+  const decisions = ledger.decisions || {};
+  for (const id of idsOf(finding)) if (Object.hasOwn(decisions, id)) return { id, ...decisions[id] };
   return null;
+}
+
+// 블록은 리뷰 봇이 쓴 외부 데이터다. 쓰는 필드의 모양만 확인하고, 맞지 않으면 사람에게 넘긴다.
+function wellFormed(finding) {
+  return typeof finding?.id === "string" && finding.id !== ""
+    && (finding.aliases === undefined || (Array.isArray(finding.aliases) && finding.aliases.every((a) => typeof a === "string")))
+    && Array.isArray(finding.locations) && finding.locations.length > 0
+    && finding.locations.every((l) => typeof l?.file === "string" && l.file !== "" && !l.file.startsWith("-"));
+}
+
+const filesOf = (finding) => [...new Set(finding.locations.map((l) => l.file))];
+
+// 지적 하나가 어느 목록에 들어가는지 정한다. hold 는 needs_user 로 보내는 이유다.
+function classify(finding, { ledger, changedSince, partial, prFiles }) {
+  if (!wellFormed(finding)) return { list: "needs_user", entry: { raw: finding, hold: "malformed finding" } };
+  const entry = { ...finding, file: finding.locations[0].file, line: finding.locations[0].line };
+  if (finding.status === "resolved") return { list: "resolved", entry };
+  if (finding.verification === "rejected") return { list: "rejected", entry };
+  if (finding.provenance === "pre_existing") return { list: "pre_existing", entry };
+
+  const earlier = ledgerDecision(ledger, finding);
+  if (earlier && earlier.decision === "fixed") {
+    entry.reopened = earlier;  // 고쳤다고 기록했는데 리뷰는 아직 남아 있다고 본다
+  } else if (earlier) {
+    // 틀림·의도됨·상관없음 판단은 그 뒤 지적 위치의 파일이 바뀌었으면 다시 연다. 판단 시점을 모르면 묻어 두지 않고 연다.
+    if (!earlier.head_sha) entry.reopened = { ...earlier, reason: "decision has no recorded head" };
+    else if (changedSince(earlier.head_sha, filesOf(finding))) entry.reopened = { ...earlier, reason: "files changed since decision" };
+    else return { list: "declined", entry: { ...entry, decision: earlier } };
+  }
+
+  // 반증을 거치고 이 PR 의 책임으로 판정된 지적만 자동으로 고친다.
+  if (partial) entry.hold = "partial report";
+  else if (finding.verification !== "confirmed") entry.hold = "not verified";
+  else if (!FIXABLE_PROVENANCE.has(finding.provenance)) entry.hold = "unknown provenance";
+  else if (filesOf(finding).some((f) => SENSITIVE_PATH.test(f))) entry.hold = "sensitive path";
+  else if (prFiles && filesOf(finding).some((f) => !prFiles.has(f))) entry.hold = "outside PR files";
+  return { list: entry.hold ? "needs_user" : "to_fix", entry };
 }
 
 /**
@@ -68,14 +108,15 @@ function ledgerDecision(ledger, finding) {
  * state: no_review | waiting | legacy | needs_user | actionable | round_cap | clear
  *   waiting   현재 HEAD 를 리뷰한 블록이 아직 없다(이전 HEAD 보고서만 있음).
  *   legacy    블록 없는 보고서만 있다. 지적은 참고용이고 완료 증거가 아니다.
- *   needs_user 자동으로 고치지 않을 지적(미검증·partial·출처 미상)만 남았다.
+ *   needs_user 자동으로 고치지 않을 지적만 남았다. 각 지적의 hold 가 이유다.
  *   actionable 이번 라운드에 고칠 지적이 있다.
  *   round_cap 상한 라운드인데 지적이 남았다. 고치지 않고 사람에게 넘긴다.
- *   clear     고칠 지적이 없다. 완료하려면 checks 도 통과해야 한다(complete 필드).
+ *   clear     고칠 지적이 없다. 완료하려면 보고서가 complete 이고 checks 도 통과해야 한다(complete 필드).
  * 틀림·의도됨·상관없음으로 기록한 지적은, 기록한 뒤 지적 위치의 파일이 바뀌었으면(changedSince) 다시
- * 연다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다.
+ * 연다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다. prFiles 를 주면 PR 이 바꾼 파일 밖을
+ * 짚는 지적은 자동으로 고치지 않는다.
  */
-export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false }) {
+export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null }) {
   const reports = comments
     .filter((c) => c.login === bot)
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
@@ -101,27 +142,13 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
   out.round = block.round ?? null;
   out.round_cap_reached = (block.round ?? 0) >= roundCap;
   const partial = block.completeness !== "complete";
-  for (const finding of block.findings || []) {
-    const entry = { ...finding, file: finding.locations?.[0]?.file, line: finding.locations?.[0]?.line };
-    if (finding.status === "resolved") { out.resolved.push(entry); continue; }
-    if (finding.verification === "rejected") { out.rejected.push(entry); continue; }
-    if (finding.provenance === "pre_existing") { out.pre_existing.push(entry); continue; }
-    const earlier = ledgerDecision(ledger, finding);
-    if (earlier && earlier.decision !== "fixed") {
-      // 틀림·의도됨 판단은 그 뒤 지적 위치의 파일이 바뀌었으면 다시 연다. 판단 시점을 모르면 묻어 두지 않고 연다.
-      const files = [...new Set((finding.locations || []).map((l) => l.file).filter(Boolean))];
-      if (!earlier.head_sha) entry.reopened = { ...earlier, reason: "decision has no recorded head" };
-      else if (changedSince(earlier.head_sha, files)) entry.reopened = { ...earlier, reason: "files changed since decision" };
-      else { out.declined.push({ ...entry, decision: earlier }); continue; }
-    } else if (earlier) entry.reopened = earlier;  // 고쳤다고 기록했는데 리뷰는 아직 남아 있다고 본다
-    // 반증을 거치고 이 PR 의 책임으로 판정된 지적만 자동으로 고친다. 미검증, partial 보고서,
-    // 출처가 비었거나 모르는 값인 지적은 사람에게 넘긴다.
-    if (partial || finding.verification !== "confirmed" || !FIXABLE_PROVENANCE.has(finding.provenance)) out.needs_user.push(entry);
-    else out.to_fix.push(entry);
+  const files = prFiles ? new Set(prFiles) : null;
+  for (const finding of Array.isArray(block.findings) ? block.findings : []) {
+    const { list, entry } = classify(finding, { ledger, changedSince, partial, prFiles: files });
+    out[list].push(entry);
   }
-  const remaining = out.to_fix.length + out.needs_user.length;
-  // 상한 라운드에 지적이 남았으면 더 고치지 않고 사람에게 넘긴다. 남은 것이 없으면 그대로 완료다.
-  if (out.round_cap_reached && remaining) out.state = "round_cap";
+  // 상한 라운드에 지적이 남았으면 더 고치지 않고 사람에게 넘긴다.
+  if (out.round_cap_reached && out.to_fix.length + out.needs_user.length) out.state = "round_cap";
   else out.state = out.to_fix.length ? "actionable" : out.needs_user.length ? "needs_user" : "clear";
   out.complete = out.state === "clear" && !partial && pendingChecks.length === 0;
   return out;
@@ -155,20 +182,22 @@ function gitOk(argv) {
   return spawnSync("git", argv, { encoding: "utf8" });
 }
 
+const commitExists = (sha) => gitOk(["cat-file", "-e", `${sha}^{commit}`]).status === 0;
+
 // 판단을 기록한 HEAD 부터 PR HEAD(로컬에 없으면 지금 체크아웃한 HEAD)까지 files 가 바뀌었는가.
 // 기록한 HEAD 를 로컬에서 찾지 못하면 바뀐 것으로 본다(지적을 묻어 두지 않는다).
 function gitChangedSince(headSha) {
-  const target = headSha && gitOk(["cat-file", "-e", `${headSha}^{commit}`]).status === 0 ? headSha : "HEAD";
+  const target = headSha && commitExists(headSha) ? headSha : "HEAD";
   return (recorded, files) => {
     if (!files.length) return false;
-    if (gitOk(["cat-file", "-e", `${recorded}^{commit}`]).status !== 0) return true;
+    if (!commitExists(recorded)) return true;
     const r = gitOk(["diff", "--name-only", recorded, target, "--", ...files]);
     return r.status !== 0 || r.stdout.trim() !== "";
   };
 }
 
 function repoRoot() {
-  const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  const r = gitOk(["rev-parse", "--show-toplevel"]);
   return r.status === 0 ? r.stdout.trim() : process.cwd();
 }
 
@@ -182,11 +211,11 @@ function readLedger(pr) {
 
 function loadFromGitHub(pr, repo) {
   const slug = repo || gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
-  const view = JSON.parse(gh(["pr", "view", String(pr), "--repo", slug, "--json", "headRefOid,statusCheckRollup"]));
+  const view = JSON.parse(gh(["pr", "view", String(pr), "--repo", slug, "--json", "headRefOid,statusCheckRollup,files"]));
   const comments = gh(["api", `repos/${slug}/issues/${pr}/comments`, "--paginate", "--jq", ".[] | {id, created_at, login: .user.login, body} | tojson"])
     .split("\n").filter(Boolean).map((line) => JSON.parse(line));
   const checks = (view.statusCheckRollup || []).map((c) => ({ name: c.name || c.context, conclusion: c.conclusion, state: c.state }));
-  return { head_sha: view.headRefOid, comments, checks };
+  return { head_sha: view.headRefOid, comments, checks, files: (view.files || []).map((f) => f.path) };
 }
 
 function main() {
@@ -201,17 +230,19 @@ function main() {
   }
   if (!opt.pr || !/^\d+$/.test(String(opt.pr))) fail("--pr <번호> 가 필요합니다");
   if (cmd === "status") {
+    if (opt.repo !== undefined && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(String(opt.repo))) fail("--repo 는 owner/name 형식입니다");
+    if (opt.bot !== undefined && !/^[A-Za-z0-9-]+(\[bot\])?$/.test(String(opt.bot))) fail("--bot 은 GitHub 로그인입니다");
     const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
     const result = assess({
       headSha: data.head_sha, comments: data.comments, checks: data.checks || [],
       bot: opt.bot || DEFAULT_BOT, ledger: readLedger(opt.pr), roundCap: Number(opt["round-cap"] || DEFAULT_ROUND_CAP),
-      changedSince: gitChangedSince(data.head_sha),
+      changedSince: gitChangedSince(data.head_sha), prFiles: Array.isArray(data.files) ? data.files : null,
     });
     process.stdout.write(JSON.stringify({ pr: Number(opt.pr), ...result }, null, 2) + "\n");
     return;
   }
   if (cmd === "record") {
-    if (!opt.id) fail("--id 가 필요합니다");
+    if (!opt.id || opt.id === true) fail("--id 가 필요합니다");
     if (!DECISIONS.has(opt.decision)) fail(`--decision 은 ${[...DECISIONS].join("|")} 중 하나입니다`);
     if (!opt.reason || opt.reason === true) fail("--reason 이 필요합니다");
     const ledger = readLedger(opt.pr);
