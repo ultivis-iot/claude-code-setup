@@ -91,6 +91,7 @@ node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
    - `wrong`: 오탐(코드가 그 실패를 막는다는 근거와 함께)
    - `intentional`: 의도된 동작(PR 본문·문서의 근거와 함께)
    - `irrelevant`: 맞지만 이 PR 에서 고칠 가치가 낮다
+   - 같은 종류의 지적이 여러 PR 에서 되풀이되면(특히 `wrong`·`intentional`) 저장소 `REVIEW.md` 에 규칙으로 옮기자고 사용자에게 제안한다. `REVIEW.md` 는 직접 고치지 않는다.
 9. 라운드 결과를 출력하고 종료한다
 
 ## Story Flow 규칙

@@ -124,7 +124,7 @@ done
 # Scripts 설치
 mkdir -p "$CLAUDE_DIR/docs/references" "$CLAUDE_DIR/templates"
 cp "$SCRIPT_DIR"/docs/references/*.md "$CLAUDE_DIR/docs/references/"
-cp "$SCRIPT_DIR/templates/cli-sync.json" "$CLAUDE_DIR/templates/"
+cp "$SCRIPT_DIR/templates/cli-sync.json" "$SCRIPT_DIR/templates/REVIEW.md" "$CLAUDE_DIR/templates/"
 if [ -d "$SCRIPT_DIR/scripts" ]; then
     mkdir -p "$CLAUDE_DIR/scripts"
     for file in "$SCRIPT_DIR/scripts"/*.sh "$SCRIPT_DIR/scripts"/*.mjs; do
