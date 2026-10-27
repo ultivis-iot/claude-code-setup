@@ -45,4 +45,5 @@ node ~/.claude/scripts/ult-notion.mjs my-tasks $ARGUMENTS --select <번호>
 
 - Notion 토큰은 `NOTION_TOKEN` 환경변수, `~/.claude/dev-tools/.env`, 또는 `~/.claude.json` 의 `notion-api` MCP 등록값에서 자동 인식한다. 없으면 오류 메시지의 안내를 사용자에게 그대로 전한다.
 - 본인 GitHub 로그인이 Member DB 의 `Github` 칸에 없으면 PM 에게 추가를 요청하라고 안내한다.
+- worktree 는 Task 의 Repository 저장소에 만든다. 그 저장소가 현재 저장소가 아니고 로컬 체크아웃(`WORKTREE_ROOT` 또는 `~/Git` 아래 저장소 이름 디렉터리, origin 이 그 GitHub 저장소)도 없으면 현재 저장소에 만들지 않고 실패한다. 오류 메시지의 clone 안내를 사용자에게 그대로 전한다. Repository 의 URL 이 GitHub 저장소가 아니어도 실패한다. Repository 관계가 없는 Task 만 현재 저장소를 쓴다.
 - 첫 실행 시 Member DB 캐싱(~1s), 이후 24h 동안 `~/.claude/notion-cache` 재사용.

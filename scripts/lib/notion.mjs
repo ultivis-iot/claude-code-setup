@@ -423,7 +423,8 @@ async function repos() {
 export function githubRepoFromUrl(url) {
   if (!url) return "";
   const s = String(url).replace(/^git@github\.com:/, "").replace(/^https?:\/\/github\.com\//, "").replace(/\.git$/, "").replace(/\/+$/, "");
-  return /^[^/]+\/[^/]+$/.test(s) ? s : "";
+  // GitHub 의 owner/repo 이름에 쓰는 문자만 받는다. 이 값은 경로와 터미널 출력에 그대로 쓰인다.
+  return /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(s) ? s : "";
 }
 export async function repositoriesList() { return (await repos()).items; }
 export async function repositoryIdByName(name) { return (await repos()).items.find((i) => i.name === name)?.id || ""; }

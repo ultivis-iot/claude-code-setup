@@ -568,8 +568,14 @@ async function cmdMyTasks(argv) {
   let issueUrl = N.urlOf(sel, "Issue URL");
   let issueNum = issueNumOf(sel);
   const taskName = N.taskName(sel);
+  // Repository 관계가 없는 Task 만 현재 저장소를 쓴다. 관계가 있는데 저장소를 알아내지 못하면 현재 저장소로
+  // 대신하지 않는다(다른 저장소의 Task 가 현재 저장소에 만들어지는 #13 과 같은 실패).
   let repoSlug = "";
-  try { repoSlug = await N.repositorySlugById(N.relIds(sel, P.REPOSITORY)[0]); } catch { /* 현재 저장소 사용 */ }
+  const repoId = N.relIds(sel, P.REPOSITORY)[0];
+  if (repoId) {
+    try { repoSlug = await N.repositorySlugById(repoId); } catch (e) { die(`Task 의 Repository 정보를 읽지 못했습니다: ${e.message}`); }
+    if (!repoSlug) die("Task 의 Repository 에서 GitHub 저장소를 알 수 없습니다. Notion Repository 의 URL 이 https://github.com/<owner>/<repo> 형식인지 확인하세요.");
+  }
 
   if (!issueNum) {
     say("");
@@ -590,7 +596,9 @@ async function cmdMyTasks(argv) {
 
   const wt = await flow("wt-add", ["--branch", branch, ...(repoSlug ? ["--repo-slug", repoSlug] : [])]);
   // Task 의 저장소를 로컬에서 못 찾았을 때 현재 저장소로 다시 만들면 다른 저장소의 Task 를 엉뚱한 곳에서 작업하게 된다(#13).
-  if (!wt.ok && repoSlug) die(`Task 의 저장소 ${repoSlug} 의 로컬 체크아웃을 찾지 못했습니다. 현재 저장소에서 실행하거나 WORKTREE_ROOT 또는 ~/Git 아래에 ${repoSlug.split("/").pop()} 로 clone 한 뒤 다시 실행하세요.\n(${wt.error})`);
+  if (!wt.ok && repoSlug && /저장소 로컬 체크아웃을 찾지 못했습니다/.test(wt.error)) {
+    die(`Task 의 저장소 ${repoSlug} 의 로컬 체크아웃을 찾지 못했습니다. 그 저장소에서 실행하거나, WORKTREE_ROOT(기본 ~/Git) 또는 ~/Git 아래에 ${repoSlug.split("/").pop()} 디렉터리로 clone 한 뒤 다시 실행하세요. origin 이 github.com/${repoSlug} 를 가리켜야 합니다.`);
+  }
   if (!wt.ok) die(`Worktree 생성 실패: ${wt.error}${wt.detail ? "\n" + wt.detail : ""}`);
   const wtPath = wt.json.worktree;
   const wtName = basename(wtPath);
