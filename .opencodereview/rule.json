@@ -1,9 +1,10 @@
 {
   "$comment": [
-    "OCR(open-code-review) 리뷰 정책. 기계 리뷰 브리지의 기본 정책(llm-cli-bridge ocr/default-rule.json)을 복사해 이 저장소에 맞게 고친 것이다.",
-    "OCR 은 include/exclude 를 계층끼리 합치지 않으므로 기본 정책의 항목도 여기에 그대로 둔다. 기본 정책이 바뀌면 이 파일도 맞춘다.",
+    "OCR(open-code-review) 리뷰 정책. 기계 리뷰 브리지의 기본 정책(llm-cli-bridge ocr/default-rule.json, 2026-10-27 판)을 복사해 이 저장소에 맞게 고친 것이다.",
+    "OCR 은 include/exclude 를 계층끼리 합치지 않으므로 기본 정책의 항목도 여기에 그대로 둔다. 기본 정책이 바뀌면 이 파일도 맞춘다(자동 검사는 없다).",
     "PR 리뷰에는 merge-base 시점의 이 파일이 적용된다. 이 파일을 고친 PR 은 merge 된 다음 PR 부터 새 정책을 쓴다.",
-    "이 저장소는 agents/·commands/·스킬·템플릿·참조 문서의 Markdown 이 곧 동작이므로 리뷰한다.",
+    "include 의 앞부분(**/CLAUDE.md ~ **/*_spec.rb)은 기본 정책에서 복사한 줄이다. 이 저장소에 해당 파일이 없는 패턴(다른 언어의 테스트 파일 등)과 아래 줄과 겹치는 **/SKILL.md 도 기본 정책과 맞추려고 그대로 둔다. 이 저장소의 scripts/test-*.mjs 는 OCR 기본 규칙(.mjs 허용, 기본 제외 경로에 해당 없음)으로 이미 리뷰된다.",
+    "뒷부분은 이 저장소가 더한 줄이다. agents/·commands/·스킬·템플릿·참조 문서의 Markdown 이 곧 동작이라 리뷰한다. plugins/**/*.md 는 플러그인의 지시 문서(agents/*.md, SKILL.md 등)를 위해 미리 둔 것이다(현재 master 의 plugins/ 에는 Markdown 이 없다). docs/workflow.md 처럼 사람이 읽는 안내 문서는 넣지 않았다.",
     "codex/plugins/dev-workflow/ 는 scripts/sync-workflow.mjs 가 만드는 생성본이라 제외한다. 원본과의 일치는 sync-workflow.mjs --check 가 확인한다."
   ],
   "include": [
