@@ -57,13 +57,14 @@ node ~/.codex/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
 
    출력의 `state` 로 이번 라운드를 정한다.
    - `no_review`·`waiting`: 현재 PR HEAD 를 리뷰한 보고서가 아직 없다. 아무것도 고치지 않고 `REVIEW ROUND COMPLETE — 현재 HEAD 리뷰 대기` 를 출력한다. 이전 HEAD 의 보고서로 완료를 판단하지 않는다.
-   - `legacy`: 블록 없는 예전 형식 보고서뿐이다. `needs_user` 의 지적을 참고 목록으로 사용자에게 보고하고 루프를 멈춘다(완료 아님, 라운드 종료).
-   - `needs_user`: 자동으로 고치지 않을 지적만 남았다. 각 지적의 `hold` 가 이유다(`partial report`, `not verified`, `unknown provenance`, `sensitive path`(`.github/`·`.codex/`), `outside PR files`(PR 이 바꾸지 않은 파일), `malformed finding`). 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
+   - `legacy`: 블록 없는 예전 형식 보고서뿐이다. `needs_user` 의 지적(`legacy: true`, `hold` 없음)을 참고 목록으로 사용자에게 보고하고 루프를 멈춘다(완료 아님, 라운드 종료).
+   - `needs_user`: 자동으로 고치지 않을 지적만 남았다. 각 지적의 `hold` 가 이유다(`partial report`, `not verified`, `unknown provenance`, `untrusted author`(PR 작성자가 OWNER·MEMBER·COLLABORATOR 가 아님), `sensitive path`(`.github`·`.claude`·`.codex` 디렉터리), `PR files unknown`, `outside PR files`(PR 이 바꾸지 않은 파일), `malformed finding`(필드 모양 불량, `./`·`..`·절대 경로 포함)). 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
    - `round_cap`: 기계 리뷰 3번째 라운드인데 지적이 남았다. 고치지 않고 라운드 종료의 "라운드 상한" 대로 사용자에게 보고한다.
-   - `actionable`: `to_fix` 를 이번 라운드에 처리한다. `reopened` 가 붙은 지적은 다시 확인한다. (a) 고쳤다고 기록했는데 리뷰가 아직 남아 있다고 본 경우이거나, (b) 틀림·의도됨·상관없음으로 기록한 뒤 그 위치의 파일이 바뀌었거나 기록에 기준 HEAD 가 없는 경우다.
+   - `actionable`: `to_fix` 를 이번 라운드에 처리한다. `reopened` 가 붙은 지적은 다시 확인한다. (a) 고쳤다고 기록했는데 리뷰가 아직 남아 있다고 본 경우이거나, (b) 틀림·의도됨·상관없음으로 기록한 뒤 그 위치의 파일이 바뀌었거나, 기록에 기준 HEAD 가 없거나 그 커밋을 로컬에서 찾지 못하는 경우다.
    - `clear`: 고칠 지적이 없다. 완료 여부는 `complete` 로만 판단한다.
    - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다.
-   - `declined` 는 판단을 기록한 뒤 그 위치의 파일이 바뀌면 `reopened` 로 다시 열린다. 다시 열린 지적도 자동 수정 조건(반증됨, 출처가 이 PR, partial 아님, PR 파일 안)을 그대로 거쳐 `to_fix` 나 `needs_user` 로 간다. 판단이 바뀌었으면 `record` 로 다시 기록한다.
+   - `declined` 는 판단을 기록한 뒤 그 위치의 파일이 바뀌면 `reopened` 로 다시 열린다. 다시 열린 지적도 자동 수정 조건(반증됨, 출처가 이 PR, partial 아님, 신뢰할 수 있는 작성자, PR 파일 안, 민감 디렉터리 아님)을 그대로 거쳐 `to_fix` 나 `needs_user` 로 간다. 판단이 바뀌었으면 `record` 로 다시 기록한다.
+   - `resolved`·`rejected`·`pre_existing` 판정은 리뷰 봇(통합 단계)의 판정을 그대로 믿는다. 그래서 `complete` 는 merge 전 사람의 확인을 대신하지 않는다.
    - `pre_existing` 은 Story 기반 PR 이면 아래 Story Flow 처럼 `tmp/story-handoff.md` 와 Notion Story comment 에, 그 밖의 PR 이면 PR 코멘트에 carryover 로 남긴다.
 2. 기계 리뷰 외의 AI 리뷰(다른 bot 의 reviews, unresolved review threads)가 있으면 함께 본다
    - bot 계정이거나 AI 리뷰 헤더/패턴이 명확한 항목만 대상으로 본다
