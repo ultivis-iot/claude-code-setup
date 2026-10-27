@@ -24,6 +24,9 @@ const DECISIONS = new Set(["fixed", "wrong", "intentional", "irrelevant"]);
 const FIXABLE_PROVENANCE = new Set(["introduced", "ported", "uncertain"]);
 const BLOCK = /<!-- ocr-review:v1 (.*?) -->/gs;
 const BLOCK_MARK = /<!-- ocr-review:v1 /;
+// 봇이 남기는 코멘트 중 리뷰 보고서만 판단 근거로 본다(같은 봇의 다른 안내 코멘트는 건너뛴다).
+const REPORT_HEADER = "## 🤖 AI Code Review Report";
+const isReport = (body) => String(body || "").includes(REPORT_HEADER) || BLOCK_MARK.test(String(body || ""));
 const COMPLETENESS = new Set(["complete", "partial"]);
 
 // 완료와 라운드 상한 판정에 쓰는 최상위 필드. 하나라도 틀리면 그 보고서로는 아무것도 판정하지 않는다.
@@ -87,7 +90,7 @@ function wellFormed(finding) {
   return typeof finding?.id === "string" && finding.id !== ""
     && (finding.aliases === undefined || (Array.isArray(finding.aliases) && finding.aliases.every((a) => typeof a === "string")))
     && Array.isArray(finding.locations) && finding.locations.length > 0
-    && finding.locations.every((l) => canonicalPath(l?.file));
+    && finding.locations.every((l) => canonicalPath(l?.file) && Number.isInteger(l.line) && l.line >= 1);
 }
 
 const filesOf = (finding) => [...new Set(finding.locations.map((l) => l.file))];
@@ -139,7 +142,7 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
  */
 export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null, authorAssociation = null }) {
   const reports = comments
-    .filter((c) => c.login === bot)
+    .filter((c) => c.login === bot && isReport(c.body))
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
     .map((c) => ({ comment_id: c.id, created_at: c.created_at, block: parseBlock(c.body), body: c.body }));
   const pendingChecks = checks.filter((c) => !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(c.conclusion || c.state));
@@ -151,7 +154,7 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
   };
   if (!reports.length) return { ...base, state: "no_review", report: null };
 
-  // 판단은 가장 최근 봇 코멘트로만 한다. 그 블록이 깨졌으면 같은 HEAD 의 더 오래된 보고서로 대신하지 않는다.
+  // 판단은 가장 최근 봇 보고서로만 한다. 그 블록이 깨졌으면 같은 HEAD 의 더 오래된 보고서로 대신하지 않는다.
   const current = reports[reports.length - 1];
   const malformed = (reason) => ({ ...base, state: "malformed_report", report: { comment_id: current.comment_id, head_sha: current.block?.head_sha ?? null, reason } });
   if (!BLOCK_MARK.test(String(current.body || ""))) {
@@ -209,14 +212,14 @@ function gitOk(argv) {
 
 const commitExists = (sha) => gitOk(["cat-file", "-e", `${sha}^{commit}`]).status === 0;
 
-// 판단을 기록한 HEAD 부터 PR HEAD(로컬에 없으면 지금 체크아웃한 HEAD)까지 files 가 바뀌었는가.
-// 기록한 HEAD 를 로컬에서 찾지 못하면 바뀐 것으로 본다(지적을 묻어 두지 않는다).
-function gitChangedSince(headSha) {
-  const target = headSha && commitExists(headSha) ? headSha : "HEAD";
+// 판단을 기록한 HEAD 부터 PR HEAD 까지 files 가 바뀌었는가. 기록한 HEAD 나 PR HEAD 를 로컬에서 찾지 못하면
+// 바뀐 것으로 본다(지금 체크아웃한 HEAD 로 대신 비교해 지적을 묻어 두지 않는다).
+export function gitChangedSince(headSha) {
+  const known = Boolean(headSha) && commitExists(headSha);
   return (recorded, files) => {
     if (!files.length) return false;
-    if (!commitExists(recorded)) return true;
-    const r = gitOk(["diff", "--name-only", recorded, target, "--", ...files]);
+    if (!known || !commitExists(recorded)) return true;
+    const r = gitOk(["diff", "--name-only", recorded, headSha, "--", ...files]);
     return r.status !== 0 || r.stdout.trim() !== "";
   };
 }

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assess, parseBlock, parseLegacy } from './review-findings.mjs';
+import { assess, gitChangedSince, parseBlock, parseLegacy } from './review-findings.mjs';
 
 const tool = path.join(path.dirname(fileURLToPath(import.meta.url)), 'review-findings.mjs');
 const HEAD = 'b'.repeat(40), OLD = 'a'.repeat(40);
@@ -87,6 +87,30 @@ check('a report whose top-level fields are wrong is never complete', () => {
     assert.equal(r.state, 'malformed_report', JSON.stringify(fields));
     assert.equal(r.complete, false, JSON.stringify(fields));
   }
+});
+
+// PR #24 기계 리뷰 2라운드 지적(finding-3e0c0e2a5242c202, finding-c8753cb5b3f79974, finding-52b344ebb487bbca)의 회귀 테스트
+check('a later non-report bot comment does not replace the report', () => {
+  const r = judge({ headSha: HEAD, comments: [
+    bot(1, '2026-10-27T01:00:00Z', block({ head_sha: HEAD })),
+    bot(2, '2026-10-27T02:00:00Z', 'Notion Task 를 연결했습니다.'),
+  ] });
+  assert.equal(r.state, 'clear');
+  assert.equal(r.report.comment_id, 1);
+  assert.equal(judge({ headSha: HEAD, comments: [bot(1, 't', 'Notion Task 를 연결했습니다.')] }).state, 'no_review');
+});
+
+check('a location without a positive integer line is malformed', () => {
+  const bad = [undefined, null, '10', 0, -1, 1.5, {}];
+  const r = judge({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, findings: bad.map((line, i) => finding(`l${i}`, { locations: [{ file: 'a.mjs', line }] })) }))] });
+  assert.deepEqual(r.needs_user.map((f) => f.hold), bad.map(() => 'malformed finding'));
+  assert.deepEqual(r.to_fix, []);
+});
+
+check('a PR head that is not available locally counts as changed', () => {
+  const local = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).stdout.trim();
+  assert.equal(gitChangedSince('f'.repeat(40))(local, ['a.mjs']), true);
+  assert.equal(gitChangedSince(local)(local, ['a.mjs']), false);
 });
 
 check('findings are split by what review-cycle may do with them', () => {
@@ -223,7 +247,12 @@ try {
   git('add', '-A');
   git('commit', '-qm', 'base');
   const input = path.join(dir, 'input.json');
-  writeFileSync(input, JSON.stringify({ head_sha: HEAD, files: ['a.mjs'], author_association: 'OWNER', comments: [bot(1, 't', block({ head_sha: HEAD, findings: [finding('f1')] }))] }));
+  // PR HEAD 는 임시 저장소의 실제 커밋이어야 한다(로컬에 없는 PR HEAD 는 바뀐 것으로 본다).
+  const writeInput = () => {
+    const head = git('rev-parse', 'HEAD').stdout.trim();
+    writeFileSync(input, JSON.stringify({ head_sha: head, files: ['a.mjs'], author_association: 'OWNER', comments: [bot(1, 't', block({ head_sha: head, findings: [finding('f1')] }))] }));
+  };
+  writeInput();
   const run = (...argv) => spawnSync(process.execPath, [tool, ...argv], { cwd: dir, encoding: 'utf8' });
 
   check('cli status', () => {
@@ -241,6 +270,7 @@ try {
   check('cli reopens the declined finding once its file changes', () => {
     writeFileSync(path.join(dir, 'a.mjs'), 'two\n');
     git('commit', '-qam', 'touch a.mjs');
+    writeInput();
     const r = JSON.parse(run('status', '--pr', '18', '--input', input).stdout);
     assert.equal(r.state, 'actionable');
     assert.equal(r.to_fix[0].reopened.reason, 'files changed since decision');
