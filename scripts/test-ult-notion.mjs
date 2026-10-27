@@ -291,11 +291,13 @@ try {
   section("story-create (2 tasks: existing-parent + in-spec parent) + task wait/after-설명");
   let createdStory, taskA, taskB;
   {
+    // Planned dates sit in the future so weekly-collect below never counts these Tasks as overdue.
+    const plannedA = [day(5), day(7)];
     const spec = {
       github_repo: "ultivis/demo",
       story: { title: "알림 센터 개편", tag: "Feature", priority: "High", project_id: P1.id, assignee_notion_id: U1.id, body_markdown: "## 배경\n- 사용자 알림이 흩어져 있음\n- [ ] 정리\n\n```js\nconst x = 1;\n```\n| a | b |\n|---|---|\n| 1 | 2 |" },
       tasks: [
-        { name: "API 추가", topic: "Feature", description: "## 목표\n- 하나\n- 둘", planned_start: "2026-10-22", planned_end: "2026-10-24", repository_id: R1.id, week_id: W1.id, parent_task_ids: [T1.id] },
+        { name: "API 추가", topic: "Feature", description: "## 목표\n- 하나\n- 둘", planned_start: plannedA[0], planned_end: plannedA[1], repository_id: R1.id, week_id: W1.id, parent_task_ids: [T1.id] },
         { name: "UI 연결", topic: "Fix", description: "설명 한 줄", repository_id: R1.id, parent_task_indexes: [0] },
       ],
     };
@@ -309,7 +311,7 @@ try {
     check("Story: template applied (waited) and Plan inserted right after '설명'", sb[0] === "heading_2:설명" && sb[1] === "heading_2:배경" && sb[2].startsWith("bulleted_list_item:사용자") && sb[3] === "to_do:정리" && sb[4].startsWith("code:") && sb[5] === "table:" && sb[6].startsWith("paragraph:(설명을") && sb.includes("heading_2:체크리스트"), sb.join(" | "));
     taskA = [...mock.pages.values()].find((p) => p.ds === DB.TASK && lib.taskName(p) === "API 추가");
     taskB = [...mock.pages.values()].find((p) => p.ds === DB.TASK && lib.taskName(p) === "UI 연결");
-    check("Task A props: story/project/repo/week/parent/planned/issue url", taskA && taskA.properties[P.STORY].relation[0].id === createdStory.id && taskA.properties[P.PROJECT].relation[0].id === P1.id && taskA.properties[P.REPOSITORY].relation[0].id === R1.id && taskA.properties[P.WEEK].relation[0].id === W1.id && taskA.properties["Parent Task"].relation[0].id === T1.id && taskA.properties["Planned Date"].date.start === "2026-10-22" && taskA.properties["Planned Date"].date.end === "2026-10-24" && /\/issues\/\d+$/.test(taskA.properties["Issue URL"].url) && taskA.properties.Topic.select.name === "Feature");
+    check("Task A props: story/project/repo/week/parent/planned/issue url", taskA && taskA.properties[P.STORY].relation[0].id === createdStory.id && taskA.properties[P.PROJECT].relation[0].id === P1.id && taskA.properties[P.REPOSITORY].relation[0].id === R1.id && taskA.properties[P.WEEK].relation[0].id === W1.id && taskA.properties["Parent Task"].relation[0].id === T1.id && taskA.properties["Planned Date"].date.start === plannedA[0] && taskA.properties["Planned Date"].date.end === plannedA[1] && /\/issues\/\d+$/.test(taskA.properties["Issue URL"].url) && taskA.properties.Topic.select.name === "Feature");
     check("Task B parent = Task A (in-spec dependency)", taskB && taskB.properties["Parent Task"].relation.map((x) => x.id).join() === taskA.id);
     const ab = children(taskA.id).map((b) => `${b.type}:${btext(b)}`);
     check("Task A: description after '설명' as blocks (heading_2 + bullets)", ab[0] === "heading_2:설명" && ab[1] === "heading_2:목표" && ab[2] === "bulleted_list_item:하나" && ab[3] === "bulleted_list_item:둘" && ab[4].startsWith("paragraph:(설명을"), ab.join(" | "));
@@ -349,11 +351,12 @@ try {
     r = await cli(["task-create", "--story", S1.url, "--name", "x", "--project", "Ultivis Vision"]);
     check("--project not in repo's Projects rejected", r.code === 1 && /지정한 Project가 현재 repository의 Project relation에 포함되지 않습니다/.test(r.err), r.err);
     const before = ghState().issues.length;
-    r = await cli(["task-create", "--story", S1.url, "--name", "후속 검증 작업", "--topic", "fix", "--description", "## 검증\n- 케이스 1", "--planned-start", "2026-10-25", "--parent-task", T1.url]);
+    const plannedFollowUp = day(8);
+    r = await cli(["task-create", "--story", S1.url, "--name", "후속 검증 작업", "--topic", "fix", "--description", "## 검증\n- 케이스 1", "--planned-start", plannedFollowUp, "--parent-task", T1.url]);
     const nt = [...mock.pages.values()].find((p) => p.ds === DB.TASK && lib.taskName(p) === "후속 검증 작업");
     check("exit 0 + summary", r.code === 0 && /✅ Task 생성 완료/.test(r.out) && /Story: 다크모드 설정/.test(r.out) && /Base Branch: dev/.test(r.out) && ghState().issues.length === before + 1, r.all);
     const num = nt && (nt.properties["Issue URL"].url.match(/(\d+)$/) || [])[1];
-    check("Task props (Topic normalized to Fix, parent, planned, repo auto-detected, Week)", nt && nt.properties.Topic.select.name === "Fix" && nt.properties["Parent Task"].relation[0].id === T1.id && nt.properties["Planned Date"].date.start === "2026-10-25" && nt.properties[P.REPOSITORY].relation[0].id === R1.id && nt.properties[P.STORY].relation[0].id === S1.id && nt.properties[P.PROJECT].relation[0].id === P1.id && nt.properties.Assignee.people[0].id === U1.id && nt.properties[P.WEEK].relation[0].id === W1.id);
+    check("Task props (Topic normalized to Fix, parent, planned, repo auto-detected, Week)", nt && nt.properties.Topic.select.name === "Fix" && nt.properties["Parent Task"].relation[0].id === T1.id && nt.properties["Planned Date"].date.start === plannedFollowUp && nt.properties[P.REPOSITORY].relation[0].id === R1.id && nt.properties[P.STORY].relation[0].id === S1.id && nt.properties[P.PROJECT].relation[0].id === P1.id && nt.properties.Assignee.people[0].id === U1.id && nt.properties[P.WEEK].relation[0].id === W1.id);
     const ntb = children(nt.id).map((b) => `${b.type}:${btext(b)}`);
     check("description inserted after 설명", ntb[0] === "heading_2:설명" && ntb[1] === "heading_2:검증" && ntb[2] === "bulleted_list_item:케이스 1", ntb.join("|"));
     const wtn = join(WT, `d-${num}`);
