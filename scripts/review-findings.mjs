@@ -15,7 +15,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEFAULT_BOT = "isaac-notion-bot";
@@ -58,7 +58,13 @@ export function parseLegacy(body) {
 
 const idsOf = (finding) => [finding.id, ...(finding.aliases || [])];
 // 리뷰 봇이 PR 작성자의 diff 에 유도될 수 있으므로, 이 경로를 건드리는 지적은 자동으로 고치지 않는다.
-const SENSITIVE_PATH = /^(\.github|\.claude)\//;
+const SENSITIVE_PATH = /^(\.github|\.claude|\.codex)\//i;
+// PR 작성자가 이 저장소의 쓰기 권한을 가진 사람일 때만 자동 수정한다(외부 기여자 PR 은 사람이 본다).
+const TRUSTED_AUTHORS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+// 저장소 기준 정규화된 상대 경로만 받는다. ./x, a/../x, /abs, 옵션처럼 보이는 값은 모양 불량이다.
+const canonicalPath = (f) => typeof f === "string" && f !== "" && !f.startsWith("-") && !posix.isAbsolute(f)
+  && posix.normalize(f) === f && !f.split("/").includes("..");
 
 function ledgerDecision(ledger, finding) {
   const decisions = ledger.decisions || {};
@@ -71,13 +77,13 @@ function wellFormed(finding) {
   return typeof finding?.id === "string" && finding.id !== ""
     && (finding.aliases === undefined || (Array.isArray(finding.aliases) && finding.aliases.every((a) => typeof a === "string")))
     && Array.isArray(finding.locations) && finding.locations.length > 0
-    && finding.locations.every((l) => typeof l?.file === "string" && l.file !== "" && !l.file.startsWith("-"));
+    && finding.locations.every((l) => canonicalPath(l?.file));
 }
 
 const filesOf = (finding) => [...new Set(finding.locations.map((l) => l.file))];
 
 // 지적 하나가 어느 목록에 들어가는지 정한다. hold 는 needs_user 로 보내는 이유다.
-function classify(finding, { ledger, changedSince, partial, prFiles }) {
+function classify(finding, { ledger, changedSince, partial, prFiles, authorAssociation }) {
   if (!wellFormed(finding)) return { list: "needs_user", entry: { raw: finding, hold: "malformed finding" } };
   const entry = { ...finding, file: finding.locations[0].file, line: finding.locations[0].line };
   if (finding.status === "resolved") return { list: "resolved", entry };
@@ -98,8 +104,10 @@ function classify(finding, { ledger, changedSince, partial, prFiles }) {
   if (partial) entry.hold = "partial report";
   else if (finding.verification !== "confirmed") entry.hold = "not verified";
   else if (!FIXABLE_PROVENANCE.has(finding.provenance)) entry.hold = "unknown provenance";
+  else if (!TRUSTED_AUTHORS.has(authorAssociation)) entry.hold = "untrusted author";
   else if (filesOf(finding).some((f) => SENSITIVE_PATH.test(f))) entry.hold = "sensitive path";
-  else if (prFiles && filesOf(finding).some((f) => !prFiles.has(f))) entry.hold = "outside PR files";
+  else if (!prFiles) entry.hold = "PR files unknown";
+  else if (filesOf(finding).some((f) => !prFiles.has(f))) entry.hold = "outside PR files";
   return { list: entry.hold ? "needs_user" : "to_fix", entry };
 }
 
@@ -113,10 +121,12 @@ function classify(finding, { ledger, changedSince, partial, prFiles }) {
  *   round_cap 상한 라운드인데 지적이 남았다. 고치지 않고 사람에게 넘긴다.
  *   clear     고칠 지적이 없다. 완료하려면 보고서가 complete 이고 checks 도 통과해야 한다(complete 필드).
  * 틀림·의도됨·상관없음으로 기록한 지적은, 기록한 뒤 지적 위치의 파일이 바뀌었으면(changedSince) 다시
- * 연다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다. prFiles 를 주면 PR 이 바꾼 파일 밖을
- * 짚는 지적은 자동으로 고치지 않는다.
+ * 연다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다. 자동 수정은 PR 작성자가 OWNER·MEMBER·
+ * COLLABORATOR 이고 지적 위치가 PR 이 바꾼 파일(prFiles) 안일 때만이다. 둘 중 하나를 모르면 고치지 않는다.
+ * resolved·rejected·pre_existing 은 리뷰 봇(통합 pass)의 판정을 그대로 믿는다. 완료는 merge 전 사람 확인을
+ * 대신하지 않는다.
  */
-export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null }) {
+export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null, authorAssociation = null }) {
   const reports = comments
     .filter((c) => c.login === bot)
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
@@ -144,7 +154,7 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
   const partial = block.completeness !== "complete";
   const files = prFiles ? new Set(prFiles) : null;
   for (const finding of Array.isArray(block.findings) ? block.findings : []) {
-    const { list, entry } = classify(finding, { ledger, changedSince, partial, prFiles: files });
+    const { list, entry } = classify(finding, { ledger, changedSince, partial, prFiles: files, authorAssociation });
     out[list].push(entry);
   }
   // 상한 라운드에 지적이 남았으면 더 고치지 않고 사람에게 넘긴다.
@@ -215,7 +225,9 @@ function loadFromGitHub(pr, repo) {
   const comments = gh(["api", `repos/${slug}/issues/${pr}/comments`, "--paginate", "--jq", ".[] | {id, created_at, login: .user.login, body} | tojson"])
     .split("\n").filter(Boolean).map((line) => JSON.parse(line));
   const checks = (view.statusCheckRollup || []).map((c) => ({ name: c.name || c.context, conclusion: c.conclusion, state: c.state }));
-  return { head_sha: view.headRefOid, comments, checks, files: (view.files || []).map((f) => f.path) };
+  // gh pr view 에는 작성자와 저장소의 관계가 없어 REST 응답에서 읽는다.
+  const author = gh(["api", `repos/${slug}/pulls/${pr}`, "--jq", ".author_association"]).trim();
+  return { head_sha: view.headRefOid, comments, checks, files: (view.files || []).map((f) => f.path), author_association: author || null };
 }
 
 function main() {
@@ -230,13 +242,16 @@ function main() {
   }
   if (!opt.pr || !/^\d+$/.test(String(opt.pr))) fail("--pr <번호> 가 필요합니다");
   if (cmd === "status") {
-    if (opt.repo !== undefined && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(String(opt.repo))) fail("--repo 는 owner/name 형식입니다");
+    if (opt.repo !== undefined && !(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(String(opt.repo)) && String(opt.repo).split("/").every((part) => part !== "." && part !== ".."))) fail("--repo 는 owner/name 형식입니다");
+    const roundCap = opt["round-cap"] === undefined ? DEFAULT_ROUND_CAP : Number(opt["round-cap"]);
+    if (!Number.isInteger(roundCap) || roundCap < 1) fail("--round-cap 은 1 이상의 정수입니다");
     if (opt.bot !== undefined && !/^[A-Za-z0-9-]+(\[bot\])?$/.test(String(opt.bot))) fail("--bot 은 GitHub 로그인입니다");
     const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
     const result = assess({
       headSha: data.head_sha, comments: data.comments, checks: data.checks || [],
-      bot: opt.bot || DEFAULT_BOT, ledger: readLedger(opt.pr), roundCap: Number(opt["round-cap"] || DEFAULT_ROUND_CAP),
+      bot: opt.bot || DEFAULT_BOT, ledger: readLedger(opt.pr), roundCap,
       changedSince: gitChangedSince(data.head_sha), prFiles: Array.isArray(data.files) ? data.files : null,
+      authorAssociation: data.author_association ?? null,
     });
     process.stdout.write(JSON.stringify({ pr: Number(opt.pr), ...result }, null, 2) + "\n");
     return;
