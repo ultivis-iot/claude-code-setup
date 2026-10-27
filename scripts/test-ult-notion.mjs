@@ -61,6 +61,8 @@ mock.addPage(DB.MEMBER, { Name: T("미등록"), Github: RT(""), Notion: PEO([]) 
 const P1 = mock.addPage(DB.PROJECT, { Title: T("Ultivis CRM"), Status: STA("진행 중"), Manager: PEO([U1]), "Project Duration": DATE("2026-01-01", "2026-12-31"), "Work Progress": NUM(40) });
 const P2 = mock.addPage(DB.PROJECT, { Title: T("Ultivis Vision"), Status: STA("진행 중") });
 const R1 = mock.addPage(DB.REPOSITORY, { Name: T("ultivis/demo"), URL: URLP("https://github.com/ultivis/demo"), [P.REPO_PROJECT]: REL([P1.id]) });
+// A repository with no local checkout, for Tasks that belong somewhere other than the current repo.
+const R2 = mock.addPage(DB.REPOSITORY, { Name: T("ultivis/elsewhere"), URL: URLP("https://github.com/ultivis/elsewhere"), [P.REPO_PROJECT]: REL([P1.id]) });
 const W0 = mock.addPage(DB.WEEK, { DateFrom: DATE("2026-10-12"), DateTo: FDATE("2026-10-18") });
 const W1 = mock.addPage(DB.WEEK, { DateFrom: DATE("2026-10-19"), DateTo: FDATE("2026-10-25") });
 const S1 = mock.addPage(DB.STORY, { Title: T("다크모드 설정"), Status: STA("진행 중"), Tag: SEL("Feature"), Priority: SEL("High"), [P.STORY_PROJECT]: REL([P1.id]), Assignee: PEO([U1]), "Issue URL": URLP(""), "Work Progress": NUM(30) });
@@ -211,6 +213,13 @@ try {
     check("select 1 (#7, issue URL set): branch + worktree", r.code === 0 && /Worktree: .*d-7/.test(r.out) && existsSync(wt7) && /cc d-7/.test(r.out), r.all);
     check("worktree branch name", g(["branch", "--show-current"], wt7) === "7-feature-task", g(["branch", "--show-current"], wt7));
     check("gh merge-base configured", g(["config", "branch.7-feature-task.gh-merge-base"], wt7) === "dev");
+    // #13: a Task of another repository must not get a worktree in the current one.
+    const ownRepo = T1.properties[P.REPOSITORY];
+    T1.properties[P.REPOSITORY] = REL([R2.id]);
+    const worktreesBefore = g(["worktree", "list", "--porcelain"], REPO);
+    r = await cli(["my-tasks", "--select", "1"]);
+    T1.properties[P.REPOSITORY] = ownRepo;
+    check("select: Task of a repo with no local checkout fails instead of using the current repo", r.code === 1 && /ultivis\/elsewhere/.test(r.err) && g(["worktree", "list", "--porcelain"], REPO) === worktreesBefore, r.all);
     const before = ghState().issues.length;
     r = await cli(["my-tasks", "--select", "2"]);
     const issues = ghState().issues;
