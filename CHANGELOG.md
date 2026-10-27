@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `scripts/test-ult-notion.mjs` 의 `collect: stats` 가 2026-10-26 부터 항상 실패하던 문제 수정(#17). 앞선 `story-create`·`task-create` 테스트가 예정일을 고정 날짜로 만들어, 그 날짜가 지나면 `weekly-collect` 가 기한 경과로 집계했다. 예정일을 실행일 기준 미래 날짜(`day(n)`)로 바꿔, `verify-workflow.sh` 가 날짜와 무관하게 통과한다.
+
 ## v1.1.0 (2026-10-22)
 
 - Notion 연동 스크립트를 bash 에서 Node.js(20 이상, 의존성 없음)로 교체해 Windows 에서도 bash·jq·curl 없이 동작하게 함. 새 `scripts/ult-notion.mjs`(Notion REST API 직접 호출)·`scripts/lib/notion.mjs`(클라이언트 공용 모듈)·`scripts/ult-flow.mjs`(gh/git/worktree/handoff/story 판정)·`scripts/graft.mjs`를 추가하고, `notion-api.sh`·`ult-my-tasks.sh`·`ult-task-note.sh`·`ult-task-status.sh`·`ult-task-link-issue.sh`·`ult-sync-task.sh`·`issue.sh`·`ult-weekly-collect.sh`·`ult-weekly-publish.sh`·`ult-story-create-exec.sh`·`ult-task-create.sh`·`ult-story-run.sh`·`ult-cache-refresh.sh` 13개를 제거. 각 스크립트는 `ult-notion.mjs` 의 서브커맨드(`my-tasks`·`task-note`·`task-status`·`task-link-issue`·`sync-task`·`issue`·`weekly-collect`·`weekly-publish`·`story-create`·`task-create`·`story-run`·`cache-refresh`)로 대응한다. 토큰 위치(`NOTION_TOKEN` 환경변수, `dev-tools/.env`, `~/.claude.json` 의 `notion-api` MCP 등록값)는 그대로.
