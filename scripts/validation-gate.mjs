@@ -87,6 +87,22 @@ function ready(data, repo, base) {
   }
 }
 
+// REVIEW.md as the snapshot base has it: the branch under review cannot rewrite its own policy.
+const POLICY_FILE = 'REVIEW.md';
+const MAX_POLICY_CHARS = 8000;
+const MAX_POLICY_BYTES = 1024 * 1024;
+function reviewPolicy(repo, base) {
+  const entry = git(repo, 'ls-tree', base, '--', POLICY_FILE);
+  // Only a regular file: a symlink would point the policy at a file the branch is free to edit.
+  if (!/^100(644|755) blob /.test(entry)) return { base_sha: base, source: null, truncated: false, text: null };
+  if (Number(git(repo, 'cat-file', '-s', `${base}:${POLICY_FILE}`)) > MAX_POLICY_BYTES) fail(`${POLICY_FILE} is larger than ${MAX_POLICY_BYTES} bytes.`);
+  let text = git(repo, 'cat-file', 'blob', `${base}:${POLICY_FILE}`);
+  if (!text) return { base_sha: base, source: null, truncated: false, text: null };
+  const truncated = text.length > MAX_POLICY_CHARS;
+  if (truncated) text = `${text.slice(0, MAX_POLICY_CHARS)}\n[policy truncated at ${MAX_POLICY_CHARS} characters]`;
+  return { base_sha: base, source: `${POLICY_FILE}@${base.slice(0, 12)}`, truncated, text };
+}
+
 function save(file, value) {
   mkdirSync(path.dirname(file), { recursive: true });
   const temp = `${file}.${process.pid}.tmp`;
@@ -127,6 +143,14 @@ export function main(args) {
     const data = { schema_version: 2, timestamp: new Date().toISOString(), snapshot, results, evidence, overall: aggregate(results, []), warnings: [], errors: [] };
     check(data);
     save(options.out, data);
+  } else if (mode === 'policy') {
+    if (!options.snapshot || !options.out) fail('policy --snapshot <file> --out <policy.json> --repo <repo>');
+    const snapshot = json(options.snapshot);
+    validate(snapshot, schema.$defs.snapshot);
+    same(capture(repo, snapshot.base_branch), snapshot);
+    const policy = reviewPolicy(repo, snapshot.base_sha);
+    save(options.out, policy);
+    console.log(policy.source ? `Review policy: ${policy.source}${policy.truncated ? ' (truncated)' : ''}` : 'Review policy: none');
   } else if (mode === 'check' || mode === 'ready' || mode === 'pre-push') {
     if (positionals.length !== 1) fail(`${mode} <status.json> [--repo <repo>] [--base <ref>]`);
     const data = json(positionals[0]);
@@ -145,7 +169,7 @@ export function main(args) {
         }
       }
     }
-  } else fail('Usage: validation-gate.mjs snapshot|record|check|ready|pre-push ...');
+  } else fail('Usage: validation-gate.mjs snapshot|policy|record|check|ready|pre-push ...');
   console.log(`OK: validation ${mode}`);
 }
 
