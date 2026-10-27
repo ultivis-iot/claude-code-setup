@@ -26,10 +26,11 @@ Act on `state`:
 
 - `no_review`, `waiting`: no report for the current PR head yet. Change nothing; wait. A report of an earlier head is never completion evidence.
 - `legacy`: only reports without a block. Show `needs_user` to the user as reference; never treat it as completion.
-- `needs_user`: only findings that are not to be fixed automatically remain (not verified, or a partial report). Report them to the user and stop.
+- `needs_user`: only findings that are not to be fixed automatically remain (not verified, a partial report, or an empty or unknown provenance). Report them to the user and stop.
+- `round_cap`: the machine review's 3rd round still has findings. Do not fix them; report them as "approach needs rethinking" and stop. A 3rd round with no findings comes back as `clear` and completes.
 - `actionable`: fix `to_fix`. A finding with `reopened` was recorded as fixed but the review still sees it; check it again. A finding with several `locations` is one cause; fix every location together.
 - `clear`: nothing to fix. Completion requires `complete: true`.
-- Never fix `pre_existing` (code this PR did not change), `rejected` (judged a false positive), `resolved` or `declined` (already recorded as wrong, intentional or irrelevant). Carry `pre_existing` over like other out-of-scope feedback.
+- Never fix `pre_existing` (code this PR did not change), `rejected` (judged a false positive), `resolved` or `declined` (already recorded as wrong, intentional or irrelevant). Carry `pre_existing` over like other out-of-scope feedback. A `declined` finding is not reopened when the code changes; record a new decision if your judgement changes.
 
 After each round, record every machine finding you handled:
 
@@ -39,7 +40,7 @@ node "$SCRIPTS/review-findings.mjs" record --pr <N> --id <id> --decision fixed|w
 
 ## Required behavior
 
-1. Process one round when `--once` is requested. Otherwise continue within the current session, recording round number and PR head SHA in the local handoff. Count waiting separately from review rounds: stop after the machine review's 3rd round (`round_cap_reached`) and report the remaining findings, current head and round as "approach needs rethinking". Reaching any limit is an incomplete result, never a completion signal.
+1. Process one round when `--once` is requested. Otherwise continue within the current session, recording round number and PR head SHA in the local handoff. Count waiting separately from review rounds: stop when `state` is `round_cap` and report the remaining findings, current head and round as "approach needs rethinking". Reaching any limit is an incomplete result, never a completion signal.
 2. Read machine review findings with the helper above, plus PR checks, other AI reviews and unresolved review threads. Tie review/check evidence to the current PR head SHA. Independent read-only queries may run concurrently; writes remain ordered.
 3. For reviews other than the machine review, keep only AI review items: accept an item only when it comes from a bot account or carries an unmistakable AI review header or pattern; skip threads that are already resolved.
 4. Record what will be addressed before editing code.

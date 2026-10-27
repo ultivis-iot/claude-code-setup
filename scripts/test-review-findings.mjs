@@ -105,9 +105,25 @@ check('declined findings are skipped, by id or alias; fixed ones that come back 
   assert.deepEqual(r.to_fix.map((f) => [f.id, f.reopened?.decision]), [['fixed-id', 'fixed']]);
 });
 
-check('round cap and checks gate completion', () => {
-  const capped = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, round: 3 }))] });
+check('only findings with a known provenance are fixed automatically', () => {
+  const r = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [
+    finding('uncertain', { provenance: 'uncertain' }),
+    finding('unlabelled', { provenance: null }),
+    finding('future', { provenance: 'something_new' }),
+  ] }))] });
+  assert.deepEqual(r.to_fix.map((f) => f.id), ['uncertain']);
+  assert.deepEqual(r.needs_user.map((f) => f.id), ['unlabelled', 'future']);
+});
+
+check('round cap stops fixing while findings remain; a clean report at the cap still completes', () => {
+  const capped = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, round: 3, findings: [finding('left')] }))] });
   assert.equal(capped.round_cap_reached, true);
+  assert.equal(capped.state, 'round_cap');
+  assert.equal(capped.complete, false);
+  assert.deepEqual(capped.to_fix.map((f) => f.id), ['left']);  // listed for the report, not to be fixed
+  const clean = assess({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, round: 3 }))] });
+  assert.equal(clean.state, 'clear');
+  assert.equal(clean.complete, true);
   const pending = assess({ headSha: HEAD, checks: [{ name: 'ci', conclusion: '', state: 'PENDING' }], comments: [bot(1, 't', block({ head_sha: HEAD }))] });
   assert.equal(pending.state, 'clear');
   assert.equal(pending.complete, false);
