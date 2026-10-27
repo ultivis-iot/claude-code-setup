@@ -94,7 +94,7 @@ check('partial reports hand everything to the user and are not completion', () =
 
 check('declined findings are skipped, by id or alias; fixed ones that come back are reopened', () => {
   const ledger = { decisions: {
-    'old-id': { decision: 'intentional', reason: 'documented in PR body' },
+    'old-id': { decision: 'intentional', reason: 'documented in PR body', head_sha: OLD },
     'fixed-id': { decision: 'fixed', reason: 'guard added', commit: 'c1' },
   } };
   const r = assess({ headSha: HEAD, ledger, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [
@@ -103,6 +103,24 @@ check('declined findings are skipped, by id or alias; fixed ones that come back 
   ] }))] });
   assert.deepEqual(r.declined.map((f) => [f.id, f.decision.decision]), [['new-id', 'intentional']]);
   assert.deepEqual(r.to_fix.map((f) => [f.id, f.reopened?.decision]), [['fixed-id', 'fixed']]);
+});
+
+check('a declined finding reopens when its files changed since the decision', () => {
+  const ledger = { decisions: {
+    same: { decision: 'wrong', reason: 'guarded', head_sha: OLD },
+    touched: { decision: 'intentional', reason: 'by design', head_sha: OLD },
+    unknown: { decision: 'irrelevant', reason: 'minor' },  // recorded before head_sha was kept
+  } };
+  const asked = [];
+  const changedSince = (head, files) => { asked.push([head, files]); return files.includes('b.mjs'); };
+  const r = assess({ headSha: HEAD, ledger, changedSince, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [
+    finding('same'),
+    finding('touched', { locations: [{ file: 'a.mjs', line: 1 }, { file: 'b.mjs', line: 2 }] }),
+    finding('unknown'),
+  ] }))] });
+  assert.deepEqual(r.declined.map((f) => f.id), ['same']);
+  assert.deepEqual(r.to_fix.map((f) => [f.id, f.reopened?.reason]), [['touched', 'files changed since decision'], ['unknown', 'decision has no recorded head']]);
+  assert.deepEqual(asked[0], [OLD, ['a.mjs']]);
 });
 
 check('only findings with a known provenance are fixed automatically', () => {
@@ -133,7 +151,11 @@ check('round cap stops fixing while findings remain; a clean report at the cap s
 // CLI: status reads --input instead of gh, record writes the ledger under the repo's tmp/.
 const dir = mkdtempSync(path.join(os.tmpdir(), 'review-findings-'));
 try {
-  spawnSync('git', ['init', '-q'], { cwd: dir });
+  const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir, encoding: 'utf8' });
+  git('init', '-q');
+  writeFileSync(path.join(dir, 'a.mjs'), 'one\n');
+  git('add', '-A');
+  git('commit', '-qm', 'base');
   const input = path.join(dir, 'input.json');
   writeFileSync(input, JSON.stringify({ head_sha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [finding('f1')] }))] }));
   const run = (...argv) => spawnSync(process.execPath, [tool, ...argv], { cwd: dir, encoding: 'utf8' });
@@ -149,6 +171,13 @@ try {
     const ledger = JSON.parse(readFileSync(path.join(dir, 'tmp', 'review-findings-18.json'), 'utf8'));
     assert.equal(ledger.decisions.f1.decision, 'wrong');
     assert.equal(JSON.parse(run('status', '--pr', '18', '--input', input).stdout).state, 'clear');
+  });
+  check('cli reopens the declined finding once its file changes', () => {
+    writeFileSync(path.join(dir, 'a.mjs'), 'two\n');
+    git('commit', '-qam', 'touch a.mjs');
+    const r = JSON.parse(run('status', '--pr', '18', '--input', input).stdout);
+    assert.equal(r.state, 'actionable');
+    assert.equal(r.to_fix[0].reopened.reason, 'files changed since decision');
   });
   check('cli stop-loop removes the Ralph Loop state file only', () => {
     const state = path.join(dir, '.claude', 'ralph-loop.local.md');

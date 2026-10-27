@@ -60,7 +60,7 @@ node ~/.codex/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
    - `round_cap`: 기계 리뷰 3번째 라운드인데 지적이 남았다. 고치지 않고 라운드 종료의 "라운드 상한" 대로 사용자에게 보고한다.
    - `actionable`: `to_fix` 를 이번 라운드에 처리한다. `reopened` 가 붙은 지적은 고쳤다고 기록했는데 리뷰가 아직 남아 있다고 본 것이니 다시 확인한다.
    - `clear`: 고칠 지적이 없다. `complete` 가 `true` 면 완료다.
-   - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다. `declined` 는 코드가 바뀌어도 다시 열리지 않으니, 판단이 바뀌었으면 `record` 로 다시 기록한다. `pre_existing` 은 아래 Story Flow 의 carryover 와 같은 방식으로 남긴다.
+   - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다. `declined` 는 판단을 기록한 뒤 그 지적 위치의 파일이 바뀌면 `reopened` 와 함께 `to_fix` 로 다시 열린다. 판단이 바뀌었으면 `record` 로 다시 기록한다. `pre_existing` 은 아래 Story Flow 의 carryover 와 같은 방식으로 남긴다.
 2. 기계 리뷰 외의 AI 리뷰(다른 bot 의 reviews, unresolved review threads)가 있으면 함께 본다
    - bot 계정이거나 AI 리뷰 헤더/패턴이 명확한 항목만 대상으로 본다
    - unresolved thread만 보고, 이미 해결된 thread는 제외한다

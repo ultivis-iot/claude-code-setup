@@ -30,7 +30,7 @@ Act on `state`:
 - `round_cap`: the machine review's 3rd round still has findings. Do not fix them; report them as "approach needs rethinking" and stop. A 3rd round with no findings comes back as `clear` and completes.
 - `actionable`: fix `to_fix`. A finding with `reopened` was recorded as fixed but the review still sees it; check it again. A finding with several `locations` is one cause; fix every location together.
 - `clear`: nothing to fix. Completion requires `complete: true`.
-- Never fix `pre_existing` (code this PR did not change), `rejected` (judged a false positive), `resolved` or `declined` (already recorded as wrong, intentional or irrelevant). Carry `pre_existing` over like other out-of-scope feedback. A `declined` finding is not reopened when the code changes; record a new decision if your judgement changes.
+- Never fix `pre_existing` (code this PR did not change), `rejected` (judged a false positive), `resolved` or `declined` (already recorded as wrong, intentional or irrelevant). Carry `pre_existing` over like other out-of-scope feedback. A `declined` finding reopens (in `to_fix`, with `reopened`) once the files at its locations change after the decision; record a new decision if your judgement changes.
 
 After each round, record every machine finding you handled:
 
