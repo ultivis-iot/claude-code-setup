@@ -23,6 +23,16 @@ export const DEFAULT_ROUND_CAP = 3;
 const DECISIONS = new Set(["fixed", "wrong", "intentional", "irrelevant"]);
 const FIXABLE_PROVENANCE = new Set(["introduced", "ported", "uncertain"]);
 const BLOCK = /<!-- ocr-review:v1 (.*?) -->/gs;
+const BLOCK_MARK = /<!-- ocr-review:v1 /;
+const COMPLETENESS = new Set(["complete", "partial"]);
+
+// 완료와 라운드 상한 판정에 쓰는 최상위 필드. 하나라도 틀리면 그 보고서로는 아무것도 판정하지 않는다.
+function reportProblem(block) {
+  if (!Array.isArray(block.findings)) return "findings is not a list";
+  if (!Number.isInteger(block.round) || block.round < 1) return "round is not a positive integer";
+  if (!COMPLETENESS.has(block.completeness)) return "unknown completeness";
+  return null;
+}
 
 export function parseBlock(body) {
   const matches = [...String(body || "").matchAll(BLOCK)];
@@ -113,7 +123,8 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
 
 /**
  * 현재 HEAD 에 대한 리뷰 상태를 판정한다.
- * state: no_review | waiting | legacy | needs_user | actionable | round_cap | clear
+ * state: no_review | waiting | legacy | malformed_report | needs_user | actionable | round_cap | clear
+ *   malformed_report 가장 최근 봇 보고서의 블록이 깨졌거나 최상위 필드가 틀렸다. 사람에게 넘긴다.
  *   waiting   현재 HEAD 를 리뷰한 블록이 아직 없다(이전 HEAD 보고서만 있음).
  *   legacy    블록 없는 보고서만 있다. 지적은 참고용이고 완료 증거가 아니다.
  *   needs_user 자동으로 고치지 않을 지적만 남았다. 각 지적의 hold 가 이유다.
@@ -140,20 +151,24 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
   };
   if (!reports.length) return { ...base, state: "no_review", report: null };
 
-  const current = [...reports].reverse().find((r) => r.block?.head_sha === headSha);
-  if (!current) {
-    const latest = reports[reports.length - 1];
-    if (latest.block) return { ...base, state: "waiting", report: { comment_id: latest.comment_id, head_sha: latest.block.head_sha } };
-    return { ...base, state: "legacy", report: { comment_id: latest.comment_id, head_sha: null }, needs_user: parseLegacy(latest.body) };
+  // 판단은 가장 최근 봇 코멘트로만 한다. 그 블록이 깨졌으면 같은 HEAD 의 더 오래된 보고서로 대신하지 않는다.
+  const current = reports[reports.length - 1];
+  const malformed = (reason) => ({ ...base, state: "malformed_report", report: { comment_id: current.comment_id, head_sha: current.block?.head_sha ?? null, reason } });
+  if (!BLOCK_MARK.test(String(current.body || ""))) {
+    return { ...base, state: "legacy", report: { comment_id: current.comment_id, head_sha: null }, needs_user: parseLegacy(current.body) };
   }
+  if (!current.block) return malformed("block could not be read");
+  if (current.block.head_sha !== headSha) return { ...base, state: "waiting", report: { comment_id: current.comment_id, head_sha: current.block.head_sha } };
+  const problem = reportProblem(current.block);
+  if (problem) return malformed(problem);
 
   const block = current.block;
   const out = { ...base, report: { comment_id: current.comment_id, head_sha: block.head_sha, completeness: block.completeness, parent_head_sha: block.parent_head_sha } };
-  out.round = block.round ?? null;
-  out.round_cap_reached = (block.round ?? 0) >= roundCap;
+  out.round = block.round;
+  out.round_cap_reached = block.round >= roundCap;
   const partial = block.completeness !== "complete";
   const files = prFiles ? new Set(prFiles) : null;
-  for (const finding of Array.isArray(block.findings) ? block.findings : []) {
+  for (const finding of block.findings) {
     const { list, entry } = classify(finding, { ledger, changedSince, partial, prFiles: files, authorAssociation });
     out[list].push(entry);
   }
