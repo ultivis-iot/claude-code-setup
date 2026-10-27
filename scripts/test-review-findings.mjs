@@ -65,6 +65,30 @@ check('legacy report is reference only, never completion', () => {
   assert.equal(r.complete, false);
 });
 
+// PR #24 기계 리뷰 지적(finding-9044a1a45687a68b, finding-0378897aba292916)의 회귀 테스트
+check('a corrupted newest report does not fall back to an older one', () => {
+  const r = judge({ headSha: HEAD, comments: [
+    bot(1, '2026-10-27T01:00:00Z', block({ head_sha: HEAD })),
+    bot(2, '2026-10-27T02:00:00Z', '## 🤖 AI Code Review Report\n\n<!-- ocr-review:v1 {"version":1,"head_sha":"' + HEAD + '","findi -->'),
+  ] });
+  assert.equal(r.state, 'malformed_report');
+  assert.equal(r.complete, false);
+  assert.equal(r.report.comment_id, 2);
+});
+
+check('a report whose top-level fields are wrong is never complete', () => {
+  const broken = [
+    { findings: null }, { findings: {} }, { findings: 'none' }, { findings: undefined },
+    { round: undefined }, { round: '3' }, { round: -1 }, { round: 1.5 }, { round: 0 },
+    { completeness: 'done' }, { completeness: undefined },
+  ];
+  for (const fields of broken) {
+    const r = judge({ headSha: HEAD, comments: [bot(1, 't', block({ head_sha: HEAD, ...fields }))] });
+    assert.equal(r.state, 'malformed_report', JSON.stringify(fields));
+    assert.equal(r.complete, false, JSON.stringify(fields));
+  }
+});
+
 check('findings are split by what review-cycle may do with them', () => {
   const r = judge({ headSha: HEAD, comments: [bot(1, '2026-10-27T01:00:00Z', block({ head_sha: HEAD, findings: [
     finding('fix'),

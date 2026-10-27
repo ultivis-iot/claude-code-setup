@@ -58,6 +58,7 @@ node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
    출력의 `state` 로 이번 라운드를 정한다.
    - `no_review`·`waiting`: 현재 PR HEAD 를 리뷰한 보고서가 아직 없다. 아무것도 고치지 않고 `REVIEW ROUND COMPLETE — 현재 HEAD 리뷰 대기` 를 출력한다. 이전 HEAD 의 보고서로 완료를 판단하지 않는다.
    - `legacy`: 블록 없는 예전 형식 보고서뿐이다. `needs_user` 의 지적(`legacy: true`, `hold` 없음)을 참고 목록으로 사용자에게 보고하고 루프를 멈춘다(완료 아님, 라운드 종료).
+   - `malformed_report`: 가장 최근 봇 보고서의 블록이 깨졌거나 최상위 필드(`findings` 목록, 1 이상 정수 `round`, `completeness`)가 틀렸다. 더 오래된 보고서로 대신 판단하지 않는다. `report.reason` 을 사용자에게 보고하고 루프를 멈춘다(완료 아님).
    - `needs_user`: 자동으로 고치지 않을 지적만 남았다. 각 지적의 `hold` 가 이유다(`partial report`, `not verified`, `unknown provenance`, `untrusted author`(PR 작성자가 OWNER·MEMBER·COLLABORATOR 가 아님), `sensitive path`(`.github`·`.claude`·`.codex` 디렉터리), `PR files unknown`, `outside PR files`(PR 이 바꾸지 않은 파일), `malformed finding`(필드 모양 불량, `./`·`..`·절대 경로 포함)). 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
    - `round_cap`: 기계 리뷰 3번째 라운드인데 지적이 남았다. 고치지 않고 라운드 종료의 "라운드 상한" 대로 사용자에게 보고한다.
    - `actionable`: `to_fix` 를 이번 라운드에 처리한다. `reopened` 가 붙은 지적은 다시 확인한다. (a) 고쳤다고 기록했는데 리뷰가 아직 남아 있다고 본 경우이거나, (b) 틀림·의도됨·상관없음으로 기록한 뒤 그 위치의 파일이 바뀌었거나, 기록에 기준 HEAD 가 없거나 그 커밋을 로컬에서 찾지 못하는 경우다.
@@ -116,7 +117,7 @@ push 실패 시 한 번은 rebase 후 재시도하고, 다시 실패하면 중�
 - 다른 AI 리뷰도 신규 actionable 항목이 없어야 한다. 반복 지적/설명 완료 항목만 남은 경우는 완료로 본다
 - 수정, 코멘트, commit, push를 수행했다면 다음 리뷰가 필요하므로 완료로 보지 않는다
 - **라운드 상한**: `state` 가 `round_cap`(기계 리뷰 3번째 라운드 이상인데 지적이 남음)이면 더 고치지 않는다. 그 라운드에 지적이 하나도 없으면 `clear` 로 나오고, `complete` 가 `true`(보고서 complete, checks 통과)면 완료로 본다. 남은 지적, 현재 HEAD, 리뷰 라운드를 정리해 사용자에게 "접근 재검토 필요"로 보고하고 루프를 멈춘다. 수정-리뷰를 계속 반복하면 리뷰어가 이전부터 있던 코드의 문제를 하나씩 더 찾아낼 뿐 수렴하지 않는다
-- `needs_user`·`legacy`·라운드 상한으로 멈출 때는 완료 신호를 내지 않고 아래 명령으로 Ralph Loop 를 멈춘다
+- `needs_user`·`legacy`·`malformed_report`·라운드 상한으로 멈출 때는 완료 신호를 내지 않고 아래 명령으로 Ralph Loop 를 멈춘다
 
   ```bash
   node ~/.claude/scripts/review-findings.mjs stop-loop
