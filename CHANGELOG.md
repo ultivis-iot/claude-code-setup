@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `my-tasks` 에서 다른 저장소의 Task 를 고르면, 그 저장소의 로컬 체크아웃이 없을 때 현재 저장소에 worktree 를 만들고 성공으로 끝나던 문제 수정(#13). `ult-flow.mjs wt-add` 는 이미 이 경우를 거부했지만 호출하는 쪽이 저장소 지정 없이 다시 불러 그 방어를 무력화하고 있었다. 이제 어느 저장소를 찾지 못했는지와 clone 위치를 알리고 실패한다.
+- `my-tasks` 에서 다른 저장소의 Task 를 고르면, 그 저장소의 로컬 체크아웃이 없을 때 현재 저장소에 worktree 를 만들고 성공으로 끝나던 문제 수정(#13). `ult-flow.mjs wt-add` 는 이미 이 경우를 거부했지만 호출하는 쪽이 저장소 지정 없이 다시 불러 그 방어를 무력화하고 있었다. 이제 어느 저장소를 찾지 못했는지와 clone 위치를 알리고 실패한다. Task 에 Repository 관계가 있는데 GitHub 저장소를 알아내지 못한 경우도 같은 이유로 실패한다(이전에는 조용히 현재 저장소를 썼음). `githubRepoFromUrl` 은 GitHub 이름 문자만 받아, Notion URL 의 제어 문자가 경로나 터미널 출력에 들어가지 않는다.
 
 - `scripts/test-ult-notion.mjs` 의 `collect: stats` 가 2026-10-26 부터 항상 실패하던 문제 수정(#17). 앞선 `story-create`·`task-create` 테스트가 예정일을 고정 날짜로 만들어, 그 날짜가 지나면 `weekly-collect` 가 기한 경과로 집계했다. 예정일을 실행일 기준 미래 날짜(`day(n)`)로 바꿔, 날짜가 지나도 `verify-workflow.sh` 가 통과한다(테스트용 Week 가 시작하는 2026-10-19 이후 실행 기준).
 - 기계 PR 리뷰(OCR + Codex 브리지)의 리뷰 정책 `.opencodereview/rule.json` 추가. OCR 이 `.md` 를 모두 빼고 있어, 이 저장소의 동작을 정하는 `agents/`·`commands/`·스킬·템플릿·참조 문서의 Markdown 이 기계 리뷰를 받지 못했다. 브리지 기본 정책을 복사해 이 저장소 경로를 더하고, 생성본 `codex/plugins/dev-workflow/` 는 제외한다(일치는 `sync-workflow.mjs --check` 가 확인). 이 파일을 고친 PR 은 merge 된 다음 PR 부터 적용된다.
