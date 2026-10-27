@@ -18,6 +18,8 @@
 
 ## 건너뛸 것
 
+결함을 찾지 않아도 되는 경로다. 변경 목록에서 빼지는 않는다.
+
 - `codex/plugins/dev-workflow/` — 생성본이다. 원본(`commands/`·`codex/skills/` 등)과 일치하는지는 `node scripts/sync-workflow.mjs --check` 가 맡는다.
 - `tmp/`, `CHANGELOG.md` 의 문체.
 
