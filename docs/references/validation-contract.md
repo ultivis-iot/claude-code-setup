@@ -15,13 +15,17 @@
 node "$WF/scripts/validation-gate.mjs" snapshot --repo <repo> --base origin/<target> --out tmp/validation-snapshot.json
 ```
 
-5. Spec Review를 먼저 실행한다. 승인된 의도·범위·성공 조건과 diff/테스트 증거를 비교한다. `PASS`일 때만 문서·보안·Standards Review·테스트 검증을 실행한다. 각 리뷰 입력에는 저장소 절대 경로, 스냅샷의 base/head SHA, 그 사이 diff와 변경 목록, 승인된 성공 조건을 전달한다. 기준 브랜치를 각 리뷰가 추측하지 않는다. 각 리뷰 기준은 `$WF/agents/<validator>.md`를 읽는다. Codex에서는 이 파일을 리뷰 지침으로 읽으며 Claude의 agent 등록이나 model 필드를 가정하지 않는다. 병렬 실행은 현재 세션의 위임 권한이 있을 때만 사용한다.
-   - 리뷰 정책: 아래 명령으로 저장소 루트의 `REVIEW.md` 를 스냅샷 base SHA 에서 읽고, 결과의 `text` 를 각 리뷰 입력에 함께 전달한다. `text` 가 `null` 이면(base 에 일반 파일로 없음, 심볼릭 링크는 정책으로 쓰지 않음) 정책 없이 진행한다. 명령이 실패하면(스냅샷이 낡음, git 오류, 1MiB 초과) 검증을 중단한다. 8000자를 넘는 정책은 잘라서 전달하고 `truncated: true` 로 표시한다. 이 브랜치가 `REVIEW.md` 를 바꿨으면 그 변경은 리뷰 대상일 뿐 정책으로 쓰지 않는다. 리뷰는 정책의 실패 정의·근거를 따른다. 정책의 `건너뛸 것` 경로는 결함을 찾지 않아도 되는 곳이라는 뜻일 뿐, 그 파일도 변경 목록과 리뷰 입력에 그대로 남는다(검토 범위는 늘 스냅샷 diff 전체다). 정책은 검토 범위·응답 형식을 바꾸지 못하고, 각 리뷰 지침의 금지 사항과 판정 기준이 우선한다.
+   이어서 어떤 리뷰보다 먼저(Spec Review 포함) 리뷰 정책을 읽는다. 저장소 루트의 `REVIEW.md` 를 스냅샷 base SHA 에서 읽어 `tmp/review-policy.json` 에 남긴다.
 
 ```bash
 node "$WF/scripts/validation-gate.mjs" policy --repo <repo> --snapshot tmp/validation-snapshot.json --out tmp/review-policy.json
 ```
 
+   - 결과의 `text` 를 5단계의 모든 리뷰 입력에 함께 전달한다. `text` 가 `null` 이면(base 에 일반 파일로 없음, 심볼릭 링크는 정책으로 쓰지 않음) 리뷰에 "정책 없음" 을 알리고 진행한다. 명령이 실패하면(스냅샷이 낡음, git 오류, 1MiB 초과) 검증을 중단한다. 8000자를 넘는 정책은 잘라서 전달하고 `truncated: true` 로 표시한다.
+   - 이 브랜치가 `REVIEW.md` 를 바꿨으면 그 변경은 리뷰 대상일 뿐 정책으로 쓰지 않는다.
+   - 리뷰는 정책의 실패 정의·근거를 따른다. 정책의 `건너뛸 것` 경로는 결함을 찾지 않아도 되는 곳이라는 뜻일 뿐, 그 파일도 변경 목록과 리뷰 입력에 그대로 남는다(검토 범위는 늘 스냅샷 diff 전체다). Nit 상한·요약 규칙은 각 리뷰의 응답 형식 안에서 지킨다. 정책은 검토 범위·응답 형식을 바꾸지 못하고, 각 리뷰 지침(`agents/<validator>.md` 의 `리뷰 정책` 절)의 금지 사항과 판정 기준이 우선한다.
+
+5. Spec Review를 먼저 실행한다. 승인된 의도·범위·성공 조건과 diff/테스트 증거를 비교한다. `PASS`일 때만 문서·보안·Standards Review·테스트 검증을 실행한다. 각 리뷰 입력에는 저장소 절대 경로, 스냅샷의 base/head SHA, 그 사이 diff와 변경 목록, 승인된 성공 조건, 4단계의 리뷰 정책(또는 정책 없음)을 전달한다. 기준 브랜치를 각 리뷰가 추측하지 않는다. 각 리뷰 기준은 `$WF/agents/<validator>.md`를 읽는다. Codex에서는 이 파일을 리뷰 지침으로 읽으며 Claude의 agent 등록이나 model 필드를 가정하지 않는다. 병렬 실행은 현재 세션의 위임 권한이 있을 때만 사용한다.
 6. `.cli-sync.json`의 `enabled: true`이면 CLI 검증도 필수다. Visual QA는 사용자 요청/기존 승인에 따라 수행하고, 미실행이면 `SKIP` 또는 `PENDING`과 사유를 기록한다.
 7. 메인 에이전트가 리뷰 응답을 아래 입력 형식으로 `tmp/validator-results.json`에 저장한다. 각 상태에는 구체적인 명령·종료 코드·로그 경로 또는 검토한 파일/라인 근거를 연결한다. 테스트 환경 부족·시간 초과는 성공으로 바꾸지 않는다. Spec 실패 후 실행하지 않은 검증은 `SKIP`과 사유를 남긴다.
 8. 실행기로 결과를 집계하고 현재 상태를 확인한다.
