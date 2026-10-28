@@ -145,7 +145,11 @@ try {
     // 각 오류는 gh 를 부르기 전에 그 검사의 메시지로 멈춘다(gh 가 없어도 같은 결과).
     for (const [argv, message] of [[['tier'], /--pr <번호> 또는 --input/], [['tier', '--pr'], /--pr 에 값이/], [['tier', '--input'], /--input 에 값이/],
       [['tier', '--pr', 'x'], /--pr 은 PR 번호/], [['tier', '--pr', '7abc'], /--pr 은 PR 번호/], [['tier', '--pr', '1', '--repo'], /--repo 에 값이/], [['tier', '--pr', '1', '--repo', 'bad'], /--repo 는 owner\/name/],
-      [['other', '--input', input], /사용법/]]) {
+      [['other', '--input', input], /사용법/],
+      // 모르는 옵션(오타), 위치 인수, 같은 옵션 두 번, --pr 와 --input 동시, --input 과 --repo 는 거부한다
+      [['tier', '--input', input, '--reop', 'o/r'], /모르는 옵션: --reop/], [['tier', '7', '--input', input], /위치 인수/],
+      [['tier', '--pr', '1', '--pr', '2'], /--pr 를 두 번/], [['tier', '--pr', '42', '--input', input], /하나만/],
+      [['tier', '--input', input, '--repo', 'o/r'], /--repo 는 --pr 와/]]) {
       const r = spawnSync(process.execPath, [tool, ...argv], { encoding: 'utf8', env: { ...process.env, PATH: '' } });
       assert.notEqual(r.status, 0, argv.join(' '));
       assert.match(r.stderr, /^ERROR: /, argv.join(' '));

@@ -89,12 +89,17 @@ function fail(message) {
   process.exit(1);
 }
 
+const OPTIONS = new Set(["pr", "repo", "input"]);
+
+// 모르는 옵션(오타)·위치 인수·같은 옵션 두 번은 다른 대상을 조용히 분류하게 하므로 거부한다.
 function args(argv) {
   const [cmd, ...rest] = argv;
   const opt = {};
   for (let i = 0; i < rest.length; i++) {
-    if (!rest[i].startsWith("--")) continue;
+    if (!rest[i].startsWith("--")) fail(`위치 인수는 받지 않습니다: ${rest[i]}`);
     const key = rest[i].slice(2);
+    if (!OPTIONS.has(key)) fail(`모르는 옵션: --${key}`);
+    if (Object.hasOwn(opt, key)) fail(`--${key} 를 두 번 줬습니다`);
     opt[key] = rest[i + 1] && !rest[i + 1].startsWith("--") ? rest[++i] : true;
   }
   return { cmd, opt };
@@ -123,6 +128,8 @@ function main() {
   // 값을 빠뜨린 옵션은 args() 에서 true 가 된다.
   for (const key of ["pr", "repo", "input"]) if (opt[key] === true) fail(`--${key} 에 값이 필요합니다`);
   if (!opt.input && !opt.pr) fail("--pr <번호> 또는 --input <파일> 이 필요합니다");
+  if (opt.input && opt.pr) fail("--pr 와 --input 중 하나만 줍니다");
+  if (opt.input && opt.repo) fail("--repo 는 --pr 와 함께만 씁니다");
   if (opt.pr !== undefined && !/^\d+$/.test(opt.pr)) fail("--pr 은 PR 번호입니다");
   if (opt.repo !== undefined && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(opt.repo)) fail("--repo 는 owner/name 형식입니다");
   try {
