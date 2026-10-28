@@ -74,6 +74,7 @@ git push origin master --tags
 - settings.json hook 설치기 테스트: `node scripts/test-install-settings.mjs` (워크플로우 검증에 포함)
 - Notion 스크립트(`ult-notion.mjs`) 테스트: `node scripts/test-ult-notion.mjs` (mock Notion 서버·가짜 gh 사용, 네트워크 불필요, 워크플로우 검증에 포함)
 - 기계 리뷰 읽기 도구(`review-findings.mjs`) 테스트: `node scripts/test-review-findings.mjs` (gh 불필요, 워크플로우 검증에 포함)
+- 기계 리뷰 지표 집계(`review-metrics.mjs`) 테스트: `node scripts/test-review-metrics.mjs` (gh 불필요, 워크플로우 검증에 포함)
 
 ### 업데이트 검증
 `./setup.sh --update` 실행 후 아래 항목 확인:
