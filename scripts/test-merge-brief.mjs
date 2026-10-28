@@ -65,7 +65,7 @@ check('validation, install, hook and permission paths ask four, five when large'
     '.husky/pre-commit', 'package.json', '.npmrc', 'Makefile', 'scripts/ult-flow.mjs', 'scripts/review-cycle-ralph-loop.mjs', 'scripts/review_findings.mjs',
     'templates/global-claude.md', 'CLAUDE.md',
     '.gitlab-ci.yml', '.circleci/config.yml', 'Dockerfile', 'docker-compose.yml', 'server.key', 'scripts/x.pem', 'src/ssh/id_rsa', 'src/api-key.ts', 'src/jwt.ts', 'scripts/deploy.sh', 'scripts/release.sh', 'scripts/setups/x.sh', 'scripts/gates/x.mjs',
-    'Jenkinsfile', 'ci/Jenkinsfile', 'azure-pipelines.yml', 'bitbucket-pipelines.yml', '.travis.yml', '.buildkite/pipeline.yml']) {
+    'Jenkinsfile', 'ci/Jenkinsfile', 'azure-pipelines.yml', 'bitbucket-pipelines.yml', '.travis.yml', '.buildkite/pipeline.yml', '.drone.yml', 'cloudbuild.yaml', 'appveyor.yml', '.gitea/workflows/x.yml', '.semaphore/x.yml', 'Justfile', 'Taskfile.yml']) {
     const r = classify([file(p)]);
     assert.equal(r.tier, 'sensitive', p);
     assert.equal(r.questions, 4, p);
