@@ -224,6 +224,13 @@ function ghTry(argv) {
   return spawnSync("gh", argv, { encoding: "utf8", windowsHide: true });
 }
 
+// 필수 check 목록의 모양을 확인한다. 배열이 아니거나 이름이 빈 문자열이 아니면 null(모름)이다.
+const checkNames = (list, pick) => {
+  if (!Array.isArray(list)) return null;
+  const names = list.map(pick);
+  return names.every((n) => typeof n === "string" && n !== "") ? names : null;
+};
+
 // 대상 브랜치의 필수 status check 이름. rulesets 와 기존 브랜치 보호를 합친다. 알아내지 못하면 null(완료로 보지 않음).
 function requiredChecksFor(slug, base) {
   if (typeof base !== "string" || !base) return null;
@@ -237,14 +244,19 @@ function requiredChecksFor(slug, base) {
     if (!Array.isArray(list) || list.length >= 100) return null;
     for (const rule of list) {
       if (rule?.type !== "required_status_checks") continue;
-      for (const c of rule.parameters?.required_status_checks || []) if (typeof c?.context === "string") names.push(c.context);
+      const required = checkNames(rule.parameters?.required_status_checks, (c) => c?.context);
+      if (!required) return null;
+      names.push(...required);
     }
   } catch { return null; }
   const protection = ghTry(["api", `repos/${slug}/branches/${branch}/protection/required_status_checks`]);
   if (protection.status === 0) {
     try {
       const p = JSON.parse(protection.stdout);
-      names.push(...(p.contexts || []), ...(p.checks || []).map((c) => c?.context).filter((c) => typeof c === "string"));
+      const contexts = checkNames(p?.contexts, (c) => c);
+      const checks = p?.checks === undefined ? [] : checkNames(p.checks, (c) => c?.context);
+      if (!contexts || !checks) return null;
+      names.push(...contexts, ...checks);
     } catch { return null; }
   } else if (!/HTTP 404/.test(protection.stderr || "")) return null;  // 404: 보호 없음 또는 필수 check 없음
   return [...new Set(names)];
