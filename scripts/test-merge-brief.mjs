@@ -60,7 +60,7 @@ check('validation, install, hook and permission paths ask four, five when large'
     'scripts/ult-notion.mjs', 'scripts/lib/notion.mjs', '.claude/settings.json', '.codex/config.toml',
     'codex/plugins/dev-workflow/hooks/hooks.json', 'codex/plugins/dev-workflow/.codex-plugin/plugin.json', 'HOOKS/pre-push',
     // 디렉터리 이름으로 든 설치·설정·게이트·인증, 자격 증명·환경 파일, 패키지·hook 설정, 사용자 설정에 설치되는 지시문
-    'scripts/install/run.mjs', 'scripts/installer/run.sh', 'scripts/setup/x.sh', 'scripts/gate/run.mjs', 'src/authentication/x.ts', 'src/oauth.ts',
+    'scripts/install/run.mjs', 'scripts/installer/run.sh', 'scripts/setup/x.sh', 'scripts/gate/run.mjs', 'src/authentication/x.ts', 'src/oauth.ts', 'src/authn/x.ts', 'src/authz/x.ts',
     '.env', 'config/.env.production', 'src/credentials.json', 'src/apikey.ts', 'src/password.ts', 'src/keychain.ts',
     '.husky/pre-commit', 'package.json', '.npmrc', 'Makefile', 'scripts/ult-flow.mjs', 'scripts/review-cycle-ralph-loop.mjs', 'scripts/review_findings.mjs',
     'templates/global-claude.md', 'CLAUDE.md']) {
@@ -103,6 +103,10 @@ check('a generated copy is skipped only when its source changed in the same PR',
 check('a renamed file is classified by its old path as well', () => {
   const r = classify([{ path: 'docs/notes.md', previous_path: 'hooks/pre-push', additions: 0, deletions: 0 }]);
   assert.equal(r.tier, 'sensitive');
+  // 새 경로만 민감하거나 코드여도 그 분류를 쓴다
+  assert.equal(classify([{ path: 'hooks/a.sh', previous_path: 'docs/a.md', additions: 0, deletions: 0 }]).tier, 'sensitive');
+  assert.equal(classify([{ path: 'scripts/a.mjs', previous_path: 'docs/a.md', additions: 0, deletions: 0 }]).tier, 'code');
+  assert.equal(classify([{ path: 'docs/a.md', previous_path: 'scripts/a.mjs', additions: 0, deletions: 0 }]).tier, 'code');
   assert.equal(classify([{ path: 'docs/a.md', previous_path: null, additions: 1, deletions: 0 }]).tier, 'docs');
 });
 
@@ -111,7 +115,7 @@ check('malformed file entries are rejected', () => {
   assert.throws(() => classify([{ path: '', additions: 1, deletions: 0 }]), /files 는/);
   for (const bad of [null, {}, [{ path: '' }], [{ path: 'a', additions: -1, deletions: 0 }], [{ path: 'a', additions: 1.5, deletions: 0 }], [{ path: 'a', additions: '1', deletions: 0 }],
     [{ path: 'a', previous_path: '', additions: 1, deletions: 0 }], [{ path: 'a', previous_path: 3, additions: 1, deletions: 0 }]]) {
-    assert.throws(() => classify(bad), /files/, JSON.stringify(bad));
+    assert.throws(() => classify(bad), /files 는 \{path/, JSON.stringify(bad));
   }
 });
 
