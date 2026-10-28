@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- README 에 기계 리뷰 진행 표시(`ai-review` commit status)와 리뷰가 도는 이벤트(열기·push·ready·다시 열기)를 적었다. 리뷰 브리지 패치 0019 와 n8n PR Review 워크플로 변경(브리지 직접 호출로 Notion Member DB 에 없는 작성자도 리뷰, `ready_for_review`·`reopened` 이벤트, 재시도, 파싱 실패 시 빈 보고서를 게시하지 않음)이 운영에 반영됐다(A0-3).
+
 ## v1.2.0 (2026-10-28)
 
 - 호환성: 검증 상태(`validation-status.json`)에 필수 필드 `review_policy`(읽은 커밋·출처·해시·잘림)가 생겨 이전 버전에서 만든 검증 결과는 `ready`·pre-push 에서 다시 검증해야 한다. `validation-gate.mjs record` 는 `--policy` 가 필수이고, 정책 단계는 `origin/HEAD` 가 필요하다(없으면 `git remote set-head origin --auto`). 업데이트 뒤 `./setup.sh --update`(Codex 는 `./setup-codex.sh --update`)로 설치본을 갱신해야 새 검증 agent 정의·실행기가 적용된다.
