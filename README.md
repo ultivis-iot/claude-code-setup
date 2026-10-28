@@ -395,7 +395,7 @@ mkdir -p tmp
 **자동 생성되는 파일**:
 - `tmp/current-plan.md` - 현재 대화에서 승인된 Plan
 - `tmp/validation-snapshot.json` - 검증 시작 시 코드·base·Plan의 식별값
-- `tmp/review-policy.json` - 스냅샷 base 에서 읽은 리뷰 정책(`REVIEW.md`)
+- `tmp/review-policy.json` - 원격 기본 브랜치에서 읽은 리뷰 정책(`REVIEW.md`)
 - `tmp/validation-status.json` - 검증 결과 기록
 - `tmp/review-findings-{PR}.json` - 기계 리뷰 지적별 처리 기록 (`review-findings.mjs record` 가 생성, `.gitignore` 권장)
 - `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
@@ -404,8 +404,8 @@ mkdir -p tmp
 
 저장소 루트의 `REVIEW.md` 는 로컬 검증(`commit-and-verify`)과 PR 기계 리뷰가 같이 읽는 리뷰 정책입니다. 이 저장소에서 실패가 무엇인지, 지적에 요구하는 근거, 건너뛸 경로, Nit 상한, 요약 형식을 짧게 적습니다. `~/.claude/templates/REVIEW.md`(Codex 는 `~/.codex/templates/REVIEW.md`)를 복사해 고쳐 씁니다.
 
-- 로컬 검증과 기계 리뷰 모두 **대상 브랜치의 현재** `REVIEW.md` 를 씁니다(분기 지점이 아님. 분기 지점은 작성자가 고를 수 있어서입니다). PR 이 `REVIEW.md` 를 바꾸면 그 변경은 리뷰 대상이고 정책으로는 merge 뒤부터 씁니다.
-- 로컬 검증은 `validation-gate.mjs policy` 가 스냅샷 base 에서 `REVIEW.md` 를 읽어 `tmp/review-policy.json` 에 남깁니다. 일반 파일만 정책으로 쓰고(심볼릭 링크·빈 파일은 정책 없음), 8000자를 넘으면 앞 8000자에 잘림 표시를 붙여 전달합니다. 기계 리뷰도 같은 기준입니다. `record`·`ready` 는 이 결과가 스냅샷 base 의 `REVIEW.md` 와 같은지 확인합니다. 정책 결과가 없거나 다르면 게이트를 통과하지 못하지만, 정책을 리뷰어에게 실제로 넘겼는지까지는 확인하지 못합니다.
+- 로컬 검증과 기계 리뷰 모두 **저장소 기본 브랜치의 현재** `REVIEW.md` 를 씁니다(분기 지점이나 대상 브랜치가 아님. 둘 다 PR 작성자가 고를 수 있어서입니다). PR 이 `REVIEW.md` 를 바꾸면 그 변경은 리뷰 대상이고 정책으로는 merge 뒤부터 씁니다.
+- 로컬 검증은 `validation-gate.mjs policy` 가 원격 기본 브랜치(`origin/HEAD`, 없으면 `git remote set-head origin --auto`) tip 에서 `REVIEW.md` 를 읽어 `tmp/review-policy.json` 에 남깁니다. 일반 파일만 정책으로 쓰고(심볼릭 링크·빈 파일은 정책 없음), 8000자를 넘으면 앞 8000자에 잘림 표시를 붙여 전달합니다. 기계 리뷰도 같은 기준입니다. `record`·`ready` 는 이 결과가 현재 기본 브랜치 tip 의 `REVIEW.md` 와 같은지 확인합니다. 정책 결과가 없거나 다르면 게이트를 통과하지 못하지만, 정책을 리뷰어에게 실제로 넘겼는지까지는 확인하지 못합니다.
 - 기계 리뷰 쪽은 리뷰 브리지(`llm-cli-bridge`)의 변경이 운영에 배포된 뒤부터 적용됩니다. 적용되면 보고서 리뷰 범위 절에 `리뷰 지침: 저장소 REVIEW.md (<sha> 기준)` 줄이 나옵니다. 이 줄이 없으면 기계 리뷰는 아직 `REVIEW.md` 를 읽지 않는 것입니다.
 - 리뷰에서 같은 지적이 되풀이되면 `review-cycle` 이 `REVIEW.md` 에 규칙으로 옮기자고 제안합니다.
 

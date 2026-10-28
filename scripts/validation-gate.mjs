@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Shared local validation contract; does not push or create PRs.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, realpathSync, renameSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -81,14 +81,15 @@ function check(data) {
 function ready(data, repo, base) {
   check(data);
   same(capture(repo, base || data.snapshot.base_branch), data.snapshot);
-  samePolicy(repo, data.snapshot.base_sha, data.review_policy);
+  samePolicy(repo, data.review_policy);
   if (data.overall === 'FAIL' || data.results['intent-validator'] !== 'PASS') fail('Intent or overall validation failed.');
   for (const name of [...required, ...(data.snapshot.cli_required ? ['cli-validator'] : [])]) {
     if (!['PASS', 'WARN'].includes(data.results[name])) fail(`Required validation did not execute: ${name}`);
   }
 }
 
-// REVIEW.md as the snapshot base has it: the branch under review cannot rewrite its own policy.
+// REVIEW.md as the remote default branch has it: the branch under review cannot rewrite its own policy, and
+// the PR opener cannot pick a target branch that carries a weaker one.
 const POLICY_FILE = 'REVIEW.md';
 const MAX_POLICY_CHARS = 8000;
 const MAX_POLICY_BYTES = 1024 * 1024;
@@ -104,14 +105,22 @@ function reviewPolicy(repo, base) {
   return { base_sha: base, source: `${POLICY_FILE}@${base.slice(0, 12)}`, truncated, text };
 }
 
-// What the status records about the policy, so ready can tell a skipped or edited policy step from the real one.
-function policyRecord(policy) {
-  return { source: policy.source, sha256: policy.text === null ? null : createHash('sha256').update(policy.text).digest('hex'), truncated: policy.truncated };
+function policyBase(repo) {
+  const head = spawnSync('git', ['-C', repo, 'symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], { encoding: 'utf8' });
+  if (head.status !== 0) fail('origin/HEAD is not set, so the default branch is unknown; run `git remote set-head origin --auto`.');
+  return git(repo, 'rev-parse', '--verify', 'refs/remotes/origin/HEAD^{commit}');
 }
 
-function samePolicy(repo, base, recorded) {
+// What the status records about the policy, so ready can tell a skipped or edited policy step from the real one.
+function policyRecord(policy) {
+  return { base_sha: policy.base_sha, source: policy.source, sha256: policy.text === null ? null : createHash('sha256').update(policy.text).digest('hex'), truncated: policy.truncated };
+}
+
+function samePolicy(repo, recorded) {
+  const base = policyBase(repo);
+  if (recorded?.base_sha !== base) fail('Review policy was read from another default branch commit; rerun the policy step.');
   const actual = policyRecord(reviewPolicy(repo, base));
-  for (const key of Object.keys(actual)) if (actual[key] !== recorded?.[key]) fail(`Review policy does not match ${POLICY_FILE} at the snapshot base (${key}); rerun the policy step.`);
+  for (const key of Object.keys(actual)) if (actual[key] !== recorded?.[key]) fail(`Review policy does not match ${POLICY_FILE} on the default branch (${key}); rerun the policy step.`);
 }
 
 function save(file, value) {
@@ -142,10 +151,10 @@ export function main(args) {
     validate(snapshot, schema.$defs.snapshot);
     same(capture(repo, snapshot.base_branch), snapshot);
     const policy = json(options.policy);
-    if (policy?.base_sha !== snapshot.base_sha) fail('Review policy was read for a different snapshot base; rerun the policy step.');
+    if (!policy || typeof policy !== 'object') fail('Expected a review policy object; rerun the policy step.');
     if (policy.text !== null && typeof policy.text !== 'string') fail('Review policy text must be a string or null; rerun the policy step.');
-    const review_policy = policyRecord({ source: policy.source ?? null, text: policy.text ?? null, truncated: policy.truncated });
-    samePolicy(repo, snapshot.base_sha, review_policy);
+    const review_policy = policyRecord({ base_sha: policy.base_sha, source: policy.source ?? null, text: policy.text ?? null, truncated: policy.truncated });
+    samePolicy(repo, review_policy);
     const input = json(options.results);
     if (!input || typeof input !== 'object' || Array.isArray(input)) fail('Expected validator result object.');
     const results = {}, evidence = {};
@@ -164,7 +173,7 @@ export function main(args) {
     const snapshot = json(options.snapshot);
     validate(snapshot, schema.$defs.snapshot);
     same(capture(repo, snapshot.base_branch), snapshot);
-    const policy = reviewPolicy(repo, snapshot.base_sha);
+    const policy = reviewPolicy(repo, policyBase(repo));
     save(options.out, policy);
     console.log(policy.source ? `Review policy: ${policy.source}${policy.truncated ? ' (truncated)' : ''}` : 'Review policy: none');
   } else if (mode === 'check' || mode === 'ready' || mode === 'pre-push') {
