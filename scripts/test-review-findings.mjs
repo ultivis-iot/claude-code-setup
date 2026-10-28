@@ -238,6 +238,51 @@ check('round cap stops fixing while findings remain; a clean report at the cap s
   assert.deepEqual(pending.checks.not_passed, ['ci']);
 });
 
+// #23: n8n 이 push 마다 리뷰를 부르면 이전 HEAD 리뷰가 늦게 끝나 현재 HEAD 보고서 뒤에 올라올 수 있다(finding-0d37579fbe1e736c).
+check('a late report of an earlier head does not hide the current head report', () => {
+  const r = judge({ headSha: HEAD, comments: [
+    bot(1, '2026-10-27T01:00:00Z', block({ head_sha: HEAD, findings: [finding('now')] })),
+    bot(2, '2026-10-27T02:00:00Z', block({ head_sha: OLD, findings: [finding('then')] })),
+  ] });
+  assert.equal(r.state, 'actionable');
+  assert.equal(r.report.comment_id, 1);
+  assert.deepEqual(r.to_fix.map((f) => f.id), ['now']);
+});
+
+check('a corrupted report newer than the current head report still stops', () => {
+  const r = judge({ headSha: HEAD, comments: [
+    bot(1, '2026-10-27T01:00:00Z', block({ head_sha: HEAD })),
+    bot(2, '2026-10-27T02:00:00Z', block({ head_sha: OLD })),
+    bot(3, '2026-10-27T03:00:00Z', '## 🤖 AI Code Review Report\n\n<!-- ocr-review:v1 {broken -->'),
+  ] });
+  assert.equal(r.state, 'malformed_report');
+  assert.equal(r.report.comment_id, 3);
+});
+
+check('only earlier-head reports mean waiting, reporting the newest one', () => {
+  const r = judge({ headSha: HEAD, comments: [
+    bot(1, '2026-10-27T01:00:00Z', block({ head_sha: 'c'.repeat(40) })),
+    bot(2, '2026-10-27T02:00:00Z', block({ head_sha: OLD })),
+  ] });
+  assert.equal(r.state, 'waiting');
+  assert.equal(r.report.head_sha, OLD);
+});
+
+// #23 1·6: Windows 식 표기와 맨 앞 .. 로 민감 디렉터리 검사·경로 정규화를 피하지 못한다.
+check('backslashes, control characters and leading .. are malformed; trailing dots or spaces do not hide a sensitive directory', () => {
+  const prFiles = ['.github./x.yml', '.GitHub /x.yml', '.claude../settings.json', 'a.mjs'];
+  const r = judge({ headSha: HEAD, prFiles, comments: [bot(1, 't', block({ head_sha: HEAD, findings: [
+    finding('backslash', { locations: [{ file: '.github\\workflows\\ci.yml', line: 1 }] }),
+    finding('control', { locations: [{ file: 'a\u0000.mjs', line: 1 }] }),
+    finding('leading-climb', { locations: [{ file: '../a.mjs', line: 1 }] }),
+    finding('dot', { locations: [{ file: '.github./x.yml', line: 1 }] }),
+    finding('space', { locations: [{ file: '.GitHub /x.yml', line: 1 }] }),
+    finding('dots', { locations: [{ file: '.claude../settings.json', line: 1 }] }),
+  ] }))] });
+  assert.deepEqual(r.needs_user.map((f) => f.hold), ['malformed finding', 'malformed finding', 'malformed finding', 'sensitive path', 'sensitive path', 'sensitive path']);
+  assert.deepEqual(r.to_fix, []);
+});
+
 // CLI: status 는 gh 대신 --input 을 읽고, record 는 저장소의 tmp/ 에 처리 이력을 쓴다.
 const dir = mkdtempSync(path.join(os.tmpdir(), 'review-findings-'));
 try {
@@ -282,6 +327,59 @@ try {
     assert.deepEqual(JSON.parse(run('stop-loop').stdout), { stopped: true });
     assert.equal(existsSync(state), false);
     assert.deepEqual(JSON.parse(run('stop-loop').stdout), { stopped: false });
+  });
+  // #23 4: 객체의 특수 키도 다른 id 처럼 저장하고 다시 읽는다(finding-8965d6560f06c829).
+  check('cli records reserved-looking ids instead of losing them', () => {
+    const head = git('rev-parse', 'HEAD').stdout.trim();
+    const special = ['__proto__', 'constructor', 'toString'];
+    writeFileSync(input, JSON.stringify({ head_sha: head, files: ['a.mjs'], author_association: 'OWNER',
+      comments: [bot(1, 't', block({ head_sha: head, findings: special.map((id) => finding(id)) }))] }));
+    for (const id of special) assert.equal(run('record', '--pr', '19', '--id', id, '--decision', 'intentional', '--reason', 'r').status, 0);
+    const ledger = readFileSync(path.join(dir, 'tmp', 'review-findings-19.json'), 'utf8');
+    for (const id of special) assert.match(ledger, new RegExp(`"${id}": \\{`));
+    const r = JSON.parse(run('status', '--pr', '19', '--input', input).stdout);
+    assert.deepEqual(r.declined.map((f) => f.id).sort(), [...special].sort());
+    writeInput();
+  });
+  // #23 2: 값을 빠뜨린 옵션이 기본값이나 "true" 로 통과하지 않는다.
+  check('cli rejects options given without a value', () => {
+    for (const option of ['--round-cap', '--bot', '--repo', '--input']) {
+      const argv = option === '--input' ? ['status', '--pr', '18', option] : ['status', '--pr', '18', '--input', input, option];
+      const r = run(...argv);
+      assert.equal(r.status, 1, option);
+      assert.match(r.stderr, new RegExp(option), option);
+    }
+    assert.equal(run('status', '--pr', '18', '--input', input, '--round-cap', '2.0').status, 1);
+    assert.equal(run('status', '--pr', '18', '--input', input, '--round-cap', '02').status, 1);
+  });
+  // #23 7: gh 를 거치는 실제 로딩 경로. POSIX 에서만 PATH 의 gh 를 가짜로 바꿀 수 있다.
+  check('cli status reads head, files, checks, comments and author through gh', () => {
+    if (process.platform === 'win32') { console.log('  SKIP gh 로딩 경로는 PATH 의 gh 를 바꾸는 POSIX shim 이 필요하다'); return; }
+    const head = git('rev-parse', 'HEAD').stdout.trim();
+    const bin = path.join(dir, 'bin');
+    mkdirSync(bin, { recursive: true });
+    const calls = path.join(dir, 'gh-calls.log');
+    const view = { headRefOid: head, files: [{ path: 'a.mjs' }], statusCheckRollup: [{ name: 'ci', conclusion: 'FAILURE' }, { context: 'lint', state: 'SUCCESS' }] };
+    const comments = [{ id: 7, created_at: 't', login: 'isaac-notion-bot', body: block({ head_sha: head, findings: [finding('via-gh')] }) }];
+    writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}
+const args = process.argv.slice(2);
+require('node:fs').appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
+const out = (s) => process.stdout.write(s + '\\n');
+if (args[0] === 'pr' && args[1] === 'view') out(${JSON.stringify(JSON.stringify(view))});
+else if (args[0] === 'api' && args[1].endsWith('/comments')) for (const c of ${JSON.stringify(comments)}) out(JSON.stringify(c));
+else if (args[0] === 'api' && args[1].includes('/pulls/')) out('MEMBER');
+else { process.stderr.write('unexpected gh ' + args.join(' ')); process.exit(1); }
+`, { mode: 0o755 });
+    const r = spawnSync(process.execPath, [tool, 'status', '--pr', '21', '--repo', 'o/r'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH } });
+    assert.equal(r.status, 0, r.stderr);
+    const out = JSON.parse(r.stdout);
+    assert.equal(out.head_sha, head);
+    assert.deepEqual(out.to_fix.map((f) => f.id), ['via-gh']);  // MEMBER 이고 PR 파일 안이라 자동 수정 대상
+    assert.deepEqual(out.checks, { total: 2, not_passed: ['ci'] });
+    const asked = readFileSync(calls, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+    assert.ok(asked.some((a) => a[0] === 'pr' && a.includes('o/r')), 'pr view uses --repo');
+    assert.ok(asked.some((a) => a[1] === 'repos/o/r/issues/21/comments'));
+    assert.ok(asked.some((a) => a[1] === 'repos/o/r/pulls/21'));
   });
   check('cli rejects bad input', () => {
     assert.equal(run('status', '--pr', '18', '--input', input, '--repo', 'a/b;rm').status, 1);

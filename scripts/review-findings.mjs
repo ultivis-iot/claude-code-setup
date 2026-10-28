@@ -71,13 +71,15 @@ export function parseLegacy(body) {
 
 const idsOf = (finding) => [finding.id, ...(finding.aliases || [])];
 // 리뷰 봇이 PR 작성자의 diff 에 유도될 수 있으므로, 이 경로를 건드리는 지적은 자동으로 고치지 않는다.
-const SENSITIVE_PATH = /^(\.github|\.claude|\.codex)\//i;
+// 저장소 최상위 디렉터리만 본다. Windows 는 이름 끝의 . 과 공백을 지우므로 지운 뒤 비교한다.
+const SENSITIVE_DIRS = new Set([".github", ".claude", ".codex"]);
+const isSensitive = (f) => f.includes("/") && SENSITIVE_DIRS.has(f.split("/")[0].replace(/[. ]+$/, "").toLowerCase());
 // PR 작성자가 이 저장소의 쓰기 권한을 가진 사람일 때만 자동 수정한다(외부 기여자 PR 은 사람이 본다).
 const TRUSTED_AUTHORS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
 
-// 저장소 기준 정규화된 상대 경로만 받는다. ./x, a/../x, /abs, 옵션처럼 보이는 값은 모양 불량이다.
+// 저장소 기준 정규화된 상대 경로만 받는다. ./x, a/../x, ../x, /abs, 옵션처럼 보이는 값, \ 구분자, 제어 문자는 모양 불량이다.
 const canonicalPath = (f) => typeof f === "string" && f !== "" && !f.startsWith("-") && !posix.isAbsolute(f)
-  && posix.normalize(f) === f && !f.split("/").includes("..");
+  && !/[\\\u0000-\u001f\u007f]/.test(f) && posix.normalize(f) === f && !f.split("/").includes("..");
 
 function ledgerDecision(ledger, finding) {
   const decisions = ledger.decisions || {};
@@ -118,7 +120,7 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
   else if (finding.verification !== "confirmed") entry.hold = "not verified";
   else if (!FIXABLE_PROVENANCE.has(finding.provenance)) entry.hold = "unknown provenance";
   else if (!TRUSTED_AUTHORS.has(authorAssociation)) entry.hold = "untrusted author";
-  else if (filesOf(finding).some((f) => SENSITIVE_PATH.test(f))) entry.hold = "sensitive path";
+  else if (filesOf(finding).some(isSensitive)) entry.hold = "sensitive path";
   else if (!prFiles) entry.hold = "PR files unknown";
   else if (filesOf(finding).some((f) => !prFiles.has(f))) entry.hold = "outside PR files";
   return { list: entry.hold ? "needs_user" : "to_fix", entry };
@@ -154,16 +156,21 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
   };
   if (!reports.length) return { ...base, state: "no_review", report: null };
 
-  // 판단은 가장 최근 봇 보고서로만 한다. 그 블록이 깨졌으면 같은 HEAD 의 더 오래된 보고서로 대신하지 않는다.
-  const current = reports[reports.length - 1];
-  const malformed = (reason) => ({ ...base, state: "malformed_report", report: { comment_id: current.comment_id, head_sha: current.block?.head_sha ?? null, reason } });
-  if (!BLOCK_MARK.test(String(current.body || ""))) {
-    return { ...base, state: "legacy", report: { comment_id: current.comment_id, head_sha: null }, needs_user: parseLegacy(current.body) };
+  // 판단은 현재 HEAD 를 리뷰한 가장 최근 보고서로 한다. 이전 HEAD 리뷰가 늦게 끝나 그 뒤에 올라온 보고서는
+  // 건너뛴다. 읽을 수 없는 블록은 어느 HEAD 의 것인지 모르므로 건너뛰지 않고 멈춘다(더 오래된 보고서로 대신하지 않음).
+  const newest = reports[reports.length - 1];
+  if (!BLOCK_MARK.test(String(newest.body || ""))) {
+    return { ...base, state: "legacy", report: { comment_id: newest.comment_id, head_sha: null }, needs_user: parseLegacy(newest.body) };
   }
-  if (!current.block) return malformed("block could not be read");
-  if (current.block.head_sha !== headSha) return { ...base, state: "waiting", report: { comment_id: current.comment_id, head_sha: current.block.head_sha } };
+  let current = null;
+  for (const report of [...reports].reverse()) {
+    if (!BLOCK_MARK.test(String(report.body || ""))) continue;
+    if (!report.block) return { ...base, state: "malformed_report", report: { comment_id: report.comment_id, head_sha: null, reason: "block could not be read" } };
+    if (report.block.head_sha === headSha) { current = report; break; }
+  }
+  if (!current) return { ...base, state: "waiting", report: { comment_id: newest.comment_id, head_sha: newest.block?.head_sha ?? null } };
   const problem = reportProblem(current.block);
-  if (problem) return malformed(problem);
+  if (problem) return { ...base, state: "malformed_report", report: { comment_id: current.comment_id, head_sha: current.block.head_sha ?? null, reason: problem } };
 
   const block = current.block;
   const out = { ...base, report: { comment_id: current.comment_id, head_sha: block.head_sha, completeness: block.completeness, parent_head_sha: block.parent_head_sha } };
@@ -260,9 +267,11 @@ function main() {
   }
   if (!opt.pr || !/^\d+$/.test(String(opt.pr))) fail("--pr <번호> 가 필요합니다");
   if (cmd === "status") {
+    // 값을 빠뜨린 옵션은 args() 에서 true 가 된다. 기본값이나 "true" 로 통과시키지 않는다.
+    for (const key of ["repo", "bot", "round-cap", "input"]) if (opt[key] === true) fail(`--${key} 에 값이 필요합니다`);
     if (opt.repo !== undefined && !(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(String(opt.repo)) && String(opt.repo).split("/").every((part) => part !== "." && part !== ".."))) fail("--repo 는 owner/name 형식입니다");
+    if (opt["round-cap"] !== undefined && !/^[1-9]\d*$/.test(opt["round-cap"])) fail("--round-cap 은 1 이상의 정수입니다");
     const roundCap = opt["round-cap"] === undefined ? DEFAULT_ROUND_CAP : Number(opt["round-cap"]);
-    if (!Number.isInteger(roundCap) || roundCap < 1) fail("--round-cap 은 1 이상의 정수입니다");
     if (opt.bot !== undefined && !/^[A-Za-z0-9-]+(\[bot\])?$/.test(String(opt.bot))) fail("--bot 은 GitHub 로그인입니다");
     const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
     const result = assess({
@@ -280,10 +289,11 @@ function main() {
     if (!opt.reason || opt.reason === true) fail("--reason 이 필요합니다");
     const ledger = readLedger(opt.pr);
     const head = gitOk(["rev-parse", "HEAD"]);
-    ledger.decisions[opt.id] = {
+    // 대입하면 __proto__ 같은 id 는 객체의 프로토타입을 바꾸고 저장되지 않는다. 자기 속성으로 정의한다.
+    Object.defineProperty(ledger.decisions, opt.id, { enumerable: true, writable: true, configurable: true, value: {
       decision: opt.decision, reason: opt.reason, commit: opt.commit || null,
       head_sha: head.status === 0 ? head.stdout.trim() : null, at: new Date().toISOString(),
-    };
+    } });
     const f = ledgerPath(opt.pr);
     mkdirSync(dirname(f), { recursive: true });
     writeFileSync(f, JSON.stringify(ledger, null, 2) + "\n");
