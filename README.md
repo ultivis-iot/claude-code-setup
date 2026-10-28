@@ -203,6 +203,7 @@ Codex 설치 시:
 │   │       ├── commit-and-verify.md
 │   │       ├── create-pr.md
 │   │       ├── review-cycle.md
+│   │       ├── merge-readiness.md
 │   │       └── ult-notion.md
 │   ├── tdd/
 │   ├── diagnosing-bugs/
@@ -362,7 +363,7 @@ Plan에 따라 코드를 구현합니다.
 /create-pr project-maker
 ```
 
-모든 검증 통과 시 Push 및 PR을 생성합니다. PR 본문에는 해결한 문제, 변경 후 동작, 실제 수행한 검증, **위험**, **되돌리는 방법**, 남은 제한이 들어갑니다. 위험과 되돌리는 방법은 에이전트가 초안을 쓰고, 변경을 요청한 사람이 확인합니다.
+모든 검증 통과 시 Push 및 PR을 생성합니다. PR 본문에는 해결한 문제, 변경 후 동작, **바뀐 불변식·결정**, 실제 수행한 검증, **검사가 놓칠 수 있는 것**, **위험**, **되돌리는 방법**, 남은 제한이 들어갑니다. 이 본문은 리뷰 전 초안이고, 머지 전에는 최종 HEAD 기준으로 다시 브리프합니다(아래 '머지 전 이해 확인'). 위험과 되돌리는 방법은 에이전트가 초안을 쓰고, 변경을 요청한 사람이 확인합니다.
 
 ### 6. PR 리뷰 반영
 
@@ -384,7 +385,7 @@ Plan에 따라 코드를 구현합니다.
 - **3라운드부터는 바뀐 부분만**: 기계 리뷰는 브리지 설정 `REVIEW_FULL_ROUNDS`(기본 2) 라운드까지 PR 전체를 리뷰하고, 그다음 라운드(기본 3라운드)부터는 직전 리뷰 HEAD 이후 바뀐 줄(±3줄)에 대한 새 지적만 보고합니다. 그 밖의 새 지적은 보고서에 `이전 코드에 대한 새 지적 N건` 으로 건수만 나오고 블록에는 들어가지 않으므로, `review-findings.mjs` 의 완료 판정을 막지 않습니다. N 이 0 보다 크면 사람이 판단해 필요하면 별도 이슈로 남깁니다. 이전 리뷰의 지적은 계속 이어받아 해결 여부를 판정합니다. 직전 HEAD 를 가져올 수 없거나 force-push·rebase 로 조상이 아니면 전체 리뷰로 돌아갑니다. 보고서 리뷰 범위 절의 `리뷰 방식` 줄로 어느 쪽인지 확인합니다. 이 동작은 리뷰 브리지(`llm-cli-bridge`)에 이 변경이 배포된 뒤부터 적용되며, `리뷰 방식` 줄이 없으면 그 브리지는 라운드와 상관없이 전체 리뷰를 합니다.
 - **리뷰 진행 표시**: 기계 리뷰는 PR 을 열 때, push 마다, draft 를 ready 로 바꿀 때, PR 을 다시 열 때 돕니다. 리뷰 브리지는 리뷰하는 HEAD 에 commit status `ai-review` 를 겁니다(`pending` → `success`: 활성 지적 N건 / `failure`: 실패 사유 / `error`: HEAD 가 바뀌어 중단). PR 커밋 옆 체크에서 리뷰가 진행 중인지, 실패했는지 봅니다(브리지 GitHub App 에 Commit statuses 쓰기 권한이 있어야 보이며, 없으면 리뷰만 돌고 status 는 생략됩니다. 이름은 브리지 `REVIEW_STATUS_CONTEXT` 로 바꿀 수 있고 기본값이 `ai-review` 입니다). 기본으로는 merge 를 막지 않으며, 저장소가 이 status 이름(`REVIEW_STATUS_CONTEXT` 와 같은 값)을 required check 로 등록하면 `review-findings.mjs` 의 완료 판정도 이 status 를 기다립니다.
 - **완료**: `status` 의 `complete` 가 `true`(현재 HEAD 의 complete 보고서에 고칠 지적이 없고, status check rollup 에 보이는 checks 가 통과하고, 대상 브랜치의 필수 status check(rulesets·브랜치 보호)가 현재 HEAD 에 있고 성공. 필수 check 를 조회하지 못하면 완료가 아님)이고 다른 AI 리뷰에도 새 지적이 없을 때만 `<promise>REVIEW COMPLETE</promise>`를 출력해 Ralph Loop가 종료됩니다.
-- **머지 전 이해 확인**: 완료는 머지가 아닙니다. 머지를 요청하면 agent 가 최종 HEAD 기준 변경 브리프(무엇이·왜 바뀌었나, 바뀐 불변식, 검사가 놓칠 수 있는 것, 되돌리는 법, 리뷰 중에 바뀐 것)를 보여주고 이해 확인 질문을 합니다. 질문 수는 `node scripts/merge-brief.mjs tier --pr <N>` 이 정하는 최소값입니다(문서만 0, 코드 1~3, 검증·설치·hook·권한 경로 4~5). 답이 틀리면 그 부분을 설명하고 다시 확인한 뒤 진행하며, 브리프·질문·답은 PR 코멘트(`<!-- merge-readiness:v1 head=<sha> -->`)로 남습니다. 기록 뒤 새 커밋이 오면 다시 합니다. 절차는 `docs/references/merge-readiness.md`.
+- **머지 전 이해 확인**: 완료는 머지가 아닙니다. 머지를 요청하면 agent 가 최종 HEAD 기준 변경 브리프(무엇이·왜 바뀌었나, 바뀐 불변식, 검사가 놓칠 수 있는 것, 되돌리는 법, 리뷰 중에 바뀐 것)를 보여주고 이해 확인 질문을 합니다. 질문 수는 `node scripts/merge-brief.mjs tier --pr <N>` 이 바뀐 파일 경로·줄 수로 정하는 최소값입니다. 최상위 README·CHANGELOG·LICENSE 와 `docs/`(`docs/references/` 제외)만 바뀌면 0, 그 밖의 파일은 1~3, 검증·리뷰 게이트·설치·hook·스키마·agent 정의·에이전트 설정·자격 증명·인증·권한 경로는 4~5 입니다(규칙은 스크립트 머리말). 도구가 실패하면 4개로 봅니다. 답이 틀리면 그 부분을 설명하고 다시 확인한 뒤 진행하며, 브리프·질문·답은 PR 코멘트(`<!-- merge-readiness:v1 head=<sha> -->`)로 남습니다. 기록 뒤 새 커밋이 오면 다시 합니다. agent 가 따르는 절차이며 hook·스크립트가 머지를 막지는 않습니다. 절차는 `docs/references/merge-readiness.md`.
 
 ## 프로젝트별 설정
 
@@ -496,7 +497,7 @@ npm install -g @nanonets/graft@0.18.0
 
 스킬/커맨드 원본을 수정한 뒤 `node scripts/sync-workflow.mjs --write`로 배포본을 생성합니다. 검증은 `--check`로 차이를 탐지하며 파일을 바꾸지 않습니다. UX 계약 테스트는 별도로 `node scripts/test-ux-review-skill.mjs`를 실행합니다.
 
-커밋·PR 절차의 공통 원본은 `docs/references/validation-contract.md`와 `create-pr-contract.md`입니다. 세 설치기가 문서·스키마·템플릿을 함께 배포합니다. 구조 검사와 hook 테스트는 모델의 스킬 선택 정확도나 리뷰 품질을 측정하는 평가를 대신하지 않습니다.
+커밋·PR·머지 절차의 공통 원본은 `docs/references/validation-contract.md`, `create-pr-contract.md`, `merge-readiness.md`입니다. 세 설치기가 문서·스키마·템플릿을 함께 배포합니다. 구조 검사와 hook 테스트는 모델의 스킬 선택 정확도나 리뷰 품질을 측정하는 평가를 대신하지 않습니다.
 
 ### 환경 변수 (.env)
 
