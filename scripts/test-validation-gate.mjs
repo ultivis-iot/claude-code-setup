@@ -27,6 +27,8 @@ function fixture() {
   writeFileSync(path.join(repo, 'code.txt'), 'initial\n');
   git(repo, 'add', '.');
   git(repo, 'commit', '-qm', 'test: initial');
+  // The review policy is read from the remote default branch (origin/HEAD); here it follows the local main.
+  git(repo, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/heads/main');
   git(repo, 'switch', '-qc', 'feature');
   mkdirSync(path.join(repo, 'tmp'));
   writeFileSync(path.join(repo, 'tmp/current-plan.md'), '# Approved fixture plan\n');
@@ -221,7 +223,7 @@ try {
   writeJson(policyFile, { ...realPolicy, text: '# weaker policy' });
   rejected(recordWith('--policy', 'tmp/review-policy.json'), /does not match/);
   writeJson(policyFile, { ...realPolicy, base_sha: '0'.repeat(40) });
-  rejected(recordWith('--policy', 'tmp/review-policy.json'), /different snapshot base/);
+  rejected(recordWith('--policy', 'tmp/review-policy.json'), /another default branch/);
   writeJson(policyFile, { ...realPolicy, text: ['# bound policy'] });
   rejected(recordWith('--policy', 'tmp/review-policy.json'), /string or null/);
   writeJson(policyFile, realPolicy);
@@ -230,11 +232,39 @@ try {
   ok(bound.ready());
   const statusFile = path.join(bound.repo, 'tmp/validation-status.json');
   const realStatus = bound.readStatus();
-  writeJson(statusFile, { ...realStatus, review_policy: { source: null, sha256: null, truncated: false } });
+  writeJson(statusFile, { ...realStatus, review_policy: { ...realStatus.review_policy, source: null, sha256: null } });
   rejected(bound.ready(), /does not match/);
   const { review_policy: _dropped, ...withoutPolicy } = realStatus;
   writeJson(statusFile, withoutPolicy);
   rejected(bound.ready(), /review_policy: required/);
+  // 정책은 대상 브랜치가 아닌 기본 브랜치(origin/HEAD)에서 읽는다. 대상 브랜치는 PR 을 여는 사람이 고른다.
+  const targeted = policyFixture(repo => writeFileSync(path.join(repo, 'REVIEW.md'), '# default policy\n'));
+  git(targeted.repo, 'switch', '-qc', 'weak', 'main');
+  writeFileSync(path.join(targeted.repo, 'REVIEW.md'), '# weak policy\n');
+  git(targeted.repo, 'commit', '-qam', 'test: weaker policy on another branch');
+  git(targeted.repo, 'switch', '-q', 'feature');
+  git(targeted.repo, 'reset', '-q', '--hard', 'weak');
+  ok(targeted.invoke('snapshot', '--base', 'weak', '--out', 'tmp/snapshot.json'));
+  assert.match(ok(targeted.policy()), /REVIEW\.md@/);
+  assert.equal(targeted.readPolicy().text, '# default policy');
+  assert.equal(targeted.readPolicy().base_sha, git(targeted.repo, 'rev-parse', 'main'));
+  writeJson(path.join(targeted.repo, 'tmp/results.json'), targeted.results);
+  const recordTargeted = () => targeted.invoke('record', '--snapshot', 'tmp/snapshot.json', '--policy', 'tmp/review-policy.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json');
+  ok(recordTargeted());
+  assert.equal(targeted.readStatus().review_policy.base_sha, git(targeted.repo, 'rev-parse', 'main'));
+  ok(targeted.invoke('ready', 'tmp/validation-status.json', '--base', 'weak'));
+  // 기본 브랜치가 움직이면 정책을 다시 읽어야 한다.
+  git(targeted.repo, 'switch', '-q', 'main');
+  writeFileSync(path.join(targeted.repo, 'REVIEW.md'), '# stricter default policy\n');
+  git(targeted.repo, 'commit', '-qam', 'test: default policy moves');
+  git(targeted.repo, 'switch', '-q', 'feature');
+  rejected(targeted.invoke('ready', 'tmp/validation-status.json', '--base', 'weak'), /default branch/);
+  rejected(recordTargeted(), /default branch/);
+  // 기본 브랜치를 모르면 대상 브랜치로 대신하지 않고 멈춘다.
+  const headless = policyFixture(() => {});
+  git(headless.repo, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
+  headless.snapshot();
+  rejected(headless.policy(), /origin\/HEAD/);
   const plan = fixture();
   const planHook = path.join(root, 'hooks/copy-plan-on-accept.mjs');
   const hookInput = JSON.stringify({ tool_name: 'ExitPlanMode', cwd: plan.repo, session_id: 'fixture-session' });

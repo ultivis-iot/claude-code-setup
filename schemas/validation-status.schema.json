@@ -175,11 +175,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "base_sha",
         "source",
         "sha256",
         "truncated"
       ],
       "properties": {
+        "base_sha": {
+          "type": "string",
+          "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+        },
         "source": {
           "type": [
             "string",

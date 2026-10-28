@@ -14,6 +14,7 @@
     "cli_required": false
   },
   "review_policy": {
+    "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "source": null,
     "sha256": null,
     "truncated": false

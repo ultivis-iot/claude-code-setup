@@ -273,7 +273,7 @@ dw ub-234                          # 프로젝트별 .isaac/dw.sh 실행
 - `.isaac/dw.local.sh` — 개인 오버라이드 (gitignore)
 - `tmp/current-plan.md` — 승인된 Plan
 - `tmp/validation-snapshot.json` — 검증 시작 시 코드·base·Plan 식별값
-- `tmp/review-policy.json` — 스냅샷 base 에서 읽은 리뷰 정책(`REVIEW.md`)
+- `tmp/review-policy.json` — 원격 기본 브랜치에서 읽은 리뷰 정책(`REVIEW.md`)
 - `tmp/validation-status.json` — 검증 결과
 
 ---
