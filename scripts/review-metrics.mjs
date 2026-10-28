@@ -15,7 +15,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_BOT, DEFAULT_ROUND_CAP, parseBlock } from "./review-findings.mjs";
+import { DEFAULT_BOT, DEFAULT_ROUND_CAP, parseBlock, reportProblem, wellFormed } from "./review-findings.mjs";
 
 const MARGIN = 3;
 const DECISIONS = ["fixed", "wrong", "intentional", "irrelevant"];
@@ -47,11 +47,14 @@ function nearness(report, finding, changedNear) {
  */
 export function summarize({ pr, comments, ledger = { decisions: {} }, bot = DEFAULT_BOT, changedNear = () => null, roundCap = DEFAULT_ROUND_CAP }) {
   // HEAD 별 마지막 보고서. 순서는 그 HEAD 를 처음 리뷰한 시점.
+  // 깨진 보고서(최상위 필드나 지적 모양이 틀림)는 review-findings.mjs 와 같은 기준으로 통째로 뺀다.
   const byHead = new Map();
+  let skipped = 0;
   for (const c of [...comments].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))) {
     if (c.login !== bot) continue;
     const block = parseBlock(c.body);
-    if (!block?.head_sha || !Array.isArray(block.findings)) continue;
+    if (!block) continue;
+    if (typeof block.head_sha !== "string" || !block.head_sha || reportProblem(block) || !block.findings.every(wellFormed)) { skipped++; continue; }
     byHead.set(block.head_sha, block);
   }
   const reports = [...byHead.values()];
@@ -64,8 +67,14 @@ export function summarize({ pr, comments, ledger = { decisions: {} }, bot = DEFA
     let fresh = 0;
     for (const f of report.findings) {
       const ids = [f.id, ...(Array.isArray(f.aliases) ? f.aliases : [])].filter((x) => typeof x === "string");
-      const known = ids.map((id) => canonical.get(id)).find(Boolean);
-      const cause = known || ids[0];
+      // 별칭 집합이 이전의 여러 원인을 이으면 하나로 합친다(첫 원인으로).
+      const found = [...new Set(ids.map((id) => canonical.get(id)).filter(Boolean))];
+      const cause = found[0] || ids[0];
+      for (const other of found.slice(1)) {
+        for (const [id, c] of canonical) if (c === other) canonical.set(id, cause);
+        causes.get(cause).round = Math.min(causes.get(cause).round, causes.get(other).round);
+        causes.delete(other);
+      }
       for (const id of ids) canonical.set(id, cause);
       if (!causes.has(cause)) {
         causes.set(cause, { latest: f, round: index + 1 });
@@ -91,7 +100,10 @@ export function summarize({ pr, comments, ledger = { decisions: {} }, bot = DEFA
   const human = { fixed: 0, wrong: 0, intentional: 0, irrelevant: 0, undecided: 0 };
   for (const [cause, info] of causes) {
     const ids = [...canonical].filter(([, c]) => c === cause).map(([id]) => id);
-    const decided = ids.map((id) => (Object.hasOwn(decisions, id) ? decisions[id]?.decision : null)).find((d) => DECISIONS.includes(d));
+    // 같은 원인에 판단이 여럿이면 가장 최근(at) 것을 쓴다. at 이 없는 예전 기록은 가장 오래된 것으로 본다.
+    const time = (entry) => { const t = Date.parse(entry?.at); return Number.isFinite(t) ? t : -Infinity; };
+    const entries = ids.filter((id) => Object.hasOwn(decisions, id) && DECISIONS.includes(decisions[id]?.decision)).map((id) => decisions[id]);
+    const decided = entries.reduce((best, e) => (!best || time(e) > time(best) ? e : best), null)?.decision;
     human[decided || "undecided"]++;
     info.decision = decided || null;
   }
@@ -100,6 +112,7 @@ export function summarize({ pr, comments, ledger = { decisions: {} }, bot = DEFA
   return {
     pr,
     rounds: reports.length,
+    skipped_reports: skipped,
     round_cap_reached: reports.length >= roundCap,
     first_round_clean: reports.length > 0 && reports[0].findings.length === 0,
     new_per_round: newPerRound,

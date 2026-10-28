@@ -31,7 +31,7 @@ const isReport = (body) => String(body || "").includes(REPORT_HEADER) || BLOCK_M
 const COMPLETENESS = new Set(["complete", "partial"]);
 
 // 완료와 라운드 상한 판정에 쓰는 최상위 필드. 하나라도 틀리면 그 보고서로는 아무것도 판정하지 않는다.
-function reportProblem(block) {
+export function reportProblem(block) {
   if (!Array.isArray(block.findings)) return "findings is not a list";
   if (!Number.isInteger(block.round) || block.round < 1) return "round is not a positive integer";
   if (!COMPLETENESS.has(block.completeness)) return "unknown completeness";
@@ -90,7 +90,7 @@ function ledgerDecision(ledger, finding) {
 }
 
 // 블록은 리뷰 봇이 쓴 외부 데이터다. 쓰는 필드의 모양만 확인하고, 맞지 않으면 사람에게 넘긴다.
-function wellFormed(finding) {
+export function wellFormed(finding) {
   return typeof finding?.id === "string" && finding.id !== ""
     && (finding.aliases === undefined || (Array.isArray(finding.aliases) && finding.aliases.every((a) => typeof a === "string")))
     && Array.isArray(finding.locations) && finding.locations.length > 0
