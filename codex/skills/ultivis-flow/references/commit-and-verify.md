@@ -6,5 +6,5 @@ The workflow root is `${CODEX_HOME:-$HOME/.codex}`, also when validating this se
 
 The shared contract owns inputs, review roles, snapshot/record/ready commands,
 required evidence, failure handling, and completion criteria. Use its executable
-`scripts/validation-gate.mjs`; do not reconstruct the result schema or readiness rules.
+`"${CODEX_HOME:-$HOME/.codex}/scripts/validation-gate.mjs"`; do not reconstruct the result schema or readiness rules.
 Do not create a PR as part of validation.
