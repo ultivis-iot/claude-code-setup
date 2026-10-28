@@ -50,6 +50,18 @@ check('a block quoted inside the report body is not the bot block', () => {
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`<!-- ocr-review:v1 ${quoted} -->\`\n</details>`), null);
   // 뒤가 깨끗해도 줄 중간에서 시작하면(인용 '> ' 포함) 봇의 블록이 아니다.
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}> <!-- ocr-review:v1 ${quoted} -->\n</details>`), null);
+  // 닫히지 않은 코드 펜스(``` · ~~~) 안의 블록도 봇의 것이 아니다. 닫힌 펜스 뒤의 블록은 읽는다.
+  const fenced = (fence) => `${LEGACY.slice(0, -'</details>'.length)}${fence}\n<!-- ocr-review:v1 ${quoted} -->\n</details>`;
+  for (const fence of ['```', '~~~', '  ````js']) {
+    assert.equal(parseBlock(fenced(fence)), null, fence);
+    const r = judge({ headSha: HEAD, comments: [bot(1, 't', fenced(fence))] });
+    assert.equal(r.state, 'malformed_report', fence);
+    assert.equal(r.complete, false);
+  }
+  // 더 짧은 펜스나 다른 문자로는 닫히지 않는다.
+  assert.equal(parseBlock(fenced('````\n```')), null);
+  assert.equal(parseBlock(fenced('```\n~~~')), null);
+  assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`\`\`\ncode\n\`\`\`\n<!-- ocr-review:v1 ${quoted} -->\n</details>`).head_sha, HEAD);
   const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
   assert.equal(r.complete, false);
   assert.notEqual(r.state, 'clear');

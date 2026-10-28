@@ -40,7 +40,7 @@ export function reportProblem(block) {
 
 // 블록이 둘 이상이면 어느 것이 리뷰 봇의 것인지 모르므로 읽지 않는다(깨진 보고서로 다룬다).
 // 리뷰 봇은 블록을 줄 맨 앞부터, 보고서 맨 끝(뒤에는 공백과 </details> 만)에 쓴다. 본문에 인용·코드로
-// 들어간 블록 하나만 있는 코멘트를 그 블록으로 읽지 않는다.
+// 들어간 블록 하나만 있는 코멘트를 그 블록으로 읽지 않는다. 닫히지 않은 코드 펜스 안의 블록도 마찬가지다.
 export function parseBlock(body) {
   const text = String(body || "");
   const matches = [...text.matchAll(BLOCK)];
@@ -48,13 +48,26 @@ export function parseBlock(body) {
   const { index } = matches[0];
   const atLineStart = index === 0 || text[index - 1] === "\n";
   const tail = text.slice(index + matches[0][0].length);
-  if (!atLineStart || !/^(?:\s|<\/details>)*$/.test(tail)) return null;
+  if (!atLineStart || !/^(?:\s|<\/details>)*$/.test(tail) || inCodeFence(text.slice(0, index))) return null;
   try {
     const block = JSON.parse(matches[0][1]);
     return block && block.version === 1 ? block : null;
   } catch {
     return null;
   }
+}
+
+// 앞 내용이 끝날 때 Markdown 코드 펜스(``` · ~~~, 들여쓰기 3칸까지)가 열려 있는지. 같은 문자로 같거나 더 긴 펜스만 닫는다.
+function inCodeFence(before) {
+  let open = null;
+  for (const line of before.split(/\r?\n/)) {
+    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!fence) continue;
+    const [, marks, rest] = fence;
+    if (!open) open = marks;
+    else if (marks[0] === open[0] && marks.length >= open.length && !rest.trim()) open = null;
+  }
+  return open !== null;
 }
 
 // 블록이 없던 시기의 보고서. 상세 리뷰 영역의 "- `file:line` **title**" 만 읽는다
