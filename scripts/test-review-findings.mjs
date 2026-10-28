@@ -74,6 +74,9 @@ check('a block quoted inside the report body is not the bot block', () => {
     }
   }
   assert.equal(parseBlock(fenced('```\n``` \t')).head_sha, HEAD);
+  // 정보 문자열에 백틱이 있는 줄(```js`x)은 백틱 펜스가 아니다(CommonMark). 뒤의 블록을 읽는다. ~~~ 펜스는 백틱이 있어도 펜스다.
+  assert.equal(parseBlock(fenced('```js`x')).head_sha, HEAD);
+  assert.equal(parseBlock(fenced('~~~js`x')), null);
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`\`\`\ncode\n\`\`\`\n<!-- ocr-review:v1 ${quoted} -->\n</details>`).head_sha, HEAD);
   const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
   assert.equal(r.complete, false);

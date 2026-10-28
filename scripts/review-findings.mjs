@@ -65,6 +65,8 @@ function inCodeFence(before) {
     const fence = /^ {0,3}(`{3,}|~{3,})([^]*)$/.exec(line);
     if (!fence) continue;
     const [, marks, rest] = fence;
+    // 정보 문자열에 백틱이 있는 백틱 줄은 펜스가 아니다(인라인 코드).
+    if (marks[0] === "`" && rest.includes("`")) continue;
     if (!open) open = marks;
     else if (marks[0] === open[0] && marks.length >= open.length && /^[ \t]*$/.test(rest)) open = null;
   }
