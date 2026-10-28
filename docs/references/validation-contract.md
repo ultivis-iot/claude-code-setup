@@ -1,7 +1,7 @@
 # 커밋과 검증 계약
 
 이 문서가 Claude/Codex 공통 실행 절차의 원본이다. 실행 전에 읽는다.
-`WF`는 설치 루트(Claude: `~/.claude`, Codex: `${CODEX_HOME:-$HOME/.codex}`) 또는 이 설정 저장소의 절대 경로다. 단 검증 실행(검증 실행기 `scripts/validation-gate.mjs`·스키마·검증 agent 정의 `agents/<validator>.md`)은 항상 설치 루트의 것을 쓴다. 이 설정 저장소의 사본은 개발 중 테스트(`scripts/verify-workflow.sh`)에서만 쓴다. 검증 대상 저장소(이 설정 저장소 포함)의 `scripts/`·`agents/` 는 리뷰 대상일 뿐이며, 바뀐 정의는 merge 뒤 설치본을 갱신(`./setup.sh --update`, Codex 는 `./setup-codex.sh --update`)한 뒤부터 쓴다. 실행기나 정의를 바꾸는 브랜치가 자기 규칙으로 검증받지 않게 하기 위해서다. (남은 한계: 검증 대상 저장소의 `.claude/agents/` 에 같은 이름의 agent 가 있으면 Claude Code 가 설치본 대신 그것을 쓸 수 있다.)
+`WF`는 설치 루트(Claude: `~/.claude`, Codex: `${CODEX_HOME:-$HOME/.codex}`)다. 이 설정 저장소를 검증할 때도 같다. 검증 실행(이 계약, 검증 실행기 `scripts/validation-gate.mjs`·스키마·검증 agent 정의 `agents/<validator>.md`)은 항상 설치 루트의 것을 쓴다. 이 설정 저장소의 사본은 개발 중 테스트(`scripts/verify-workflow.sh`)에서만 쓴다. 검증 대상 저장소(이 설정 저장소 포함)의 `scripts/`·`agents/` 는 리뷰 대상일 뿐이며, 바뀐 정의는 merge 뒤 설치본을 갱신(`./setup.sh --update`, Codex 는 `./setup-codex.sh --update`)한 뒤부터 쓴다. 실행기나 정의를 바꾸는 브랜치가 자기 규칙으로 검증받지 않게 하기 위해서다. (남은 한계: 검증 대상 저장소의 `.claude/agents/` 에 같은 이름의 agent 가 있으면 Claude Code 가 설치본 대신 그것을 쓸 수 있다.)
 검증 실행에는 Node.js가 필요하다. `<repo>`는 대상 저장소, 명령의 작업 디렉터리도 그 저장소로 맞춘다.
 
 ## 실행
@@ -15,7 +15,7 @@
 node "$WF/scripts/validation-gate.mjs" snapshot --repo <repo> --base origin/<target> --out tmp/validation-snapshot.json
 ```
 
-   이어서 어떤 리뷰보다 먼저(Spec Review 포함) 리뷰 정책을 읽는다. 저장소 루트의 `REVIEW.md` 를 원격 기본 브랜치(`origin/HEAD`) tip 에서 읽어 `tmp/review-policy.json` 에 남긴다. 대상 브랜치는 PR 을 여는 사람이 고르므로 정책을 고르지 못하게 기본 브랜치에서 읽는다(리뷰 브리지와 같은 기준). `origin/HEAD` 가 없으면 명령이 실패하므로 `git remote set-head origin --auto` 로 설정한다.
+   이어서 어떤 리뷰보다 먼저(Spec Review 포함) 리뷰 정책을 읽는다. 저장소 루트의 `REVIEW.md` 를 원격 기본 브랜치(`origin/HEAD`) tip 에서 읽어 `tmp/review-policy.json` 에 남긴다. 대상 브랜치는 PR 을 여는 사람이 고르므로 정책을 고르지 못하게 기본 브랜치에서 읽는다(리뷰 브리지와 같은 기준). `origin/HEAD` 가 없으면 명령이 실패하므로 `git remote set-head origin --auto` 로 설정한다. 이 값은 로컬 ref 라 마지막 fetch 시점의 기본 브랜치이고 원격의 현재 tip 을 확인하지 않는다. 3단계의 `git fetch origin --prune` 이 이를 갱신한다(원격 기본 브랜치 이름이 바뀌었으면 `set-head --auto` 도 다시 한다). origin 이 fork 를 가리키면 fork 의 기본 브랜치 정책을 쓴다.
 
 ```bash
 node "$WF/scripts/validation-gate.mjs" policy --repo <repo> --snapshot tmp/validation-snapshot.json --out tmp/review-policy.json
