@@ -20,5 +20,5 @@ node "$WF/scripts/validation-gate.mjs" ready tmp/validation-status.json --repo <
 실패한 push/PR 생성은 원인을 확인하고 기존 권한 안에서 복구한다. 다른 대상에 게시하는 방식으로 우회하지 않는다.
 검증 상태를 읽기만 하고 모델이 준비 완료를 판정하거나, 오래된 결과의 SHA를 수정해서 재사용하지 않는다.
 
-선택적 Git hook 설치: 이 설정 저장소의 `hooks/install-hooks.sh`를 대상 저장소에서 실행한다.
+선택적 Git hook 설치: 이 설정 저장소의 `hooks/install-hooks.sh`를 대상 저장소에서 실행한다. 대상이 설정 저장소 자신이면 실행기·스키마는 설치본(`~/.claude`)에서 복사한다.
 커밋은 허용하고, 검증되지 않은 push는 차단한다. hook은 로컬 방어선이며 `--no-verify`로 우회할 수 있으므로 서버 측 강제가 필요하면 보호 브랜치/CI도 같은 게이트 계약을 적용해야 한다.

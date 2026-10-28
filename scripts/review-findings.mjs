@@ -39,9 +39,16 @@ export function reportProblem(block) {
 }
 
 // 블록이 둘 이상이면 어느 것이 리뷰 봇의 것인지 모르므로 읽지 않는다(깨진 보고서로 다룬다).
+// 리뷰 봇은 블록을 줄 맨 앞부터, 보고서 맨 끝(뒤에는 공백과 </details> 만)에 쓴다. 본문에 인용·코드로
+// 들어간 블록 하나만 있는 코멘트를 그 블록으로 읽지 않는다.
 export function parseBlock(body) {
-  const matches = [...String(body || "").matchAll(BLOCK)];
+  const text = String(body || "");
+  const matches = [...text.matchAll(BLOCK)];
   if (matches.length !== 1) return null;
+  const { index } = matches[0];
+  const atLineStart = index === 0 || text[index - 1] === "\n";
+  const tail = text.slice(index + matches[0][0].length);
+  if (!atLineStart || !/^(?:\s|<\/details>)*$/.test(tail)) return null;
   try {
     const block = JSON.parse(matches[0][1]);
     return block && block.version === 1 ? block : null;
@@ -134,7 +141,7 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
  *   malformed_report 현재 HEAD 보고서보다 뒤에 올라온 봇 보고서의 블록이 깨졌거나(블록이 둘 이상인 것 포함)
  *            현재 HEAD 보고서의 최상위 필드가 틀렸다. 사람에게 넘긴다.
  *   waiting   현재 HEAD 를 리뷰한 블록이 아직 없다(이전 HEAD 보고서만 있음).
- *   legacy    블록 없는 보고서만 있다. 지적은 참고용이고 완료 증거가 아니다.
+ *   legacy    가장 최근 봇 보고서에 블록이 없다(예전 형식). 지적은 참고용이고 완료 증거가 아니다.
  *   needs_user 자동으로 고치지 않을 지적만 남았다. 각 지적의 hold 가 이유다.
  *   actionable 이번 라운드에 고칠 지적이 있다.
  *   round_cap 상한 라운드인데 지적이 남았다. 고치지 않고 사람에게 넘긴다.
