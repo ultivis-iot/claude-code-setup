@@ -11,7 +11,7 @@
 // 참고로만 읽고 현재 HEAD 의 완료 증거로 쓰지 않는다. record 는 지적별 처리 결과를
 // tmp/review-findings-<PR>.json 에 남긴다(오탐률 집계의 원천이자 같은 지적을 다시 고치지
 // 않기 위한 기록). stop-loop 는 완료 신호 없이 Ralph Loop 를 멈춘다(사람에게 넘기거나 라운드
-// 상한에 닿았을 때). --input 은 gh 대신 {head_sha, comments, checks} JSON 을 읽는다(테스트용).
+// 상한에 닿았을 때). --input 은 gh 대신 {head_sha, comments, checks, files, author_association} JSON 을 읽는다(테스트용).
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -37,11 +37,12 @@ function reportProblem(block) {
   return null;
 }
 
+// 블록이 둘 이상이면 어느 것이 리뷰 봇의 것인지 모르므로 읽지 않는다(깨진 보고서로 다룬다).
 export function parseBlock(body) {
   const matches = [...String(body || "").matchAll(BLOCK)];
-  if (!matches.length) return null;
+  if (matches.length !== 1) return null;
   try {
-    const block = JSON.parse(matches[matches.length - 1][1]);
+    const block = JSON.parse(matches[0][1]);
     return block && block.version === 1 ? block : null;
   } catch {
     return null;
@@ -129,7 +130,8 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
 /**
  * 현재 HEAD 에 대한 리뷰 상태를 판정한다.
  * state: no_review | waiting | legacy | malformed_report | needs_user | actionable | round_cap | clear
- *   malformed_report 가장 최근 봇 보고서의 블록이 깨졌거나 최상위 필드가 틀렸다. 사람에게 넘긴다.
+ *   malformed_report 현재 HEAD 보고서보다 뒤에 올라온 봇 보고서의 블록이 깨졌거나(블록이 둘 이상인 것 포함)
+ *            현재 HEAD 보고서의 최상위 필드가 틀렸다. 사람에게 넘긴다.
  *   waiting   현재 HEAD 를 리뷰한 블록이 아직 없다(이전 HEAD 보고서만 있음).
  *   legacy    블록 없는 보고서만 있다. 지적은 참고용이고 완료 증거가 아니다.
  *   needs_user 자동으로 고치지 않을 지적만 남았다. 각 지적의 hold 가 이유다.
@@ -287,6 +289,7 @@ function main() {
     if (!opt.id || opt.id === true) fail("--id 가 필요합니다");
     if (!DECISIONS.has(opt.decision)) fail(`--decision 은 ${[...DECISIONS].join("|")} 중 하나입니다`);
     if (!opt.reason || opt.reason === true) fail("--reason 이 필요합니다");
+    if (opt.commit === true) fail("--commit 에 값이 필요합니다");
     const ledger = readLedger(opt.pr);
     const head = gitOk(["rev-parse", "HEAD"]);
     // 대입하면 __proto__ 같은 id 는 객체의 프로토타입을 바꾸고 저장되지 않는다. 자기 속성으로 정의한다.
