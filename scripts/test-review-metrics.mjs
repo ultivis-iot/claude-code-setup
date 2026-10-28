@@ -102,6 +102,37 @@ check('a decision recorded only under an alias counts for its cause', () => {
   assert.equal(s.human.undecided, 5);
 });
 
+check('malformed reports are skipped whole and counted', () => {
+  const broken = [
+    bot(10, '2026-10-27T05:00:00Z', report({ head_sha: H(5), round: 0, findings: [finding('x')] })),
+    bot(11, '2026-10-27T05:01:00Z', report({ head_sha: H(6), round: 4, completeness: 'done' })),
+    bot(12, '2026-10-27T05:02:00Z', report({ head_sha: H(7), round: 4, findings: [null] })),
+    bot(13, '2026-10-27T05:03:00Z', report({ head_sha: H(8), round: 4, findings: [finding('y', { locations: [{ file: 'a.mjs', line: 0 }] })] })),
+  ];
+  const s = summarize({ pr: 7, comments: [...comments, ...broken], ledger, changedNear });
+  assert.equal(s.rounds, 3);
+  assert.equal(s.skipped_reports, 4);
+  assert.equal(s.findings.total, 6);
+});
+
+check('an alias set that links two earlier causes merges them into one', () => {
+  const linked = [
+    bot(1, '2026-10-27T01:00:00Z', report({ head_sha: H(1), round: 1, findings: [finding('a'), finding('b', { severity: 'high' })] })),
+    bot(2, '2026-10-27T02:00:00Z', report({ head_sha: H(2), parent_head_sha: H(1), round: 2, findings: [finding('c', { aliases: ['a', 'b'], carried: true })] })),
+  ];
+  const s = summarize({ pr: 7, comments: linked, ledger: { decisions: { a: { decision: 'fixed' }, b: { decision: 'fixed' } } } });
+  assert.equal(s.findings.total, 1);
+  assert.equal(s.human.fixed, 1);
+  assert.equal(s.human.undecided, 0);
+});
+
+check('the latest decision recorded for a cause wins', () => {
+  const decisions = { 'f-b': { decision: 'wrong', at: '2026-10-27T01:00:00Z' }, 'f-b2': { decision: 'fixed', at: '2026-10-27T02:00:00Z' } };
+  assert.equal(summarize({ pr: 7, comments, ledger: { decisions }, changedNear }).human.wrong, 0);
+  const older = { 'f-b': { decision: 'wrong' }, 'f-b2': { decision: 'fixed', at: '2026-10-27T02:00:00Z' } };
+  assert.equal(summarize({ pr: 7, comments, ledger: { decisions: older }, changedNear }).human.fixed, 1);
+});
+
 check('a PR without bot reports is counted as not reviewed', () => {
   const s = summarize({ pr: 8, comments: [bot(1, 't', 'hello')], ledger: { decisions: {} } });
   assert.equal(s.rounds, 0);
