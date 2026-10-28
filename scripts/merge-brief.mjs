@@ -25,13 +25,13 @@ import { fileURLToPath } from "node:url";
 const CODE_LINES = 150, CODE_FILES = 5, SENSITIVE_LINES = 300;
 const SENSITIVE = new RegExp([
   // hook·스키마·agent 정의·CI·에이전트 설정 디렉터리
-  "(^|/)(hooks|schemas|agents|\\.github|\\.circleci|\\.buildkite|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
+  "(^|/)(hooks|schemas|agents|\\.github|\\.circleci|\\.buildkite|\\.gitea|\\.semaphore|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
   // 설치·설정·게이트·배포 (디렉터리 이름이나 파일 이름의 앞부분)
   "(^|/)(setup|install|installer|gates?|deploy|release)s?([/._-]|$)",
   // 이 저장소의 검증·리뷰 도구와 Notion 자격 증명을 다루는 스크립트(새로 만들면 여기에 더한다)
   "(^|/)(validation-gate|review[-_]findings|merge-brief|verify-workflow|sync-workflow|graft|ult-notion|ult-flow|notion|review-cycle-ralph-loop)\\.[^/]*$",
   // 패키지·빌드·CI·컨테이너 설정, 환경 파일, 사용자 설정에 설치되는 지시문
-  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|dockerfile|docker-compose[^/]*|\\.gitlab-ci\\.ya?ml|\\.travis\\.ya?ml|jenkinsfile|azure-pipelines\\.ya?ml|bitbucket-pipelines\\.ya?ml|claude\\.md|global-claude\\.md)$",
+  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|dockerfile|docker-compose[^/]*|\\.gitlab-ci\\.ya?ml|\\.travis\\.ya?ml|jenkinsfile|azure-pipelines\\.ya?ml|bitbucket-pipelines\\.ya?ml|\\.drone\\.ya?ml|cloudbuild\\.ya?ml|appveyor\\.ya?ml|justfile|taskfile\\.ya?ml|claude\\.md|global-claude\\.md)$",
   // 키 파일
   "(\\.(pem|key)|(^|/)id_(rsa|ed25519|ecdsa)[^/]*)$",
   // 인증·비밀·권한·자격 증명 단어
