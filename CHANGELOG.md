@@ -3,6 +3,9 @@
 ## Unreleased
 
 - README 에 기계 리뷰 진행 표시(`ai-review` commit status)와 리뷰가 도는 이벤트(열기·push·ready·다시 열기)를 적었다. 리뷰 브리지 패치 0019 와 n8n PR Review 워크플로 변경(브리지 직접 호출로 Notion Member DB 에 없는 작성자도 리뷰, `ready_for_review`·`reopened` 이벤트, 재시도, 파싱 실패 시 빈 보고서를 게시하지 않음)이 운영에 반영됐다(A0-3).
+- `review-findings.mjs`: 봇 코멘트 본문에 인용·코드로 들어간 블록 하나만 있으면 그 블록을 보고서로 읽던 문제를 고친다. 줄 맨 앞에서 시작하고 뒤에 공백·`</details>` 만 있는 블록만 읽는다(#23).
+- `hooks/install-hooks.sh`: 설정 저장소 자신(worktree 포함)에 hook 을 설치하면 브랜치의 실행기가 아니라 설치본 `~/.claude` 의 실행기·스키마를 복사한다. 설치본이 없으면 설치를 멈춘다(#26).
+- 문서: `legacy` 상태(가장 최근 보고서가 블록 없는 예전 형식), 자동 수정 조건의 `uncertain` 출처, 고치지 않는 지적의 '상관없음'(#23).
 
 ## v1.2.0 (2026-10-28)
 

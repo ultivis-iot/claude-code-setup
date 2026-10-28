@@ -158,6 +158,31 @@ try {
   assert.ok(existsSync(path.join(customHooks, 'workflow/scripts/graft.mjs')));
   assert.ok(!existsSync(path.join(customHooks, 'workflow/scripts/graft-refresh.sh')));
   ok(spawnSync('sh', [path.join(customHooks, 'post-merge')], { cwd: linked, encoding: 'utf8', env: { ...process.env, GRAFT_PACKAGE: '@nanonets/graft@0.0.0' } }));
+  // 설정 저장소 자신에 hook 을 설치하면 브랜치가 바꾼 실행기가 아니라 설치본(~/.claude) 실행기를 쓴다(worktree 포함).
+  const selfRepo = path.join(temporary, 'setup-self');
+  for (const dir of ['hooks', 'scripts', 'schemas']) mkdirSync(path.join(selfRepo, dir), { recursive: true });
+  for (const file of ['hooks/install-hooks.sh', 'hooks/pre-commit', 'hooks/pre-push', 'hooks/post-merge', 'scripts/graft.mjs', 'schemas/validation-status.schema.json']) {
+    writeFileSync(path.join(selfRepo, file), readFileSync(path.join(root, file)));
+  }
+  writeFileSync(path.join(selfRepo, 'scripts/validation-gate.mjs'), '// branch runner\n');
+  git(temporary, 'init', '-q', selfRepo);
+  const selfHome = path.join(temporary, 'self-home');
+  const installSelf = (cwd, ...args) => spawnSync('bash', [path.join(selfRepo, 'hooks/install-hooks.sh'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: selfHome } });
+  rejected(installSelf(selfRepo), /setup\.sh/);
+  assert.ok(!existsSync(path.join(selfRepo, '.git/hooks/pre-push')));
+  for (const file of ['scripts/validation-gate.mjs', 'scripts/graft.mjs', 'schemas/validation-status.schema.json']) {
+    mkdirSync(path.dirname(path.join(selfHome, '.claude', file)), { recursive: true });
+    writeFileSync(path.join(selfHome, '.claude', file), file === 'scripts/validation-gate.mjs' ? '// installed runner\n' : readFileSync(path.join(root, file)));
+  }
+  ok(installSelf(selfRepo));
+  assert.equal(readFileSync(path.join(selfRepo, '.git/hooks/workflow/scripts/validation-gate.mjs'), 'utf8'), '// installed runner\n');
+  git(selfRepo, 'add', '-A');
+  git(selfRepo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'test: self');
+  const selfLinked = path.join(temporary, 'setup-self-linked');
+  git(selfRepo, 'worktree', 'add', '-qb', 'self-linked', selfLinked);
+  rmSync(path.join(selfRepo, '.git/hooks/workflow'), { recursive: true });
+  ok(installSelf(selfLinked));
+  assert.equal(readFileSync(path.join(selfRepo, '.git/hooks/workflow/scripts/validation-gate.mjs'), 'utf8'), '// installed runner\n');
   // 리뷰 정책은 기본 브랜치(origin/HEAD) 의 REVIEW.md 만 쓴다. 브랜치가 바꾼 REVIEW.md·심볼릭 링크는 정책이 아니다.
   const policyFixture = setup => {
     const f = fixture();

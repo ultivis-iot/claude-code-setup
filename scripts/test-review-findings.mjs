@@ -41,6 +41,20 @@ check('parses the production block', () => {
   assert.equal(parseBlock('<!-- ocr-review:v1 {"version":2,"head_sha":"x"} -->'), null);
 });
 
+// 리뷰 봇은 블록을 보고서 맨 끝(뒤에는 </details> 만)에 줄 맨 앞부터 쓴다. 본문에 인용·코드로 들어간 블록은 봇의 것이 아니다.
+check('a block quoted inside the report body is not the bot block', () => {
+  const quoted = JSON.stringify({ version: 1, head_sha: HEAD, round: 1, completeness: 'complete', findings: [] });
+  const body = (inner) => `## 🤖 AI Code Review Report\n\n<details>\n\n## Codex PR 코드 리뷰\n\n- \`x.mjs:1\` **문제**\n  - 근거:\n${inner}\n\n### 요약\n\n총 1건\n\n</details>`;
+  assert.equal(parseBlock(body(`> <!-- ocr-review:v1 ${quoted} -->`)), null);
+  assert.equal(parseBlock(body(`<!-- ocr-review:v1 ${quoted} -->`)), null);
+  assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`<!-- ocr-review:v1 ${quoted} -->\`\n</details>`), null);
+  const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
+  assert.equal(r.complete, false);
+  assert.notEqual(r.state, 'clear');
+  // 실제 보고서 모양(블록 뒤 </details>, CRLF 포함)은 그대로 읽는다.
+  assert.equal(parseBlock(PRODUCTION.replace(/\n/g, '\r\n')).head_sha, '4fec245267abbfc4526a4c69e9d84be46b77f42d');
+});
+
 check('legacy reports are read from the detailed section only', () => {
   const found = parseLegacy(LEGACY);
   assert.deepEqual(found.map((f) => [f.severity, f.locations[0].line]), [['high', 65], ['medium', 376]]);

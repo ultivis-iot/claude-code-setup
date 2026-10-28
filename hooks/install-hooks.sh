@@ -23,12 +23,23 @@ for name in pre-commit pre-push post-merge; do
     fi
 done
 
+# 실행기·스키마는 이 설치기 옆의 것을 쓴다. 설치기가 들어 있는 저장소 자신(worktree 포함)에 설치하면
+# 브랜치가 바꾼 실행기로 자기 검증을 하게 되므로 설치본(~/.claude)을 쓴다.
+SOURCE="$SCRIPT_DIR/.."
+source_common="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$source_common" ] && [ "$source_common" = "$(git rev-parse --path-format=absolute --git-common-dir)" ]; then
+    SOURCE="$HOME/.claude"
+    for file in scripts/validation-gate.mjs scripts/graft.mjs schemas/validation-status.schema.json; do
+        [ -f "$SOURCE/$file" ] || { echo "ERROR: 설정 저장소 자신에는 설치본 실행기를 씁니다. $SOURCE/$file 이 없으니 ./setup.sh 를 먼저 실행하세요." >&2; exit 1; }
+    done
+fi
+
 mkdir -p "$HOOKS/workflow/scripts" "$HOOKS/workflow/schemas"
-cp "$SCRIPT_DIR/../scripts/validation-gate.mjs" "$HOOKS/workflow/scripts/"
-cp "$SCRIPT_DIR/../scripts/graft.mjs" "$HOOKS/workflow/scripts/"
+cp "$SOURCE/scripts/validation-gate.mjs" "$HOOKS/workflow/scripts/"
+cp "$SOURCE/scripts/graft.mjs" "$HOOKS/workflow/scripts/"
 # 예전 설치본의 bash 갱신 스크립트는 더 이상 쓰지 않는다
 rm -f "$HOOKS/workflow/scripts/graft-refresh.sh"
-cp "$SCRIPT_DIR/../schemas/validation-status.schema.json" "$HOOKS/workflow/schemas/"
+cp "$SOURCE/schemas/validation-status.schema.json" "$HOOKS/workflow/schemas/"
 for name in pre-commit pre-push post-merge; do
     target="$HOOKS/$name"
     if [ -f "$target" ]; then

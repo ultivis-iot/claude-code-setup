@@ -57,7 +57,7 @@ node ~/.claude/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
 
    출력의 `state` 로 이번 라운드를 정한다.
    - `no_review`·`waiting`: 현재 PR HEAD 를 리뷰한 보고서가 아직 없다(이전 HEAD 리뷰가 늦게 끝나 현재 HEAD 보고서 뒤에 올라온 경우는 건너뛰고 현재 HEAD 보고서로 판단한다). 아무것도 고치지 않고 `REVIEW ROUND COMPLETE — 현재 HEAD 리뷰 대기` 를 출력한다. 이전 HEAD 의 보고서로 완료를 판단하지 않는다.
-   - `legacy`: 블록 없는 예전 형식 보고서뿐이다. `needs_user` 의 지적(`legacy: true`, `hold` 없음)을 참고 목록으로 사용자에게 보고하고 루프를 멈춘다(완료 아님, 라운드 종료).
+   - `legacy`: 가장 최근 봇 보고서가 블록 없는 예전 형식이다(이전 보고서에 블록이 있어도 대신 쓰지 않는다). `needs_user` 의 지적(`legacy: true`, `hold` 없음)을 참고 목록으로 사용자에게 보고하고 루프를 멈춘다(완료 아님, 라운드 종료).
    - `malformed_report`: 현재 HEAD 를 리뷰한 가장 최근 보고서보다 뒤에 올라온 봇 보고서(같은 봇의 다른 안내 코멘트는 보고서로 보지 않는다)의 블록이 깨졌거나(블록이 둘 이상인 것 포함, 어느 HEAD 의 것인지 몰라 건너뛰지 않는다), 현재 HEAD 보고서의 최상위 필드(`findings` 목록, 1 이상 정수 `round`, `completeness`)가 틀렸다. 더 오래된 보고서로 대신 판단하지 않는다. `report.reason` 을 사용자에게 보고하고 루프를 멈춘다(완료 아님).
    - `needs_user`: 자동으로 고치지 않을 지적만 남았다. 각 지적의 `hold` 가 이유다(`partial report`, `not verified`, `unknown provenance`, `untrusted author`(PR 작성자가 OWNER·MEMBER·COLLABORATOR 가 아님), `sensitive path`(저장소 최상위 `.github`·`.claude`·`.codex` 디렉터리, 이름 끝의 `.`·공백을 지우고 대소문자 없이 비교), `PR files unknown`, `outside PR files`(PR 이 바꾸지 않은 파일), `malformed finding`(필드 모양 불량, `./`·`..`·절대 경로·`\` 구분자·제어 문자 포함, `-` 로 시작하거나 빈 경로 등, 행 번호가 1 이상 정수가 아님. 모양 불량은 `resolved` 등 다른 판정보다 먼저 본다)). 목록을 사용자에게 보고하고 루프를 멈춘다(라운드 종료).
    - `round_cap`: 기계 리뷰 3번째 라운드 이상인데 지적이 남았다. 고치지 않고 라운드 종료의 "라운드 상한" 대로 사용자에게 보고한다.
