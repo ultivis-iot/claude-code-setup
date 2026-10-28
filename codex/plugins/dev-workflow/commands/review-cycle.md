@@ -114,7 +114,7 @@ push 실패 시 한 번은 rebase 후 재시도하고, 다시 실패하면 중�
 
 ## 라운드 종료
 
-- `status` 의 `complete` 가 `true` 일 때만 완료로 본다. 현재 HEAD 의 complete 보고서에 고칠 지적이 없고, PR 의 status check rollup 에 보이는 checks 가 모두 통과한 상태다. 도구는 rollup 에 나타난 check 만 본다. 저장소가 요구하는 필수 check 가 rollup 에 아예 없으면 `gh pr checks` 로 따로 확인한다
+- `status` 의 `complete` 가 `true` 일 때만 완료로 본다. 현재 HEAD 의 complete 보고서에 고칠 지적이 없고, PR 의 status check rollup 에 보이는 checks 가 모두 통과했고, 대상 브랜치의 필수 status check(rulesets 의 `required_status_checks` 와 브랜치 보호)가 현재 HEAD 에 모두 있고 성공한 상태다. 필수 check 가 아직 안 보이면 `checks.missing_required` 에 나오고 완료가 아니다(기다린다). 필수 check 를 조회하지 못하면 `checks.required_unknown` 이 `true` 이고 완료가 아니다
 - 다른 AI 리뷰도 신규 actionable 항목이 없어야 한다. 반복 지적/설명 완료 항목만 남은 경우는 완료로 본다
 - 수정, 코멘트, commit, push를 수행했다면 다음 리뷰가 필요하므로 완료로 보지 않는다
 - **라운드 상한**: `state` 가 `round_cap`(기계 리뷰 3번째 라운드 이상인데 지적이 남음)이면 더 고치지 않는다. 그 라운드에 지적이 하나도 없으면 `clear` 로 나오고, `complete` 가 `true`(보고서 complete, checks 통과)면 완료로 본다. 남은 지적, 현재 HEAD, 리뷰 라운드를 정리해 사용자에게 "접근 재검토 필요"로 보고하고 루프를 멈춘다. 수정-리뷰를 계속 반복하면 리뷰어가 이전부터 있던 코드의 문제를 하나씩 더 찾아낼 뿐 수렴하지 않는다

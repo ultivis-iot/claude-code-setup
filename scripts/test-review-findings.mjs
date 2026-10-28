@@ -293,6 +293,27 @@ check('backslashes, control characters and leading .. are malformed; trailing do
   assert.deepEqual(r.to_fix, []);
 });
 
+// #23: 대상 브랜치의 필수 check 가 있으면 그 check 가 현재 HEAD 에서 성공해야 완료다.
+// push 직후 check 가 아직 없는 순간(checks 0건)을 완료로 보지 않고, 필수 check 를 모르면 완료로 보지 않는다.
+check('required checks must be present and green; unknown requirements are never complete', () => {
+  const clean = [bot(1, 't', block({ head_sha: HEAD }))];
+  const none = judge({ headSha: HEAD, comments: clean, requiredChecks: [] });
+  assert.equal(none.complete, true);  // CI 없는 저장소
+  const notYet = judge({ headSha: HEAD, comments: clean, requiredChecks: ['ci'] });
+  assert.equal(notYet.state, 'clear');
+  assert.equal(notYet.complete, false);
+  assert.deepEqual(notYet.checks.missing_required, ['ci']);
+  const green = judge({ headSha: HEAD, comments: clean, requiredChecks: ['ci', 'lint'], checks: [{ name: 'ci', conclusion: 'SUCCESS' }, { name: 'lint', state: 'SUCCESS' }] });
+  assert.equal(green.complete, true);
+  assert.deepEqual(green.checks.required, ['ci', 'lint']);
+  const red = judge({ headSha: HEAD, comments: clean, requiredChecks: ['ci'], checks: [{ name: 'ci', conclusion: 'FAILURE' }, { name: 'other', conclusion: 'SUCCESS' }] });
+  assert.equal(red.complete, false);
+  assert.deepEqual(red.checks.missing_required, ['ci']);
+  const unknown = judge({ headSha: HEAD, comments: clean, requiredChecks: null });
+  assert.equal(unknown.complete, false);
+  assert.equal(unknown.checks.required_unknown, true);
+});
+
 // CLI: status 는 gh 대신 --input 을 읽고, record 는 저장소의 tmp/ 에 처리 이력을 쓴다.
 const dir = mkdtempSync(path.join(os.tmpdir(), 'review-findings-'));
 try {
@@ -370,7 +391,8 @@ try {
     const bin = path.join(dir, 'bin');
     mkdirSync(bin, { recursive: true });
     const calls = path.join(dir, 'gh-calls.log');
-    const view = { headRefOid: head, files: [{ path: 'a.mjs' }], statusCheckRollup: [{ name: 'ci', conclusion: 'FAILURE' }, { context: 'lint', state: 'SUCCESS' }] };
+    const view = { headRefOid: head, baseRefName: 'main', files: [{ path: 'a.mjs' }], statusCheckRollup: [{ name: 'ci', conclusion: 'FAILURE' }, { context: 'lint', state: 'SUCCESS' }] };
+    const rules = [{ type: 'deletion' }, { type: 'required_status_checks', parameters: { required_status_checks: [{ context: 'lint' }] } }];
     const comments = [{ id: 7, created_at: 't', login: 'isaac-notion-bot', body: block({ head_sha: head, findings: [finding('via-gh')] }) }];
     writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}
 const args = process.argv.slice(2);
@@ -379,14 +401,30 @@ const out = (s) => process.stdout.write(s + '\\n');
 if (args[0] === 'pr' && args[1] === 'view') out(${JSON.stringify(JSON.stringify(view))});
 else if (args[0] === 'api' && args[1].endsWith('/comments')) for (const c of ${JSON.stringify(comments)}) out(JSON.stringify(c));
 else if (args[0] === 'api' && args[1].includes('/pulls/')) out('MEMBER');
+else if (args[0] === 'api' && args[1] === 'repos/o/r/rules/branches/main') out(${JSON.stringify(JSON.stringify(rules))});
+else if (args[0] === 'api' && args[1] === 'repos/o/r/branches/main/protection/required_status_checks') {
+  if (process.env.FAKE_PROTECTION === 'forbidden') { process.stderr.write('gh: Resource not accessible (HTTP 403)'); process.exit(1); }
+  if (process.env.FAKE_PROTECTION) out(process.env.FAKE_PROTECTION);
+  else { process.stderr.write('gh: Branch not protected (HTTP 404)'); process.exit(1); }
+}
 else { process.stderr.write('unexpected gh ' + args.join(' ')); process.exit(1); }
 `, { mode: 0o755 });
-    const r = spawnSync(process.execPath, [tool, 'status', '--pr', '21', '--repo', 'o/r'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH } });
-    assert.equal(r.status, 0, r.stderr);
-    const out = JSON.parse(r.stdout);
+    const status = (env = {}) => {
+      const r = spawnSync(process.execPath, [tool, 'status', '--pr', '21', '--repo', 'o/r'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH, ...env } });
+      assert.equal(r.status, 0, r.stderr);
+      return JSON.parse(r.stdout);
+    };
+    const out = status();
     assert.equal(out.head_sha, head);
     assert.deepEqual(out.to_fix.map((f) => f.id), ['via-gh']);  // MEMBER 이고 PR 파일 안이라 자동 수정 대상
-    assert.deepEqual(out.checks, { total: 2, not_passed: ['ci'] });
+    // rulesets 의 필수 check(lint)와 브랜치 보호(404 = 없음)를 합친다
+    assert.deepEqual(out.checks, { total: 2, not_passed: ['ci'], required: ['lint'], missing_required: [], required_unknown: false });
+    // 브랜치 보호의 필수 check 도 더한다(contexts 와 checks 둘 다)
+    const both = status({ FAKE_PROTECTION: JSON.stringify({ contexts: ['build'], checks: [{ context: 'e2e' }] }) });
+    assert.deepEqual(both.checks.required, ['lint', 'build', 'e2e']);
+    assert.deepEqual(both.checks.missing_required, ['build', 'e2e']);
+    // 404 가 아닌 오류는 '모름' 이고 완료로 보지 않는다
+    assert.equal(status({ FAKE_PROTECTION: 'forbidden' }).checks.required_unknown, true);
     const asked = readFileSync(calls, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.ok(asked.some((a) => a[0] === 'pr' && a.includes('o/r')), 'pr view uses --repo');
     assert.ok(asked.some((a) => a[1] === 'repos/o/r/issues/21/comments'));

@@ -44,7 +44,7 @@
 
 완료 조건:
 
-- `status` 의 `complete: true`(현재 HEAD 의 complete 보고서, 고칠 지적 없음, status check rollup 에 보이는 checks 통과. 필수 check 가 rollup 에 없으면 `gh pr checks` 로 따로 확인)
+- `status` 의 `complete: true`(현재 HEAD 의 complete 보고서, 고칠 지적 없음, status check rollup 에 보이는 checks 통과, 대상 브랜치의 필수 status check 가 현재 HEAD 에 있고 성공. 없거나 실패면 `checks.missing_required`, 조회 실패면 `checks.required_unknown` 이고 완료가 아님)
 - 다른 AI 리뷰는 신규 actionable 리뷰가 없거나 반복 지적만 남음
 
 멈추는 조건(완료 아님):

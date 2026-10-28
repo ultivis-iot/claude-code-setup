@@ -54,7 +54,7 @@ When the same kind of finding keeps coming back across PRs (especially `wrong` o
 7. Commit and push the follow-up changes.
 8. Record each handled machine finding with `review-findings.mjs record` (see above).
 9. End the round without printing `<promise>REVIEW COMPLETE</promise>` if code changes, comments, commits, or pushes were made.
-10. Report completion only when `review-findings.mjs status` reports `complete: true` (the helper sees only checks present in the status check rollup; confirm required checks with `gh pr checks` if any are missing), other AI reviews have no new actionable findings, and required checks for the current head have completed successfully. An absent, pending, inaccessible or stale check is not a successful check. If review completion cannot be established, report what is still pending.
+10. Report completion only when `review-findings.mjs status` reports `complete: true` (the helper also reads the target branch's required status checks from rulesets and branch protection: a required check that is missing or not successful is listed in `checks.missing_required`, and `checks.required_unknown: true` means the requirements could not be read; neither is complete), other AI reviews have no new actionable findings, and required checks for the current head have completed successfully. An absent, pending, inaccessible or stale check is not a successful check. If review completion cannot be established, report what is still pending.
 
 ## Story-based PRs
 

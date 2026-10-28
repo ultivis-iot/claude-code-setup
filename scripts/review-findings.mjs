@@ -11,7 +11,8 @@
 // 참고로만 읽고 현재 HEAD 의 완료 증거로 쓰지 않는다. record 는 지적별 처리 결과를
 // tmp/review-findings-<PR>.json 에 남긴다(오탐률 집계의 원천이자 같은 지적을 다시 고치지
 // 않기 위한 기록). stop-loop 는 완료 신호 없이 Ralph Loop 를 멈춘다(사람에게 넘기거나 라운드
-// 상한에 닿았을 때). --input 은 gh 대신 {head_sha, comments, checks, files, author_association} JSON 을 읽는다(테스트용).
+// 상한에 닿았을 때). --input 은 gh 대신 {head_sha, comments, checks, files, author_association, required_checks} JSON 을 읽는다(테스트용,
+// required_checks 가 없으면 필수 check 가 없는 것으로 본다).
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -137,22 +138,26 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
  *   needs_user 자동으로 고치지 않을 지적만 남았다. 각 지적의 hold 가 이유다.
  *   actionable 이번 라운드에 고칠 지적이 있다.
  *   round_cap 상한 라운드인데 지적이 남았다. 고치지 않고 사람에게 넘긴다.
- *   clear     고칠 지적이 없다. 완료하려면 보고서가 complete 이고 checks 도 통과해야 한다(complete 필드).
+ *   clear     고칠 지적이 없다. 완료하려면 보고서가 complete 이고 checks 도 통과하고, 대상 브랜치의 필수 check 가
+ *             현재 HEAD 에 있고 성공해야 한다(complete 필드). 필수 check 를 모르면(requiredChecks null) 완료가 아니다.
  * 틀림·의도됨·상관없음으로 기록한 지적은, 기록한 뒤 지적 위치의 파일이 바뀌었으면(changedSince) 다시
  * 연다. 해결 확인은 다음 리뷰 블록의 status=resolved 가 기록이다. 자동 수정은 PR 작성자가 OWNER·MEMBER·
  * COLLABORATOR 이고 지적 위치가 PR 이 바꾼 파일(prFiles) 안일 때만이다. 둘 중 하나를 모르면 고치지 않는다.
  * resolved·rejected·pre_existing 은 리뷰 봇(통합 pass)의 판정을 그대로 믿는다. 완료는 merge 전 사람 확인을
  * 대신하지 않는다.
  */
-export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null, authorAssociation = null }) {
+export function assess({ headSha, comments, checks = [], requiredChecks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null, authorAssociation = null }) {
   const reports = comments
     .filter((c) => c.login === bot && isReport(c.body))
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
     .map((c) => ({ comment_id: c.id, created_at: c.created_at, block: parseBlock(c.body), body: c.body }));
-  const pendingChecks = checks.filter((c) => !["SUCCESS", "NEUTRAL", "SKIPPED"].includes(c.conclusion || c.state));
+  const passed = (c) => ["SUCCESS", "NEUTRAL", "SKIPPED"].includes(c.conclusion || c.state);
+  const pendingChecks = checks.filter((c) => !passed(c));
+  // 대상 브랜치의 필수 check 는 현재 HEAD 에 있고 성공해야 한다. null 은 필수 check 를 알아내지 못했다는 뜻이다.
+  const missingRequired = (requiredChecks || []).filter((name) => !checks.some((c) => c.name === name && passed(c)));
   const base = {
     head_sha: headSha,
-    checks: { total: checks.length, not_passed: pendingChecks.map((c) => c.name) },
+    checks: { total: checks.length, not_passed: pendingChecks.map((c) => c.name), required: requiredChecks || [], missing_required: missingRequired, required_unknown: requiredChecks === null },
     to_fix: [], needs_user: [], declined: [], pre_existing: [], rejected: [], resolved: [],
     round: null, round_cap: roundCap, round_cap_reached: false, complete: false,
   };
@@ -187,7 +192,7 @@ export function assess({ headSha, comments, checks = [], bot = DEFAULT_BOT, ledg
   // 상한 라운드에 지적이 남았으면 더 고치지 않고 사람에게 넘긴다.
   if (out.round_cap_reached && out.to_fix.length + out.needs_user.length) out.state = "round_cap";
   else out.state = out.to_fix.length ? "actionable" : out.needs_user.length ? "needs_user" : "clear";
-  out.complete = out.state === "clear" && !partial && pendingChecks.length === 0;
+  out.complete = out.state === "clear" && !partial && pendingChecks.length === 0 && requiredChecks !== null && missingRequired.length === 0;
   return out;
 }
 
@@ -213,6 +218,33 @@ function gh(argv) {
   if (r.error) fail(`gh 를 실행할 수 없습니다: ${r.error.message}`);
   if (r.status !== 0) fail(`gh ${argv.join(" ")}: ${r.stderr.trim()}`);
   return r.stdout;
+}
+
+function ghTry(argv) {
+  return spawnSync("gh", argv, { encoding: "utf8", windowsHide: true });
+}
+
+// 대상 브랜치의 필수 status check 이름. rulesets 와 기존 브랜치 보호를 합친다. 알아내지 못하면 null(완료로 보지 않음).
+function requiredChecksFor(slug, base) {
+  if (typeof base !== "string" || !base) return null;
+  const branch = encodeURIComponent(base);
+  const rules = ghTry(["api", `repos/${slug}/rules/branches/${branch}`, "--paginate"]);
+  if (rules.error || rules.status !== 0) return null;
+  const names = [];
+  try {
+    for (const rule of JSON.parse(rules.stdout || "[]")) {
+      if (rule?.type !== "required_status_checks") continue;
+      for (const c of rule.parameters?.required_status_checks || []) if (typeof c?.context === "string") names.push(c.context);
+    }
+  } catch { return null; }
+  const protection = ghTry(["api", `repos/${slug}/branches/${branch}/protection/required_status_checks`]);
+  if (protection.status === 0) {
+    try {
+      const p = JSON.parse(protection.stdout);
+      names.push(...(p.contexts || []), ...(p.checks || []).map((c) => c?.context).filter((c) => typeof c === "string"));
+    } catch { return null; }
+  } else if (!/HTTP 404/.test(protection.stderr || "")) return null;  // 404: 보호 없음 또는 필수 check 없음
+  return [...new Set(names)];
 }
 
 function gitOk(argv) {
@@ -248,13 +280,13 @@ function readLedger(pr) {
 
 function loadFromGitHub(pr, repo) {
   const slug = repo || gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
-  const view = JSON.parse(gh(["pr", "view", String(pr), "--repo", slug, "--json", "headRefOid,statusCheckRollup,files"]));
+  const view = JSON.parse(gh(["pr", "view", String(pr), "--repo", slug, "--json", "headRefOid,baseRefName,statusCheckRollup,files"]));
   const comments = gh(["api", `repos/${slug}/issues/${pr}/comments`, "--paginate", "--jq", ".[] | {id, created_at, login: .user.login, body} | tojson"])
     .split("\n").filter(Boolean).map((line) => JSON.parse(line));
   const checks = (view.statusCheckRollup || []).map((c) => ({ name: c.name || c.context, conclusion: c.conclusion, state: c.state }));
   // gh pr view 에는 작성자와 저장소의 관계가 없어 REST 응답에서 읽는다.
   const author = gh(["api", `repos/${slug}/pulls/${pr}`, "--jq", ".author_association"]).trim();
-  return { head_sha: view.headRefOid, comments, checks, files: (view.files || []).map((f) => f.path), author_association: author || null };
+  return { head_sha: view.headRefOid, comments, checks, files: (view.files || []).map((f) => f.path), author_association: author || null, required_checks: requiredChecksFor(slug, view.baseRefName) };
 }
 
 function main() {
@@ -278,6 +310,8 @@ function main() {
     const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
     const result = assess({
       headSha: data.head_sha, comments: data.comments, checks: data.checks || [],
+      // --input(테스트용)에 required_checks 가 없으면 필수 check 가 없는 것으로 본다.
+      requiredChecks: Object.hasOwn(data, "required_checks") ? data.required_checks : [],
       bot: opt.bot || DEFAULT_BOT, ledger: readLedger(opt.pr), roundCap,
       changedSince: gitChangedSince(data.head_sha), prFiles: Array.isArray(data.files) ? data.files : null,
       authorAssociation: data.author_association ?? null,
