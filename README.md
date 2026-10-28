@@ -178,6 +178,7 @@ git pull
 │   ├── graft.mjs               # Graft CLI 확인(ensure)·그래프 갱신(refresh)
 │   ├── lib/notion.mjs          # Notion REST 클라이언트 공용 모듈
 │   ├── review-findings.mjs     # review-cycle 이 기계 리뷰 블록을 지적 단위로 읽고 기록 (status/record/stop-loop)
+│   ├── review-metrics.mjs      # 기계 리뷰 지표 집계 (오탐률·라운드·이전 코드 지적 비율)
 │   └── ...                     # 그 외 workflow 실행 스크립트
 ├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
 └── dev-tools/
@@ -398,6 +399,8 @@ mkdir -p tmp
 - `tmp/review-policy.json` - 원격 기본 브랜치에서 읽은 리뷰 정책(`REVIEW.md`)
 - `tmp/validation-status.json` - 검증 결과 기록
 - `tmp/review-findings-{PR}.json` - 기계 리뷰 지적별 처리 기록 (`review-findings.mjs record` 가 생성, `.gitignore` 권장)
+
+기계 리뷰가 잘 동작하는지는 `node scripts/review-metrics.mjs --pr 24,25,27` 로 봅니다. PR 코멘트의 블록과 처리 기록을 읽어 원인 기준 지적 수, 사람 판정(고침·틀림·의도됨·상관없음·미판정)과 오탐률, 리뷰 봇이 오탐으로 본 비율, PR 별 라운드 수와 상한 도달, 2라운드부터 새 지적 중 이미 리뷰한 코드에서 나온 비율을 표로 냅니다(`--json` 은 JSON). 이미 리뷰한 코드인지는 바뀐 부분만 리뷰한 라운드는 블록의 `earlier_code_findings` 로, 전체 리뷰 라운드는 직전 HEAD 이후 바뀐 줄(±3) 밖인지를 로컬 git 으로 판단하고, 커밋이 없으면 모름으로 셉니다. 처리 기록은 마지막 판단만 남으므로 판단을 바꾼 이력은 세지 않습니다.
 - `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
 
 ### 리뷰 정책 `REVIEW.md` (선택)
