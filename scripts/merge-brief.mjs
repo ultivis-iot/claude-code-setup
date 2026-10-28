@@ -2,23 +2,31 @@
 // 머지 전 이해 확인(docs/references/merge-readiness.md)에서 물을 질문 수를 PR 의 바뀐 파일로 정한다.
 //
 //   node merge-brief.mjs tier --pr <N> [--repo <o/r>]
-//   node merge-brief.mjs tier --input <file>      (테스트용: {files: [{path, additions, deletions}]})
+//   node merge-brief.mjs tier --input <file>      (테스트용: {files: [{path, previous_path?, additions, deletions}]})
 //
 // 결과는 {tier, questions, lines, files, reasons} JSON 이다. 질문 수는 최소값이다. agent 는 늘릴 수 있지만
-// 줄이지 않는다. 가장 높은 분류를 쓰고 상한은 5 다.
-// - docs: README·CHANGELOG·LICENSE·*.txt·docs/(docs/references/ 제외)만 바뀜 → 0(브리프만)
-// - code: 그 밖의 파일. agent 가 읽는 참조 문서·명령·스킬 Markdown 도 동작을 정하므로 여기 든다
+// 줄이지 않는다. 가장 높은 분류를 쓴다(최대 5).
+// - docs: 최상위 README·CHANGELOG·LICENSE 와 docs/(docs/references/ 제외)만 바뀜 → 0(브리프만)
+// - code: 그 밖의 파일. agent 가 읽는 참조 문서·명령·스킬·템플릿도 동작을 정하므로 여기 든다
 //   → 1, 바뀐 줄이 150 을 넘으면 +1, 파일이 5 개를 넘으면 +1
-// - sensitive: 검증·설치·hook·스키마·agent 정의·CI·인증·비밀·권한·토큰·마이그레이션 경로 → 4, 바뀐 줄이 300 을 넘으면 5
-// 생성본(codex/plugins/dev-workflow/)은 원본과 같은 내용이라 세지 않는다.
+// - sensitive: 어느 깊이든 검증·리뷰 게이트, 설치, hook, 스키마, agent 정의, 에이전트·CI 설정, 자격 증명을 다루는
+//   스크립트, 인증·비밀·권한·토큰·마이그레이션 경로 → 4, 바뀐 줄이 300 을 넘으면 5
+// 이름을 바꾼 파일은 이전 경로로도 분류한다. 생성본(codex/plugins/dev-workflow/{skills,commands}/)은 같은 PR 에서
+// 원본도 바뀌었을 때만 같은 내용으로 보고 세지 않는다. 경로만 보므로 내용 속 비밀은 알아내지 못한다.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const MAX_QUESTIONS = 5;
-const GENERATED = /^codex\/plugins\/dev-workflow\//;
-const SENSITIVE = /^(hooks|schemas|agents|\.github)\/|(^|\/)(setup|install)[^/]*$|validation-gate|auth|secret|permission|token|migration/i;
-const DOCS = /(^|\/)(README|CHANGELOG|LICENSE)[^/]*$|\.txt$/i;
+const CODE_LINES = 150, CODE_FILES = 5, SENSITIVE_LINES = 300;
+const SENSITIVE = new RegExp([
+  "(^|/)(hooks|schemas|agents|\\.github|\\.claude|\\.codex|\\.codex-plugin)/",
+  "(^|/)(setup|install)[^/]*$",
+  "(^|/)(validation-gate|review-findings|merge-brief|verify-workflow|sync-workflow|graft|ult-notion|notion)\\.[^/]*$",
+  "(^|[/._-])(auth|authn|authz|secrets?|permissions?|tokens?|migrations?)([/._-]|$)",
+].join("|"), "i");
+const DOCS = /^(README|CHANGELOG|LICENSE)[^/]*$/i;
+// 생성본 자리와 그 원본. sync-workflow.mjs 가 원본을 그대로(명령은 .claude/ → .codex/ 만 바꿔) 복사한다.
+const GENERATED = [["codex/plugins/dev-workflow/skills/", "codex/skills/"], ["codex/plugins/dev-workflow/commands/", "commands/"]];
 
 function category(path) {
   if (SENSITIVE.test(path)) return "sensitive";
@@ -26,13 +34,20 @@ function category(path) {
   return "code";
 }
 
+const RANK = { docs: 0, code: 1, sensitive: 2 };
 const count = (n) => Number.isInteger(n) && n >= 0;
+const pathOk = (p) => typeof p === "string" && p !== "";
 
 export function classify(files) {
-  if (!Array.isArray(files) || !files.every((f) => f && typeof f.path === "string" && f.path !== "" && count(f.additions) && count(f.deletions))) {
-    throw new Error("files 는 {path, additions, deletions} 목록이어야 합니다");
+  if (!Array.isArray(files) || !files.every((f) => f && pathOk(f.path) && (f.previous_path == null || pathOk(f.previous_path)) && count(f.additions) && count(f.deletions))) {
+    throw new Error("files 는 {path, previous_path?, additions, deletions} 목록이어야 합니다");
   }
-  const counted = files.filter((f) => !GENERATED.test(f.path)).map((f) => ({ path: f.path, lines: f.additions + f.deletions, category: category(f.path) }));
+  const changed = new Set(files.map((f) => f.path));
+  const copyOfChangedSource = (path) => GENERATED.some(([copy, source]) => path.startsWith(copy) && changed.has(source + path.slice(copy.length)));
+  const counted = files.filter((f) => !copyOfChangedSource(f.path)).map((f) => {
+    const kinds = [f.path, f.previous_path].filter(Boolean).map(category);
+    return { path: f.path, lines: f.additions + f.deletions, category: kinds.reduce((a, b) => (RANK[b] > RANK[a] ? b : a)) };
+  });
   const lines = counted.reduce((sum, f) => sum + f.lines, 0);
   const of = (name) => counted.filter((f) => f.category === name).map((f) => f.path);
   const sensitive = of("sensitive"), code = of("code");
@@ -40,16 +55,17 @@ export function classify(files) {
   let tier = "docs", questions = 0;
   if (sensitive.length) {
     tier = "sensitive";
-    questions = 4 + (lines > 300 ? 1 : 0);
+    questions = 4;
     reasons.push(`민감 경로: ${sensitive.join(", ")}`);
+    if (lines > SENSITIVE_LINES) { questions++; reasons.push(`바뀐 줄 ${lines}`); }
   } else if (code.length) {
     tier = "code";
-    questions = 1 + (lines > 150 ? 1 : 0) + (counted.length > 5 ? 1 : 0);
+    questions = 1;
     reasons.push(`코드: ${code.join(", ")}`);
+    if (lines > CODE_LINES) { questions++; reasons.push(`바뀐 줄 ${lines}`); }
+    if (counted.length > CODE_FILES) { questions++; reasons.push(`파일 ${counted.length}개`); }
   }
-  if (tier !== "docs" && lines > (tier === "sensitive" ? 300 : 150)) reasons.push(`바뀐 줄 ${lines}`);
-  if (tier === "code" && counted.length > 5) reasons.push(`파일 ${counted.length}개`);
-  return { tier, questions: Math.min(questions, MAX_QUESTIONS), lines, files: counted, reasons };
+  return { tier, questions, lines, files: counted, reasons };
 }
 
 function fail(message) {
@@ -68,11 +84,21 @@ function args(argv) {
   return { cmd, opt };
 }
 
-function loadFromGitHub(pr, repo) {
-  const r = spawnSync("gh", ["pr", "view", pr, "--json", "files", ...(repo ? ["--repo", repo] : [])], { encoding: "utf8", windowsHide: true });
+function gh(argv) {
+  const r = spawnSync("gh", argv, { encoding: "utf8", windowsHide: true });
   if (r.error) fail(`gh 를 실행할 수 없습니다: ${r.error.message}`);
-  if (r.status !== 0) fail(`gh pr view ${pr}: ${r.stderr.trim()}`);
-  return JSON.parse(r.stdout);
+  if (r.status !== 0) fail(`gh ${argv.join(" ")}: ${r.stderr.trim()}`);
+  return r.stdout;
+}
+
+// REST 파일 목록은 이전 경로(previous_filename)를 주고 최대 3000개까지다. PR 의 changed_files 와 다르면 잘린 것이니 멈춘다.
+function loadFromGitHub(pr, repo) {
+  const slug = repo || "{owner}/{repo}";
+  const expected = Number(gh(["api", `repos/${slug}/pulls/${pr}`, "--jq", ".changed_files"]).trim());
+  const files = gh(["api", "--paginate", `repos/${slug}/pulls/${pr}/files?per_page=100`, "--jq",
+    ".[] | {path: .filename, previous_path: .previous_filename, additions, deletions}"]).split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  if (!Number.isInteger(expected) || files.length !== expected) fail(`PR 파일 목록이 완전하지 않습니다(받은 ${files.length}개, PR 은 ${expected}개). 질문 수는 sensitive 로 봅니다`);
+  return { files };
 }
 
 function main() {
@@ -83,9 +109,9 @@ function main() {
   if (!opt.input && !opt.pr) fail("--pr <번호> 또는 --input <파일> 이 필요합니다");
   if (opt.pr !== undefined && !/^\d+$/.test(opt.pr)) fail("--pr 은 PR 번호입니다");
   if (opt.repo !== undefined && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(opt.repo)) fail("--repo 는 owner/name 형식입니다");
-  const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
   try {
-    process.stdout.write(JSON.stringify(classify(data.files), null, 2) + "\n");
+    const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
+    process.stdout.write(JSON.stringify(classify(data?.files), null, 2) + "\n");
   } catch (error) {
     fail(error.message);
   }
