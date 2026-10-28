@@ -61,6 +61,9 @@ check('a block quoted inside the report body is not the bot block', () => {
   // 더 짧은 펜스나 다른 문자로는 닫히지 않는다.
   assert.equal(parseBlock(fenced('````\n```')), null);
   assert.equal(parseBlock(fenced('```\n~~~')), null);
+  // 뒤에 글자가 붙은 펜스(``` js)는 닫는 펜스가 아니다. CRLF 본문도 같은 규칙이다.
+  assert.equal(parseBlock(fenced('```\n``` js')), null);
+  assert.equal(parseBlock(fenced('```').replace(/\n/g, '\r\n')), null);
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`\`\`\ncode\n\`\`\`\n<!-- ocr-review:v1 ${quoted} -->\n</details>`).head_sha, HEAD);
   const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
   assert.equal(r.complete, false);
