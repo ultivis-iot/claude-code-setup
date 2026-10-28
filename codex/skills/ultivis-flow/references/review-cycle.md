@@ -16,7 +16,7 @@ Inspect the latest AI PR feedback and process follow-up rounds in the current Co
 
 ## Machine review findings
 
-The machine review (`isaac-notion-bot`, "🤖 AI Code Review Report") ends each comment with an `<!-- ocr-review:v1 -->` block (exactly one, starting at the beginning of a line and followed only by whitespace and `</details>`; a block quoted or embedded in the report body is not read). Read it only through the helper, not by parsing the Markdown. Resolve the scripts directory as `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}`.
+The machine review (`isaac-notion-bot`, "🤖 AI Code Review Report") ends each comment with an `<!-- ocr-review:v1 -->` block (exactly one, starting at the beginning of a line and followed only by whitespace and `</details>`, outside any unclosed code fence; a block quoted or embedded in the report body is not read). Read it only through the helper, not by parsing the Markdown. Resolve the scripts directory as `${WORKFLOW_SCRIPTS_DIR:-${CODEX_HOME:-$HOME/.codex}/scripts}`.
 
 ```bash
 node "$SCRIPTS/review-findings.mjs" status --pr <N>
