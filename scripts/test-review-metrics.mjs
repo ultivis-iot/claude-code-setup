@@ -199,6 +199,32 @@ try {
       process.chdir(cwd);
     }
   });
+  // --repo 가 지금 checkout 과 다른 저장소면 그 checkout 의 처리 기록·git 이력을 섞지 않는다.
+  check('cli does not mix a local ledger into another repository\'s metrics', () => {
+    if (process.platform === 'win32') { console.log('  SKIP gh 를 바꾸는 POSIX shim 이 필요하다'); return; }
+    const work = path.join(dir, 'work');
+    mkdirSync(path.join(work, 'tmp'), { recursive: true });
+    spawnSync('git', ['init', '-q'], { cwd: work });
+    writeFileSync(path.join(work, 'tmp', 'review-findings-7.json'), JSON.stringify(ledger));
+    const bin = path.join(dir, 'bin');
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}
+const args = process.argv.slice(2);
+if (args[0] === 'repo') process.stdout.write('o/local\\n');
+else if (args[0] === 'api') for (const c of ${JSON.stringify(comments)}) process.stdout.write(JSON.stringify(c) + '\\n');
+else process.exit(1);
+`, { mode: 0o755 });
+    const run = (...a) => spawnSync(process.execPath, [tool, '--pr', '7', '--json', ...a], { cwd: work, encoding: 'utf8', env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH } });
+    const same = run();
+    assert.equal(same.status, 0, same.stderr);
+    assert.equal(JSON.parse(same.stdout).prs[0].human.fixed, 2);  // 같은 저장소: 처리 기록을 쓴다
+    const other = run('--repo', 'o/other');
+    assert.equal(other.status, 0, other.stderr);
+    assert.match(other.stderr, /처리 기록과 git 비교를 쓰지 않습니다/);
+    const out = JSON.parse(other.stdout).prs[0];
+    assert.equal(out.human.undecided, 6);
+    assert.equal(out.later_rounds.earlier_code + out.later_rounds.changed_code, 1);  // 바뀐 부분만 리뷰한 라운드의 1건만
+  });
   check('cli rejects bad arguments', () => {
     const bad = path.join(dir, 'bad.json');
     writeFileSync(bad, '{');
