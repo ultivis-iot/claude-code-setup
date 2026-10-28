@@ -177,10 +177,10 @@ try {
     mkdirSync(path.dirname(installed(file)), { recursive: true });
     writeFileSync(installed(file), `// installed ${file}\n`);
   }
-  // 설치본 중 하나라도 없으면 그 파일을 알리고 멈춘다.
+  // 설치본 중 하나라도 없으면 복사 전에 그 파일을 알리고 멈춘다(cp 실패 메시지가 아니라 설치기의 안내).
   for (const file of copied) {
     rmSync(installed(file));
-    rejected(installSelf(selfRepo), new RegExp(file.replace('.', '\\.')));
+    rejected(installSelf(selfRepo), new RegExp(`${file.replace(/\./g, '\\.')} 이 없으니 \\./setup\\.sh`));
     assert.ok(!existsSync(path.join(selfRepo, '.git/hooks/pre-push')));
     writeFileSync(installed(file), `// installed ${file}\n`);
   }
