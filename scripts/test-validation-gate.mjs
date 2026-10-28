@@ -158,7 +158,7 @@ try {
   assert.ok(existsSync(path.join(customHooks, 'workflow/scripts/graft.mjs')));
   assert.ok(!existsSync(path.join(customHooks, 'workflow/scripts/graft-refresh.sh')));
   ok(spawnSync('sh', [path.join(customHooks, 'post-merge')], { cwd: linked, encoding: 'utf8', env: { ...process.env, GRAFT_PACKAGE: '@nanonets/graft@0.0.0' } }));
-  // 리뷰 정책은 스냅샷 base 의 REVIEW.md 만 쓴다. 브랜치가 바꾼 REVIEW.md·심볼릭 링크는 정책이 아니다.
+  // 리뷰 정책은 기본 브랜치(origin/HEAD) 의 REVIEW.md 만 쓴다. 브랜치가 바꾼 REVIEW.md·심볼릭 링크는 정책이 아니다.
   const policyFixture = setup => {
     const f = fixture();
     git(f.repo, 'switch', '-q', 'main');
@@ -178,6 +178,10 @@ try {
   assert.equal(basePolicy.text, '# base policy');
   assert.equal(basePolicy.base_sha, git(based.repo, 'rev-parse', 'main'));
   assert.equal(basePolicy.truncated, false);
+  // --repo 가 하위 디렉터리여도 저장소 루트의 REVIEW.md 를 읽는다.
+  mkdirSync(path.join(based.repo, 'sub'), { recursive: true });
+  ok(run(process.execPath, [gate, 'policy', '--repo', path.join(based.repo, 'sub'), '--snapshot', 'tmp/snapshot.json', '--out', 'tmp/sub-policy.json'], based.repo));
+  assert.equal(JSON.parse(readFileSync(path.join(based.repo, 'tmp/sub-policy.json'))).text, '# base policy');
   writeFileSync(path.join(based.repo, 'code.txt'), 'after snapshot\n');
   git(based.repo, 'commit', '-qam', 'test: after snapshot');
   rejected(based.policy(), /stale/);
@@ -253,7 +257,13 @@ try {
   ok(recordTargeted());
   assert.equal(targeted.readStatus().review_policy.base_sha, git(targeted.repo, 'rev-parse', 'main'));
   ok(targeted.invoke('ready', 'tmp/validation-status.json', '--base', 'weak'));
-  // 기본 브랜치가 움직이면 정책을 다시 읽어야 한다.
+  // 기본 브랜치가 움직이면(REVIEW.md 가 그대로여도) 정책을 다시 읽어야 한다.
+  git(targeted.repo, 'switch', '-q', 'main');
+  writeFileSync(path.join(targeted.repo, 'other.txt'), 'unrelated\n');
+  git(targeted.repo, 'add', 'other.txt');
+  git(targeted.repo, 'commit', '-qm', 'test: default branch moves without touching the policy');
+  git(targeted.repo, 'switch', '-q', 'feature');
+  rejected(targeted.invoke('ready', 'tmp/validation-status.json', '--base', 'weak'), /default branch/);
   git(targeted.repo, 'switch', '-q', 'main');
   writeFileSync(path.join(targeted.repo, 'REVIEW.md'), '# stricter default policy\n');
   git(targeted.repo, 'commit', '-qam', 'test: default policy moves');
