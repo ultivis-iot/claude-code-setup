@@ -57,7 +57,7 @@ export function parseBlock(body) {
   }
 }
 
-// 앞 내용이 끝날 때 Markdown 코드 펜스(``` · ~~~, 들여쓰기 3칸까지)가 열려 있는지. 같은 문자로 같거나 더 긴 펜스만 닫는다.
+// 앞 내용이 끝날 때 Markdown 코드 펜스(``` · ~~~, 들여쓰기 3칸까지)가 열려 있는지. 같은 문자로 같거나 더 긴 펜스이고 뒤에 공백·탭만 있을 때만 닫는다.
 function inCodeFence(before) {
   let open = null;
   // Markdown 의 줄바꿈은 LF·CR·CRLF 다. 펜스 뒤 내용은 U+2028 같은 문자도 포함해 그대로 받는다.
@@ -66,7 +66,7 @@ function inCodeFence(before) {
     if (!fence) continue;
     const [, marks, rest] = fence;
     if (!open) open = marks;
-    else if (marks[0] === open[0] && marks.length >= open.length && !rest.trim()) open = null;
+    else if (marks[0] === open[0] && marks.length >= open.length && /^[ \t]*$/.test(rest)) open = null;
   }
   return open !== null;
 }
