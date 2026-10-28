@@ -34,7 +34,9 @@ check('docs are only top-level notes and docs/ outside references', () => {
   for (const p of ['commands/README.md', 'commands/CHANGELOG.md', 'codex/skills/ultivis-flow/references/prompt.txt', 'templates/notes.txt']) {
     assert.notEqual(classify([file(p)]).tier, 'docs', p);
   }
-  assert.equal(classify([file('docs/notes.txt'), file('LICENSE')]).tier, 'docs');
+  assert.equal(classify([file('docs/notes.txt'), file('LICENSE'), file('docs/guide.rst')]).tier, 'docs');
+  // 문서 자리라도 텍스트 문서가 아니면 문서가 아니다
+  for (const p of ['docs/tools/run.mjs', 'README.sh', 'LICENSE.mjs', 'CHANGELOG.json']) assert.notEqual(classify([file(p)]).tier, 'docs', p);
 });
 
 check('a small code change asks one question, larger changes ask up to three', () => {
@@ -56,7 +58,12 @@ check('validation, install, hook and permission paths ask four, five when large'
     // 리뷰·검증 게이트와 그 도구, 자격 증명을 다루는 Notion 스크립트, 에이전트 설정도 민감 경로다(어느 깊이든)
     'scripts/review-findings.mjs', 'scripts/merge-brief.mjs', 'scripts/graft.mjs', 'scripts/verify-workflow.sh', 'scripts/sync-workflow.mjs',
     'scripts/ult-notion.mjs', 'scripts/lib/notion.mjs', '.claude/settings.json', '.codex/config.toml',
-    'codex/plugins/dev-workflow/hooks/hooks.json', 'codex/plugins/dev-workflow/.codex-plugin/plugin.json', 'HOOKS/pre-push']) {
+    'codex/plugins/dev-workflow/hooks/hooks.json', 'codex/plugins/dev-workflow/.codex-plugin/plugin.json', 'HOOKS/pre-push',
+    // 디렉터리 이름으로 든 설치·설정·게이트·인증, 자격 증명·환경 파일, 패키지·hook 설정, 사용자 설정에 설치되는 지시문
+    'scripts/install/run.mjs', 'scripts/installer/run.sh', 'scripts/setup/x.sh', 'scripts/gate/run.mjs', 'src/authentication/x.ts', 'src/oauth.ts',
+    '.env', 'config/.env.production', 'src/credentials.json', 'src/apikey.ts', 'src/password.ts', 'src/keychain.ts',
+    '.husky/pre-commit', 'package.json', '.npmrc', 'Makefile', 'scripts/ult-flow.mjs', 'scripts/review-cycle-ralph-loop.mjs', 'scripts/review_findings.mjs',
+    'templates/global-claude.md', 'CLAUDE.md']) {
     const r = classify([file(p)]);
     assert.equal(r.tier, 'sensitive', p);
     assert.equal(r.questions, 4, p);
@@ -79,13 +86,16 @@ check('the highest category wins and the count never exceeds five', () => {
 check('a generated copy is skipped only when its source changed in the same PR', () => {
   const r = classify([file('commands/review-cycle.md', 10), file('codex/plugins/dev-workflow/commands/review-cycle.md', 10),
     file('codex/skills/ultivis-flow/SKILL.md', 3), file('codex/plugins/dev-workflow/skills/ultivis-flow/SKILL.md', 3)]);
-  assert.equal(r.lines, 13);
+  // 생성본 줄도 바뀐 줄로 센다(파일 수에서만 뺀다). 원본과 다른 내용을 생성본에 숨겨 줄 기준을 낮추지 못하게.
+  assert.equal(r.lines, 26);
   assert.deepEqual(r.files.map((f) => f.path), ['commands/review-cycle.md', 'codex/skills/ultivis-flow/SKILL.md']);
   // 원본 없이 생성본 자리만 바뀌었으면 그대로 센다. 생성본 트리 밖(hooks·manifest)은 생성본이 아니다.
   assert.equal(classify([file('codex/plugins/dev-workflow/skills/x/SKILL.md', 500)]).questions, 2);
   const hidden = classify([file('hooks/x.sh', 1), file('codex/plugins/dev-workflow/hooks/x.sh', 5000)]);
   assert.equal(hidden.lines, 5001);
   assert.equal(hidden.questions, 5);
+  const bigCopy = classify([file('codex/skills/x/SKILL.md', 1), file('codex/plugins/dev-workflow/skills/x/SKILL.md', 5000)]);
+  assert.equal(bigCopy.questions, 2);
   assert.equal(classify([]).questions, 0);
 });
 

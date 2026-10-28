@@ -6,35 +6,43 @@
 //
 // 결과는 {tier, questions, lines, files, reasons} JSON 이다. 질문 수는 최소값이다. agent 는 늘릴 수 있지만
 // 줄이지 않는다. 가장 높은 분류를 쓴다(최대 5).
-// - docs: 최상위 README·CHANGELOG·LICENSE 와 docs/(docs/references/ 제외)만 바뀜 → 0(브리프만)
+// - docs: 최상위 README·CHANGELOG·LICENSE 와 docs/(docs/references/ 제외)의 텍스트 문서(.md·.txt·.rst, 확장자 없음)만 바뀜
+//   → 0(브리프만)
 // - code: 그 밖의 파일. agent 가 읽는 참조 문서·명령·스킬·템플릿도 동작을 정하므로 여기 든다
 //   → 1, 바뀐 줄이 150 을 넘으면 +1, 파일이 5 개를 넘으면 +1
-// - sensitive: 어느 깊이든 검증·리뷰 게이트, 설치, hook, 스키마, agent 정의, 에이전트·CI 설정, 자격 증명을 다루는
-//   스크립트, 인증·비밀·권한·토큰·마이그레이션 경로 → 4, 바뀐 줄이 300 을 넘으면 5
+// - sensitive: 어느 깊이든(디렉터리 이름 포함) 검증·리뷰 게이트, 설치·설정, hook, 스키마, agent 정의, 에이전트·CI·패키지
+//   설정, 사용자 설정에 설치되는 지시문(CLAUDE.md·templates/global-claude.md), 자격 증명·환경 파일, 인증·비밀·권한·토큰·
+//   마이그레이션 경로 → 4, 바뀐 줄이 300 을 넘으면 5
 // 이름을 바꾼 파일은 이전 경로로도 분류한다. 생성본(codex/plugins/dev-workflow/{skills,commands}/)은 같은 PR 에서
-// 원본도 바뀌었을 때만 같은 내용으로 보고 세지 않는다. 경로만 보므로 내용 속 비밀은 알아내지 못한다.
+// 원본도 바뀌었을 때 분류·파일 수에서 빼지만 바뀐 줄로는 센다.
+// 이 도구는 이해 확인 질문의 최소 개수를 정할 뿐 보안 게이트가 아니다. 경로 이름만 보므로 내용이나 파일 모드(심볼릭 링크 등)의
+// 위험은 알아내지 못한다. 그런 위험은 agent 가 diff 를 보고 질문을 늘린다. 새 검증·설치 스크립트를 더하면 SENSITIVE 에도 더한다.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const CODE_LINES = 150, CODE_FILES = 5, SENSITIVE_LINES = 300;
 const SENSITIVE = new RegExp([
-  "(^|/)(hooks|schemas|agents|\\.github|\\.claude|\\.codex|\\.codex-plugin)/",
-  "(^|/)(setup|install)[^/]*$",
-  "(^|/)(validation-gate|review-findings|merge-brief|verify-workflow|sync-workflow|graft|ult-notion|notion)\\.[^/]*$",
-  "(^|[/._-])(auth|authn|authz|secrets?|permissions?|tokens?|migrations?)([/._-]|$)",
+  "(^|/)(hooks|schemas|agents|\\.github|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
+  "(^|/)(setup|install|installer|gate)(s?)([/._-]|$)",
+  "(^|/)(validation-gate|review[-_]findings|merge-brief|verify-workflow|sync-workflow|graft|ult-notion|ult-flow|notion|review-cycle-ralph-loop)\\.[^/]*$",
+  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|claude\\.md|global-claude\\.md)$",
+  "(^|[/._-])(auth|authn|authz|authentication|oauth|secrets?|permissions?|tokens?|migrations?|credentials?|passwords?|apikeys?|keychain)([/._-]|$)",
 ].join("|"), "i");
-const DOCS = /^(README|CHANGELOG|LICENSE)[^/]*$/i;
+const DOCS = /^(README|CHANGELOG|LICENSE)(\.(md|txt|rst))?$/i;
+const TEXT_DOC = /\.(md|txt|rst)$/i;
 // 생성본 자리와 그 원본. sync-workflow.mjs 가 원본을 그대로(명령은 .claude/ → .codex/ 만 바꿔) 복사한다.
 const GENERATED = [["codex/plugins/dev-workflow/skills/", "codex/skills/"], ["codex/plugins/dev-workflow/commands/", "commands/"]];
 
 function category(path) {
   if (SENSITIVE.test(path)) return "sensitive";
-  if (DOCS.test(path) || (path.startsWith("docs/") && !path.startsWith("docs/references/"))) return "docs";
+  if (DOCS.test(path) || (path.startsWith("docs/") && !path.startsWith("docs/references/") && TEXT_DOC.test(path))) return "docs";
   return "code";
 }
 
 const RANK = { docs: 0, code: 1, sensitive: 2 };
+// 이름을 바꾼 파일은 새 경로와 이전 경로 중 더 높은 분류를 쓴다.
+const highest = (paths) => paths.filter(Boolean).map(category).reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
 const count = (n) => Number.isInteger(n) && n >= 0;
 const pathOk = (p) => typeof p === "string" && p !== "";
 
@@ -44,11 +52,9 @@ export function classify(files) {
   }
   const changed = new Set(files.map((f) => f.path));
   const copyOfChangedSource = (path) => GENERATED.some(([copy, source]) => path.startsWith(copy) && changed.has(source + path.slice(copy.length)));
-  const counted = files.filter((f) => !copyOfChangedSource(f.path)).map((f) => {
-    const kinds = [f.path, f.previous_path].filter(Boolean).map(category);
-    return { path: f.path, lines: f.additions + f.deletions, category: kinds.reduce((a, b) => (RANK[b] > RANK[a] ? b : a)) };
-  });
-  const lines = counted.reduce((sum, f) => sum + f.lines, 0);
+  const counted = files.filter((f) => !copyOfChangedSource(f.path))
+    .map((f) => ({ path: f.path, lines: f.additions + f.deletions, category: highest([f.path, f.previous_path]) }));
+  const lines = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
   const of = (name) => counted.filter((f) => f.category === name).map((f) => f.path);
   const sensitive = of("sensitive"), code = of("code");
   const reasons = [];
@@ -97,7 +103,7 @@ function loadFromGitHub(pr, repo) {
   const expected = Number(gh(["api", `repos/${slug}/pulls/${pr}`, "--jq", ".changed_files"]).trim());
   const files = gh(["api", "--paginate", `repos/${slug}/pulls/${pr}/files?per_page=100`, "--jq",
     ".[] | {path: .filename, previous_path: .previous_filename, additions, deletions}"]).split("\n").filter(Boolean).map((line) => JSON.parse(line));
-  if (!Number.isInteger(expected) || files.length !== expected) fail(`PR 파일 목록이 완전하지 않습니다(받은 ${files.length}개, PR 은 ${expected}개). 질문 수는 sensitive 로 봅니다`);
+  if (!Number.isInteger(expected) || files.length !== expected) fail(`PR 파일 목록이 완전하지 않습니다(받은 ${files.length}개, PR 은 ${expected}개). 결과를 내지 않으니 질문은 4개로 보세요`);
   return { files };
 }
 
