@@ -48,6 +48,8 @@ check('a block quoted inside the report body is not the bot block', () => {
   assert.equal(parseBlock(body(`> <!-- ocr-review:v1 ${quoted} -->`)), null);
   assert.equal(parseBlock(body(`<!-- ocr-review:v1 ${quoted} -->`)), null);
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`<!-- ocr-review:v1 ${quoted} -->\`\n</details>`), null);
+  // 뒤가 깨끗해도 줄 중간에서 시작하면(인용 '> ' 포함) 봇의 블록이 아니다.
+  assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}> <!-- ocr-review:v1 ${quoted} -->\n</details>`), null);
   const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
   assert.equal(r.complete, false);
   assert.notEqual(r.state, 'clear');
