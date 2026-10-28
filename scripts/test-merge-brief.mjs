@@ -144,7 +144,7 @@ try {
   check('the CLI rejects missing or valueless options and bad input', () => {
     // 각 오류는 gh 를 부르기 전에 그 검사의 메시지로 멈춘다(gh 가 없어도 같은 결과).
     for (const [argv, message] of [[['tier'], /--pr <번호> 또는 --input/], [['tier', '--pr'], /--pr 에 값이/], [['tier', '--input'], /--input 에 값이/],
-      [['tier', '--pr', 'x'], /--pr 은 PR 번호/], [['tier', '--pr', '7abc'], /--pr 은 PR 번호/], [['tier', '--pr', '1', '--repo'], /--repo 에 값이/], [['tier', '--pr', '1', '--repo', 'bad'], /--repo 는 owner\/name/],
+      [['tier', '--pr', 'x'], /--pr 은 PR 번호/], [['tier', '--pr', '7abc'], /--pr 은 PR 번호/], [['tier', '--pr', '1', '--repo'], /--repo 에 값이/], [['tier', '--pr', '1', '--repo', 'bad'], /--repo 는 owner\/name/], [['tier', '--pr', '1', '--repo', 'a/..'], /--repo 는 owner\/name/],
       [['other', '--input', input], /사용법/],
       // 모르는 옵션(오타), 위치 인수, 같은 옵션 두 번, --pr 와 --input 동시, --input 과 --repo 는 거부한다
       [['tier', '--input', input, '--reop', 'o/r'], /모르는 옵션: --reop/], [['tier', '7', '--input', input], /위치 인수/],

@@ -131,7 +131,7 @@ function main() {
   if (opt.input && opt.pr) fail("--pr 와 --input 중 하나만 줍니다");
   if (opt.input && opt.repo) fail("--repo 는 --pr 와 함께만 씁니다");
   if (opt.pr !== undefined && !/^\d+$/.test(opt.pr)) fail("--pr 은 PR 번호입니다");
-  if (opt.repo !== undefined && !/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(opt.repo)) fail("--repo 는 owner/name 형식입니다");
+  if (opt.repo !== undefined && !(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(opt.repo) && opt.repo.split("/").every((part) => part !== "." && part !== ".."))) fail("--repo 는 owner/name 형식입니다");
   try {
     const data = opt.input ? JSON.parse(readFileSync(opt.input, "utf8")) : loadFromGitHub(opt.pr, opt.repo);
     process.stdout.write(JSON.stringify(classify(data?.files), null, 2) + "\n");
