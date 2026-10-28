@@ -161,28 +161,43 @@ try {
   // 설정 저장소 자신에 hook 을 설치하면 브랜치가 바꾼 실행기가 아니라 설치본(~/.claude) 실행기를 쓴다(worktree 포함).
   const selfRepo = path.join(temporary, 'setup-self');
   for (const dir of ['hooks', 'scripts', 'schemas']) mkdirSync(path.join(selfRepo, dir), { recursive: true });
-  for (const file of ['hooks/install-hooks.sh', 'hooks/pre-commit', 'hooks/pre-push', 'hooks/post-merge', 'scripts/graft.mjs', 'schemas/validation-status.schema.json']) {
+  for (const file of ['hooks/install-hooks.sh', 'hooks/pre-commit', 'hooks/pre-push', 'hooks/post-merge']) {
     writeFileSync(path.join(selfRepo, file), readFileSync(path.join(root, file)));
   }
-  writeFileSync(path.join(selfRepo, 'scripts/validation-gate.mjs'), '// branch runner\n');
+  // 실행기·Graft 갱신·스키마 세 파일 모두 브랜치 것과 설치본 것을 다른 내용으로 두어 어느 쪽을 복사했는지 각각 확인한다.
+  const copied = ['scripts/validation-gate.mjs', 'scripts/graft.mjs', 'schemas/validation-status.schema.json'];
+  for (const file of copied) writeFileSync(path.join(selfRepo, file), `// branch ${file}\n`);
   git(temporary, 'init', '-q', selfRepo);
   const selfHome = path.join(temporary, 'self-home');
   const installSelf = (cwd, ...args) => spawnSync('bash', [path.join(selfRepo, 'hooks/install-hooks.sh'), ...args], { cwd, encoding: 'utf8', env: { ...process.env, HOME: selfHome } });
+  const installed = (file) => path.join(selfHome, '.claude', file);
   rejected(installSelf(selfRepo), /setup\.sh/);
   assert.ok(!existsSync(path.join(selfRepo, '.git/hooks/pre-push')));
-  for (const file of ['scripts/validation-gate.mjs', 'scripts/graft.mjs', 'schemas/validation-status.schema.json']) {
-    mkdirSync(path.dirname(path.join(selfHome, '.claude', file)), { recursive: true });
-    writeFileSync(path.join(selfHome, '.claude', file), file === 'scripts/validation-gate.mjs' ? '// installed runner\n' : readFileSync(path.join(root, file)));
+  for (const file of copied) {
+    mkdirSync(path.dirname(installed(file)), { recursive: true });
+    writeFileSync(installed(file), `// installed ${file}\n`);
   }
+  // 설치본 중 하나라도 없으면 그 파일을 알리고 멈춘다.
+  for (const file of copied) {
+    rmSync(installed(file));
+    rejected(installSelf(selfRepo), new RegExp(file.replace('.', '\\.')));
+    assert.ok(!existsSync(path.join(selfRepo, '.git/hooks/pre-push')));
+    writeFileSync(installed(file), `// installed ${file}\n`);
+  }
+  const assertInstalledCopies = () => {
+    for (const file of copied) {
+      assert.equal(readFileSync(path.join(selfRepo, '.git/hooks/workflow', file), 'utf8'), `// installed ${file}\n`, file);
+    }
+  };
   ok(installSelf(selfRepo));
-  assert.equal(readFileSync(path.join(selfRepo, '.git/hooks/workflow/scripts/validation-gate.mjs'), 'utf8'), '// installed runner\n');
+  assertInstalledCopies();
   git(selfRepo, 'add', '-A');
   git(selfRepo, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'test: self');
   const selfLinked = path.join(temporary, 'setup-self-linked');
   git(selfRepo, 'worktree', 'add', '-qb', 'self-linked', selfLinked);
   rmSync(path.join(selfRepo, '.git/hooks/workflow'), { recursive: true });
   ok(installSelf(selfLinked));
-  assert.equal(readFileSync(path.join(selfRepo, '.git/hooks/workflow/scripts/validation-gate.mjs'), 'utf8'), '// installed runner\n');
+  assertInstalledCopies();
   // 리뷰 정책은 기본 브랜치(origin/HEAD) 의 REVIEW.md 만 쓴다. 브랜치가 바꾼 REVIEW.md·심볼릭 링크는 정책이 아니다.
   const policyFixture = setup => {
     const f = fixture();
