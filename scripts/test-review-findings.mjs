@@ -432,7 +432,13 @@ else { process.stderr.write('unexpected gh ' + args.join(' ')); process.exit(1);
     assert.equal(status({ FAKE_PROTECTION: 'forbidden' }).checks.required_unknown, true);
     // 조회 실패·깨진 응답·꽉 찬 페이지는 모두 '모름' 이고 완료가 아니다
     for (const env of [{ FAKE_RULES: 'fail' }, { FAKE_RULES: 'not json' }, { FAKE_RULES: JSON.stringify(Array.from({ length: 100 }, () => ({ type: 'deletion' }))) },
-      { FAKE_PROTECTION: 'not json' }, { FAKE_PROTECTION: 'null' }]) {
+      { FAKE_PROTECTION: 'not json' }, { FAKE_PROTECTION: 'null' },
+      // 안쪽 모양이 틀린 응답도 '필수 check 없음' 이 아니라 모름이다(finding-c5b8afbc59922ae2)
+      { FAKE_RULES: JSON.stringify([{ type: 'required_status_checks', parameters: {} }]) },
+      { FAKE_RULES: JSON.stringify([{ type: 'required_status_checks', parameters: { required_status_checks: 'ci' } }]) },
+      { FAKE_RULES: JSON.stringify([{ type: 'required_status_checks', parameters: { required_status_checks: [{ context: '' }] } }]) },
+      { FAKE_PROTECTION: '{}' }, { FAKE_PROTECTION: JSON.stringify({ contexts: 'ci' }) },
+      { FAKE_PROTECTION: JSON.stringify({ contexts: [], checks: [{ context: 5 }] }) }]) {
       const r = status(env);
       assert.equal(r.checks.required_unknown, true, JSON.stringify(env));
       assert.equal(r.complete, false, JSON.stringify(env));
