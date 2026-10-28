@@ -81,6 +81,7 @@ function check(data) {
 function ready(data, repo, base) {
   check(data);
   same(capture(repo, base || data.snapshot.base_branch), data.snapshot);
+  samePolicy(repo, data.snapshot.base_sha, data.review_policy);
   if (data.overall === 'FAIL' || data.results['intent-validator'] !== 'PASS') fail('Intent or overall validation failed.');
   for (const name of [...required, ...(data.snapshot.cli_required ? ['cli-validator'] : [])]) {
     if (!['PASS', 'WARN'].includes(data.results[name])) fail(`Required validation did not execute: ${name}`);
@@ -103,6 +104,16 @@ function reviewPolicy(repo, base) {
   return { base_sha: base, source: `${POLICY_FILE}@${base.slice(0, 12)}`, truncated, text };
 }
 
+// What the status records about the policy, so ready can tell a skipped or edited policy step from the real one.
+function policyRecord(policy) {
+  return { source: policy.source, sha256: policy.text === null ? null : createHash('sha256').update(policy.text).digest('hex'), truncated: policy.truncated };
+}
+
+function samePolicy(repo, base, recorded) {
+  const actual = policyRecord(reviewPolicy(repo, base));
+  for (const key of Object.keys(actual)) if (actual[key] !== recorded?.[key]) fail(`Review policy does not match ${POLICY_FILE} at the snapshot base (${key}); rerun the policy step.`);
+}
+
 function save(file, value) {
   mkdirSync(path.dirname(file), { recursive: true });
   const temp = `${file}.${process.pid}.tmp`;
@@ -117,7 +128,7 @@ export function main(args) {
   while (args.length) {
     const arg = args.shift();
     if (arg.startsWith('--')) {
-      if (!['--repo', '--base', '--out', '--snapshot', '--results'].includes(arg) || !args.length || args[0].startsWith('--')) fail(`Invalid option: ${arg}`);
+      if (!['--repo', '--base', '--out', '--snapshot', '--policy', '--results'].includes(arg) || !args.length || args[0].startsWith('--')) fail(`Invalid option: ${arg}`);
       options[arg.slice(2)] = args.shift();
     } else positionals.push(arg);
   }
@@ -126,10 +137,14 @@ export function main(args) {
     if (!options.base || !options.out) fail('snapshot --repo <repo> --base <ref> --out <snapshot.json>');
     save(options.out, { schema_version: 2, started_at: new Date().toISOString(), ...capture(repo, options.base) });
   } else if (mode === 'record') {
-    if (!options.snapshot || !options.results || !options.out) fail('record --snapshot <file> --results <reviews.json> --out <status.json> --repo <repo>');
+    if (!options.snapshot || !options.policy || !options.results || !options.out) fail('record --snapshot <file> --policy <policy.json> --results <reviews.json> --out <status.json> --repo <repo>');
     const snapshot = json(options.snapshot);
     validate(snapshot, schema.$defs.snapshot);
     same(capture(repo, snapshot.base_branch), snapshot);
+    const policy = json(options.policy);
+    if (policy?.base_sha !== snapshot.base_sha) fail('Review policy was read for a different snapshot base; rerun the policy step.');
+    const review_policy = policyRecord({ source: policy.source ?? null, text: policy.text ?? null, truncated: policy.truncated });
+    samePolicy(repo, snapshot.base_sha, review_policy);
     const input = json(options.results);
     if (!input || typeof input !== 'object' || Array.isArray(input)) fail('Expected validator result object.');
     const results = {}, evidence = {};
@@ -140,7 +155,7 @@ export function main(args) {
       results[name] = result.status;
       evidence[name] = result.evidence;
     }
-    const data = { schema_version: 2, timestamp: new Date().toISOString(), snapshot, results, evidence, overall: aggregate(results, []), warnings: [], errors: [] };
+    const data = { schema_version: 2, timestamp: new Date().toISOString(), snapshot, review_policy, results, evidence, overall: aggregate(results, []), warnings: [], errors: [] };
     check(data);
     save(options.out, data);
   } else if (mode === 'policy') {

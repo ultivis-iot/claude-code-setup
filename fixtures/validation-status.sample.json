@@ -13,6 +13,11 @@
     "cli_config_sha256": null,
     "cli_required": false
   },
+  "review_policy": {
+    "source": null,
+    "sha256": null,
+    "truncated": false
+  },
   "results": {
     "intent-validator": "PASS",
     "doc-validator": "WARN",
