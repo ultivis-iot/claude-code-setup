@@ -270,6 +270,24 @@ try {
   git(targeted.repo, 'switch', '-q', 'feature');
   rejected(targeted.invoke('ready', 'tmp/validation-status.json', '--base', 'weak'), /default branch/);
   rejected(recordTargeted(), /default branch/);
+  // 실제 원격 추적 구조: origin/HEAD -> origin/main. 로컬 main 만 움직이면 정책 기준은 그대로이고,
+  // fetch 로 origin/main 이 움직여야 정책을 다시 읽어야 한다(로컬 브랜치와 원격 tip 을 혼동하지 않는다).
+  const tracked = policyFixture(repo => writeFileSync(path.join(repo, 'REVIEW.md'), '# remote policy\n'));
+  git(tracked.repo, 'update-ref', 'refs/remotes/origin/main', 'main');
+  git(tracked.repo, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+  git(tracked.repo, 'switch', '-q', 'main');
+  writeFileSync(path.join(tracked.repo, 'REVIEW.md'), '# local-only policy\n');
+  git(tracked.repo, 'commit', '-qam', 'test: local main moves, not pushed');
+  git(tracked.repo, 'switch', '-q', 'feature');
+  tracked.snapshot();
+  ok(tracked.policy());
+  assert.equal(tracked.readPolicy().text, '# remote policy');
+  assert.equal(tracked.readPolicy().base_sha, git(tracked.repo, 'rev-parse', 'refs/remotes/origin/main'));
+  writeJson(path.join(tracked.repo, 'tmp/results.json'), tracked.results);
+  ok(tracked.invoke('record', '--snapshot', 'tmp/snapshot.json', '--policy', 'tmp/review-policy.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json'));
+  ok(tracked.invoke('ready', 'tmp/validation-status.json', '--base', 'main'));
+  git(tracked.repo, 'update-ref', 'refs/remotes/origin/main', 'main');  // fetch 가 원격의 새 tip 을 가져온 상태
+  rejected(tracked.invoke('ready', 'tmp/validation-status.json', '--base', 'main'), /default branch|stale/);
   // 기본 브랜치를 모르면 대상 브랜치로 대신하지 않고 멈춘다.
   const headless = policyFixture(() => {});
   git(headless.repo, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
