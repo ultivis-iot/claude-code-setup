@@ -6,13 +6,14 @@
 //
 // 결과는 {tier, questions, lines, files, reasons} JSON 이다. 질문 수는 최소값이다. agent 는 늘릴 수 있지만
 // 줄이지 않는다. 가장 높은 분류를 쓴다(최대 5).
-// - docs: 최상위 README·CHANGELOG·LICENSE 와 docs/(docs/references/ 제외)의 텍스트 문서(.md·.txt·.rst, 확장자 없음)만 바뀜
+// - docs: 최상위 README·CHANGELOG·LICENSE(확장자 없음·.md·.txt·.rst)와 docs/(docs/references/ 제외)의 .md·.txt·.rst 만 바뀜
 //   → 0(브리프만)
 // - code: 그 밖의 파일. agent 가 읽는 참조 문서·명령·스킬·템플릿도 동작을 정하므로 여기 든다
 //   → 1, 바뀐 줄이 150 을 넘으면 +1, 파일이 5 개를 넘으면 +1
-// - sensitive: 어느 깊이든(디렉터리 이름 포함) 검증·리뷰 게이트, 설치·설정, hook, 스키마, agent 정의, 에이전트·CI·패키지
-//   설정, 사용자 설정에 설치되는 지시문(CLAUDE.md·templates/global-claude.md), 자격 증명·환경 파일, 인증·비밀·권한·토큰·
-//   마이그레이션 경로 → 4, 바뀐 줄이 300 을 넘으면 5
+// - sensitive: 어느 깊이든(디렉터리 이름 포함) 아래 SENSITIVE 의 경로 → 4, 바뀐 줄이 300 을 넘으면 5. 검증·리뷰 게이트, 설치·
+//   설정·배포, hook, 스키마, agent 정의, 에이전트·CI·패키지·컨테이너 설정, 사용자 설정에 설치되는 지시문(CLAUDE.md·
+//   templates/global-claude.md), 환경·키 파일, 인증·비밀·권한·토큰·마이그레이션 이름이다. 이 밖의 위험(세션·암호화 코드 등)은
+//   이름으로 다 알 수 없다.
 // 이름을 바꾼 파일은 이전 경로로도 분류한다. 생성본(codex/plugins/dev-workflow/{skills,commands}/)은 같은 PR 에서
 // 원본도 바뀌었을 때 분류·파일 수에서 빼지만 바뀐 줄로는 센다.
 // 이 도구는 이해 확인 질문의 최소 개수를 정할 뿐 보안 게이트가 아니다. 경로 이름만 보므로 내용이나 파일 모드(심볼릭 링크 등)의
@@ -23,11 +24,18 @@ import { fileURLToPath } from "node:url";
 
 const CODE_LINES = 150, CODE_FILES = 5, SENSITIVE_LINES = 300;
 const SENSITIVE = new RegExp([
-  "(^|/)(hooks|schemas|agents|\\.github|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
-  "(^|/)(setup|install|installer|gate)(s?)([/._-]|$)",
+  // hook·스키마·agent 정의·CI·에이전트 설정 디렉터리
+  "(^|/)(hooks|schemas|agents|\\.github|\\.circleci|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
+  // 설치·설정·게이트·배포 (디렉터리 이름이나 파일 이름의 앞부분)
+  "(^|/)(setup|install|installer|gates?|deploy|release)s?([/._-]|$)",
+  // 이 저장소의 검증·리뷰 도구와 Notion 자격 증명을 다루는 스크립트(새로 만들면 여기에 더한다)
   "(^|/)(validation-gate|review[-_]findings|merge-brief|verify-workflow|sync-workflow|graft|ult-notion|ult-flow|notion|review-cycle-ralph-loop)\\.[^/]*$",
-  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|claude\\.md|global-claude\\.md)$",
-  "(^|[/._-])(auth|authn|authz|authentication|oauth|secrets?|permissions?|tokens?|migrations?|credentials?|passwords?|apikeys?|keychain)([/._-]|$)",
+  // 패키지·빌드·CI·컨테이너 설정, 환경 파일, 사용자 설정에 설치되는 지시문
+  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|dockerfile|docker-compose[^/]*|\\.gitlab-ci\\.ya?ml|claude\\.md|global-claude\\.md)$",
+  // 키 파일
+  "(\\.(pem|key)|(^|/)id_(rsa|ed25519|ecdsa)[^/]*)$",
+  // 인증·비밀·권한·자격 증명 단어
+  "(^|[/._-])(auth|authn|authz|authentication|oauth|jwt|secrets?|permissions?|tokens?|migrations?|credentials?|passwords?|api[-_]?keys?|keychain)([/._-]|$)",
 ].join("|"), "i");
 const DOCS = /^(README|CHANGELOG|LICENSE)(\.(md|txt|rst))?$/i;
 const TEXT_DOC = /\.(md|txt|rst)$/i;
@@ -54,6 +62,7 @@ export function classify(files) {
   const copyOfChangedSource = (path) => GENERATED.some(([copy, source]) => path.startsWith(copy) && changed.has(source + path.slice(copy.length)));
   const counted = files.filter((f) => !copyOfChangedSource(f.path))
     .map((f) => ({ path: f.path, lines: f.additions + f.deletions, category: highest([f.path, f.previous_path]) }));
+  // 생성본 줄도 센다. 그래서 lines 는 files[].lines 의 합보다 클 수 있다.
   const lines = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);
   const of = (name) => counted.filter((f) => f.category === name).map((f) => f.path);
   const sensitive = of("sensitive"), code = of("code");

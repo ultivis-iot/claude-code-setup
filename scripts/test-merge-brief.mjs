@@ -63,7 +63,8 @@ check('validation, install, hook and permission paths ask four, five when large'
     'scripts/install/run.mjs', 'scripts/installer/run.sh', 'scripts/setup/x.sh', 'scripts/gate/run.mjs', 'src/authentication/x.ts', 'src/oauth.ts', 'src/authn/x.ts', 'src/authz/x.ts',
     '.env', 'config/.env.production', 'src/credentials.json', 'src/apikey.ts', 'src/password.ts', 'src/keychain.ts',
     '.husky/pre-commit', 'package.json', '.npmrc', 'Makefile', 'scripts/ult-flow.mjs', 'scripts/review-cycle-ralph-loop.mjs', 'scripts/review_findings.mjs',
-    'templates/global-claude.md', 'CLAUDE.md']) {
+    'templates/global-claude.md', 'CLAUDE.md',
+    '.gitlab-ci.yml', '.circleci/config.yml', 'Dockerfile', 'docker-compose.yml', 'server.key', 'scripts/x.pem', 'src/ssh/id_rsa', 'src/api-key.ts', 'src/jwt.ts', 'scripts/deploy.sh', 'scripts/release.sh']) {
     const r = classify([file(p)]);
     assert.equal(r.tier, 'sensitive', p);
     assert.equal(r.questions, 4, p);
