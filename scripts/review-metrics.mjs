@@ -229,6 +229,14 @@ export function gitChangedNear() {
   };
 }
 
+// git remote origin 주소(https·ssh)에서 owner/name. 알 수 없으면 null.
+export function originSlug(cwd = process.cwd()) {
+  const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf8" });
+  if (r.status !== 0) return null;
+  const m = r.stdout.trim().match(/[/:]([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/);
+  return m ? `${m[1]}/${m[2]}` : null;
+}
+
 function readLedger(pr) {
   const f = join(repoRoot(), "tmp", `review-findings-${pr}.json`);
   if (!existsSync(f)) return { decisions: {} };
@@ -254,8 +262,8 @@ function main() {
     if (!opt.pr || !/^\d+(,\d+)*$/.test(opt.pr)) fail("--pr <번호[,번호...]> 가 필요합니다");
     if (opt.repo !== undefined && !(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(opt.repo) && opt.repo.split("/").every((p) => p !== "." && p !== ".."))) fail("--repo 는 owner/name 형식입니다");
     // 처리 기록과 git 이력은 지금 checkout 의 것이다. 다른 저장소를 집계하면 섞지 않고 모름·미판정으로 둔다.
-    const local = spawnSync("gh", ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"], { encoding: "utf8", windowsHide: true });
-    const localSlug = local.status === 0 ? local.stdout.trim() : null;
+    // gh repo view 는 GH_REPO 환경변수를 따르므로 지금 checkout 의 origin 주소에서 직접 읽는다.
+    const localSlug = originSlug();
     const slug = opt.repo || localSlug || fail("저장소를 알 수 없습니다. --repo owner/name 을 주세요");
     const sameRepo = localSlug !== null && slug.toLowerCase() === localSlug.toLowerCase();
     if (!sameRepo) process.stderr.write(`경고: ${slug} 는 지금 checkout(${localSlug || "알 수 없음"})이 아니라 처리 기록과 git 비교를 쓰지 않습니다(미판정·모름으로 셉니다).\n`);
