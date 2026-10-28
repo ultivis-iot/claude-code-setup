@@ -65,7 +65,15 @@ check('a block quoted inside the report body is not the bot block', () => {
   assert.equal(parseBlock(fenced('```\n``` js')), null);
   assert.equal(parseBlock(fenced('```').replace(/\n/g, '\r\n')), null);
   // CR 만 쓴 줄바꿈, 펜스 뒤의 U+2028·U+2029 도 펜스를 숨기지 못한다.
-  for (const fence of ['```\rquoted', '~~~\r', '``` x', '``` x']) assert.equal(parseBlock(fenced(fence)), null, JSON.stringify(fence));
+  for (const fence of ['```\rquoted', '~~~\r', '```\u2028x', '```\u2029x']) assert.equal(parseBlock(fenced(fence)), null, JSON.stringify(fence));
+  // 닫는 펜스 뒤에는 공백·탭만 올 수 있다. NBSP·U+2028·U+2029·VT·BOM 이 붙은 줄은 펜스를 닫지 않는다(LF·CRLF).
+  for (const closer of ['```\u00a0', '```\u2028', '```\u2029', '```\u000b', '```\ufeff']) {
+    for (const body of [fenced(`\`\`\`\n${closer}`), fenced(`\`\`\`\n${closer}`).replace(/\n/g, '\r\n')]) {
+      assert.equal(parseBlock(body), null, JSON.stringify(closer));
+      assert.notEqual(judge({ headSha: HEAD, comments: [bot(1, 't', body)] }).state, 'clear');
+    }
+  }
+  assert.equal(parseBlock(fenced('```\n``` \t')).head_sha, HEAD);
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`\`\`\ncode\n\`\`\`\n<!-- ocr-review:v1 ${quoted} -->\n</details>`).head_sha, HEAD);
   const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
   assert.equal(r.complete, false);
