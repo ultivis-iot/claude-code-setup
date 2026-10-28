@@ -5,7 +5,7 @@
 //   node review-metrics.mjs --input <file> [--json]      (테스트용: {prs: [{pr, comments, ledger}]})
 //
 // 입력은 PR 코멘트의 <!-- ocr-review:v1 --> 블록과 review-findings.mjs record 가 남긴 처리 기록
-// (tmp/review-findings-<PR>.json)이다. 읽기만 한다.
+// (tmp/review-findings-<PR>.json, 로컬 파일)이다. 읽기만 한다. 블록이 없거나 깨진 보고서는 세지 않는다.
 // - 지적은 id·별칭으로 라운드를 넘어 같은 원인으로 묶는다.
 // - 라운드는 리뷰한 HEAD 수다. 같은 HEAD 를 다시 리뷰한 보고서는 마지막 것을 쓴다.
 // - 2라운드부터의 새 지적이 이미 리뷰한 코드에서 나왔는지: 바뀐 부분만 리뷰한 라운드는 블록의
@@ -25,6 +25,21 @@ const count = (items, key) => items.reduce((acc, item) => {
   return acc;
 }, {});
 const isActive = (f) => f.status !== "resolved" && f.verification !== "rejected" && f.provenance !== "pre_existing";
+
+// 지적이 직전 HEAD 이후 바뀐 줄 근처인가. 위치 하나라도 근처면 true, 아니면 모르는 위치가 있으면 null, 모두 밖이면 false.
+function nearness(report, finding, changedNear) {
+  // 바뀐 부분만 리뷰한 라운드는 바뀐 줄 근처 지적만 남긴다
+  if (report.review_mode === "incremental") return true;
+  const locations = Array.isArray(finding.locations) ? finding.locations : [];
+  if (!locations.length) return null;
+  let unknown = false;
+  for (const location of locations) {
+    const near = changedNear(report.parent_head_sha, report.head_sha, location);
+    if (near === true) return true;
+    if (near === null) unknown = true;
+  }
+  return unknown ? null : false;
+}
 
 /**
  * PR 하나의 지표. changedNear(parent, head, location) 은 위치가 parent..head 사이에 바뀐 줄 ±3 안이면 true,
@@ -58,10 +73,7 @@ export function summarize({ pr, comments, ledger = { decisions: {} }, bot = DEFA
           fresh++;
           if (index > 0) {
             later.new++;
-            const near = report.review_mode === "incremental"
-              ? true  // 바뀐 부분만 리뷰한 라운드는 바뀐 줄 근처 지적만 남긴다
-              : (Array.isArray(f.locations) && f.locations.length ? f.locations : [null]).map((l) => (l ? changedNear(report.parent_head_sha, report.head_sha, l) : null)).reduce(
-                (acc, v) => (acc === true || v === true ? true : acc === null || v === null ? null : false), false);
+            const near = nearness(report, f, changedNear);
             if (near === true) later.changed_code++;
             else if (near === false) later.earlier_code++;
             else later.unknown++;
@@ -177,11 +189,14 @@ function repoRoot() {
   return r.status === 0 ? r.stdout.trim() : process.cwd();
 }
 
+const SHA = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/;
+
 // parent..head 사이에 바뀐 head 쪽 줄. 커밋이 로컬에 없으면 null.
-function gitChangedNear() {
+// SHA 는 리뷰 봇이 쓴 블록에서 오므로 형식을 확인한다('--output=<경로>' 같은 값이 git 옵션으로 읽히지 않게).
+export function gitChangedNear() {
   const cache = new Map();
   return (parent, head, location) => {
-    if (!parent || !head || typeof location?.file !== "string" || !Number.isInteger(location.line)) return null;
+    if (!SHA.test(String(parent)) || !SHA.test(String(head)) || typeof location?.file !== "string" || !Number.isInteger(location.line)) return null;
     const key = `${parent}\0${head}\0${location.file}`;
     if (!cache.has(key)) {
       const r = spawnSync("git", ["diff", "-U0", "--no-color", "--no-ext-diff", parent, head, "--", location.file], { encoding: "utf8" });
@@ -216,14 +231,15 @@ function main() {
     if (!["--pr", "--repo", "--bot", "--input"].includes(key) || i + 1 >= args.length) fail(`알 수 없는 옵션이거나 값이 없습니다: ${key}`);
     opt[key.slice(2)] = args[++i];
   }
+  if (opt.bot !== undefined && !/^[A-Za-z0-9-]+(\[bot\])?$/.test(opt.bot)) fail("--bot 은 GitHub 로그인입니다");
   let summaries;
   if (opt.input) {
-    const data = JSON.parse(readFileSync(opt.input, "utf8"));
+    let data;
+    try { data = JSON.parse(readFileSync(opt.input, "utf8")); } catch (e) { fail(`${opt.input} 를 읽을 수 없습니다: ${e.message}`); }
     summaries = (data.prs || []).map((p) => summarize({ pr: p.pr, comments: p.comments || [], ledger: p.ledger, bot: opt.bot || DEFAULT_BOT }));
   } else {
     if (!opt.pr || !/^\d+(,\d+)*$/.test(opt.pr)) fail("--pr <번호[,번호...]> 가 필요합니다");
     if (opt.repo !== undefined && !(/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(opt.repo) && opt.repo.split("/").every((p) => p !== "." && p !== ".."))) fail("--repo 는 owner/name 형식입니다");
-    if (opt.bot !== undefined && !/^[A-Za-z0-9-]+(\[bot\])?$/.test(opt.bot)) fail("--bot 은 GitHub 로그인입니다");
     const slug = opt.repo || gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
     const changedNear = gitChangedNear();
     summaries = opt.pr.split(",").map(Number).map((pr) => {

@@ -2,11 +2,11 @@
 // review-metrics.mjs (기계 리뷰 지표 집계) 테스트. 네트워크·gh 불필요.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregate, formatMarkdown, summarize } from './review-metrics.mjs';
+import { aggregate, formatMarkdown, gitChangedNear, summarize } from './review-metrics.mjs';
 
 const tool = path.join(path.dirname(fileURLToPath(import.meta.url)), 'review-metrics.mjs');
 let count = 0;
@@ -96,6 +96,12 @@ check('blocks pasted by other accounts are ignored', () => {
   assert.equal(s.findings.total, 6);
 });
 
+check('a decision recorded only under an alias counts for its cause', () => {
+  const s = summarize({ pr: 7, comments, ledger: { decisions: { 'f-b2': { decision: 'wrong' } } }, changedNear });
+  assert.equal(s.human.wrong, 1);
+  assert.equal(s.human.undecided, 5);
+});
+
 check('a PR without bot reports is counted as not reviewed', () => {
   const s = summarize({ pr: 8, comments: [bot(1, 't', 'hello')], ledger: { decisions: {} } });
   assert.equal(s.rounds, 0);
@@ -128,10 +134,55 @@ try {
     assert.equal(out.total.findings.total, 6);
     assert.equal(out.prs[0].later_rounds.unknown, 3);  // --input 에는 git 비교가 없어 전체 리뷰 라운드는 모름
   });
+  // 블록의 SHA 는 리뷰 봇이 쓴 값이다. git 옵션처럼 보이는 값은 git 에 넘기지 않는다(--output 으로 파일을 쓰지 못하게).
+  check('block SHAs that look like git options are never passed to git', () => {
+    const victim = path.join(dir, 'victim.txt');
+    writeFileSync(victim, 'keep\n');
+    const near = gitChangedNear();
+    assert.equal(near(`--output=${victim}`, 'a'.repeat(40), { file: 'x', line: 1 }), null);
+    assert.equal(near('a'.repeat(40), `--output=${victim}`, { file: 'x', line: 1 }), null);
+    assert.equal(readFileSync(victim, 'utf8'), 'keep\n');
+  });
+  // 실제 git 저장소로 바뀐 줄 ±3 경계를 확인한다(전체 리뷰 라운드의 이전 코드 판정이 여기서 나온다).
+  check('git changed-line check uses a three-line margin around changed hunks', () => {
+    const repo = path.join(dir, 'repo');
+    const git = (...a) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: repo, encoding: 'utf8' });
+    mkdirSync(repo, { recursive: true });
+    git('init', '-q');
+    writeFileSync(path.join(repo, 'a.mjs'), Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n') + '\n');
+    git('add', '-A'); git('commit', '-qm', 'base');
+    const parent = git('rev-parse', 'HEAD').stdout.trim();
+    writeFileSync(path.join(repo, 'a.mjs'), Array.from({ length: 30 }, (_, i) => (i + 1 === 15 ? 'changed' : `line ${i + 1}`)).join('\n') + '\n');
+    git('commit', '-qam', 'change line 15');
+    const head = git('rev-parse', 'HEAD').stdout.trim();
+    const cwd = process.cwd();
+    process.chdir(repo);
+    try {
+      const near = gitChangedNear();
+      assert.equal(near(parent, head, { file: 'a.mjs', line: 12 }), true);
+      assert.equal(near(parent, head, { file: 'a.mjs', line: 18 }), true);
+      assert.equal(near(parent, head, { file: 'a.mjs', line: 11 }), false);
+      assert.equal(near(parent, head, { file: 'a.mjs', line: 19 }), false);
+      assert.equal(near(parent, 'f'.repeat(40), { file: 'a.mjs', line: 15 }), null);  // 로컬에 없는 커밋
+    } finally {
+      process.chdir(cwd);
+    }
+  });
   check('cli rejects bad arguments', () => {
+    const bad = path.join(dir, 'bad.json');
+    writeFileSync(bad, '{');
+    const r = spawnSync(process.execPath, [tool, '--input', bad], { encoding: 'utf8' });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /읽을 수 없습니다/);
+    const badBot = spawnSync(process.execPath, [tool, '--input', bad, '--bot', 'a;b'], { encoding: 'utf8' });
+    assert.equal(badBot.status, 1);
+    assert.match(badBot.stderr, /--bot 은 GitHub 로그인/);
     assert.equal(spawnSync(process.execPath, [tool], { encoding: 'utf8' }).status, 1);
     assert.equal(spawnSync(process.execPath, [tool, '--pr', '7;rm'], { encoding: 'utf8' }).status, 1);
-    assert.equal(spawnSync(process.execPath, [tool, '--pr', '7', '--repo', '../x'], { encoding: 'utf8' }).status, 1);
+    const badRepo = spawnSync(process.execPath, [tool, '--pr', '7', '--repo', '../x'], { encoding: 'utf8' });
+    assert.equal(badRepo.status, 1);
+    assert.match(badRepo.stderr, /--repo 는 owner\/name/);
+    assert.match(spawnSync(process.execPath, [tool, '--pr', '7;rm'], { encoding: 'utf8' }).stderr, /--pr/);
   });
 } finally {
   rmSync(dir, { recursive: true, force: true });
