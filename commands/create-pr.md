@@ -9,7 +9,7 @@ argument-hint: [directory] [-b target-branch]
 입력은 `$ARGUMENTS`다. 디렉터리와 `-b <target>`을 해석한다.
 
 실행 전에 `~/.claude/docs/references/create-pr-contract.md`를 읽고 그 절차를 따른다.
-설정 저장소에서 직접 사용하는 경우에는 저장소의 같은 문서를 사용한다.
+설정 저장소에서도 설치본의 계약과 실행기를 쓴다(저장소의 사본은 리뷰 대상).
 검증 실행기의 `ready` 실패 시 push/PR을 수행하지 않는다.
 
 완료 시 PR URL, 명시적으로 사용한 base, 검증한 HEAD를 보고한다.
