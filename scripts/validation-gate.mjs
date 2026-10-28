@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Shared local validation contract; does not push or create PRs.
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, mkdirSync, realpathSync, renameSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -94,7 +94,8 @@ const POLICY_FILE = 'REVIEW.md';
 const MAX_POLICY_CHARS = 8000;
 const MAX_POLICY_BYTES = 1024 * 1024;
 function reviewPolicy(repo, base) {
-  const entry = git(repo, 'ls-tree', base, '--', POLICY_FILE);
+  // --full-tree: the path is the repository root's REVIEW.md even when --repo is a subdirectory.
+  const entry = git(repo, 'ls-tree', '--full-tree', base, '--', POLICY_FILE);
   // Only a regular file: a symlink would point the policy at a file the branch is free to edit.
   if (!/^100(644|755) blob /.test(entry)) return { base_sha: base, source: null, truncated: false, text: null };
   if (Number(git(repo, 'cat-file', '-s', `${base}:${POLICY_FILE}`)) > MAX_POLICY_BYTES) fail(`${POLICY_FILE} is larger than ${MAX_POLICY_BYTES} bytes.`);
@@ -106,8 +107,8 @@ function reviewPolicy(repo, base) {
 }
 
 function policyBase(repo) {
-  const head = spawnSync('git', ['-C', repo, 'symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], { encoding: 'utf8' });
-  if (head.status !== 0) fail('origin/HEAD is not set, so the default branch is unknown; run `git remote set-head origin --auto`.');
+  try { git(repo, 'symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'); }
+  catch { fail('origin/HEAD is not set, so the default branch is unknown; run `git remote set-head origin --auto`.'); }
   return git(repo, 'rev-parse', '--verify', 'refs/remotes/origin/HEAD^{commit}');
 }
 
