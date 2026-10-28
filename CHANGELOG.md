@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 머지 전 이해 확인 추가. agent 에게 위임한 변경을 사람이 이해하지 못한 채 머지하는 부채를 줄이려고, 머지 요청 시 최종 HEAD 기준 변경 브리프와 변경 범위에 따른 이해 확인 질문(0~5개)을 거치고 PR 코멘트로 기록한다(`docs/references/merge-readiness.md`). 질문 수는 새 `scripts/merge-brief.mjs tier` 가 바뀐 파일 경로·줄 수로 정한다. PR 본문 필수 항목에 바뀐 불변식·결정, 검사가 놓칠 수 있는 것을 더했다. 전역 CLAUDE.md 템플릿에 머지 원칙 한 줄 추가.
+
 ## v1.2.1 (2026-10-28)
 
 - README 에 기계 리뷰 진행 표시(`ai-review` commit status)와 리뷰가 도는 이벤트(열기·push·ready·다시 열기)를 적었다. 리뷰 브리지 패치 0019 와 n8n PR Review 워크플로 변경(브리지 직접 호출로 Notion Member DB 에 없는 작성자도 리뷰, `ready_for_review`·`reopened` 이벤트, 재시도, 파싱 실패 시 빈 보고서를 게시하지 않음)이 운영에 반영됐다(A0-3).

@@ -81,13 +81,14 @@ else
 fi
 
 check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"
-for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs review-findings.mjs review-metrics.mjs install-settings.mjs; do
+for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs review-findings.mjs review-metrics.mjs merge-brief.mjs install-settings.mjs; do
     check_file "$WORKFLOW_ROOT/scripts/$node_script"
     node --check "$WORKFLOW_ROOT/scripts/$node_script"
 done
 check_file "$WORKFLOW_ROOT/schemas/validation-status.schema.json"
 check_file "$WORKFLOW_ROOT/docs/references/validation-contract.md"
 check_file "$WORKFLOW_ROOT/docs/references/create-pr-contract.md"
+check_file "$WORKFLOW_ROOT/docs/references/merge-readiness.md"
 check_file "$WORKFLOW_ROOT/templates/cli-sync.json"
 check_file "$WORKFLOW_ROOT/templates/REVIEW.md"
 
@@ -97,6 +98,7 @@ if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/test-install-settings.mjs"
     node "$WORKFLOW_ROOT/scripts/test-review-findings.mjs"
     node "$WORKFLOW_ROOT/scripts/test-review-metrics.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-merge-brief.mjs"
     node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"

@@ -24,6 +24,7 @@ This is the lifecycle baseline when selected or required by repository instructi
 - For commit and validation behavior, read [references/commit-and-verify.md](references/commit-and-verify.md).
 - For PR creation, read [references/create-pr.md](references/create-pr.md).
 - For AI review handling, read [references/review-cycle.md](references/review-cycle.md).
+- For merging a PR, read [references/merge-readiness.md](references/merge-readiness.md).
 - For issue lookup and Ultivis/Notion task support, read [references/ult-notion.md](references/ult-notion.md).
 
 Load only the reference that matches the user's current request.

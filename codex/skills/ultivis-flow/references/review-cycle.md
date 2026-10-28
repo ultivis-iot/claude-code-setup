@@ -58,7 +58,7 @@ When the same kind of finding keeps coming back across PRs (especially `wrong` o
 
 ## Story-based PRs
 
-- For Task PRs, the base branch is `dev` or the repository default branch. Rerun review-cycle until AI review and CI are clear, then merge into the target base branch.
+- For Task PRs, the base branch is `dev` or the repository default branch. Rerun review-cycle until AI review and CI are clear. Completion is not a merge: before merging into the target base branch, follow [merge-readiness.md](merge-readiness.md) and merge only on the user's explicit request.
 - Do not create Story PRs. After all Task PRs are merged, run Story-level integration validation.
 - If Task PR feedback is Story-wide or belongs to another Task, do not expand the Task PR. Record it in `tmp/story-handoff.md` and the Notion Story.
 - After each Task PR merge, update the Story handoff before starting dependent Tasks.
