@@ -143,6 +143,7 @@ export function main(args) {
     same(capture(repo, snapshot.base_branch), snapshot);
     const policy = json(options.policy);
     if (policy?.base_sha !== snapshot.base_sha) fail('Review policy was read for a different snapshot base; rerun the policy step.');
+    if (policy.text !== null && typeof policy.text !== 'string') fail('Review policy text must be a string or null; rerun the policy step.');
     const review_policy = policyRecord({ source: policy.source ?? null, text: policy.text ?? null, truncated: policy.truncated });
     samePolicy(repo, snapshot.base_sha, review_policy);
     const input = json(options.results);

@@ -186,6 +186,10 @@ try {
   absent.snapshot();
   assert.match(ok(absent.policy()), /Review policy: none/);
   assert.deepEqual(absent.readPolicy(), { base_sha: git(absent.repo, 'rev-parse', 'main'), source: null, truncated: false, text: null });
+  const empty = policyFixture(repo => writeFileSync(path.join(repo, 'REVIEW.md'), '  \n\n'));
+  empty.snapshot();
+  assert.match(ok(empty.policy()), /Review policy: none/);
+  assert.equal(empty.readPolicy().text, null);
   const linkedPolicy = policyFixture(repo => { writeFileSync(path.join(repo, 'target.md'), '# via link\n'); symlinkSync('target.md', path.join(repo, 'REVIEW.md')); });
   linkedPolicy.snapshot();
   ok(linkedPolicy.policy());
@@ -218,6 +222,8 @@ try {
   rejected(recordWith('--policy', 'tmp/review-policy.json'), /does not match/);
   writeJson(policyFile, { ...realPolicy, base_sha: '0'.repeat(40) });
   rejected(recordWith('--policy', 'tmp/review-policy.json'), /different snapshot base/);
+  writeJson(policyFile, { ...realPolicy, text: ['# bound policy'] });
+  rejected(recordWith('--policy', 'tmp/review-policy.json'), /string or null/);
   writeJson(policyFile, realPolicy);
   ok(recordWith('--policy', 'tmp/review-policy.json'));
   assert.equal(bound.readStatus().review_policy.source, realPolicy.source);

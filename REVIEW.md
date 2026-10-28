@@ -18,9 +18,9 @@
 
 ## 건너뛸 것
 
-결함을 찾지 않아도 되는 경로다. 변경 목록에서 빼지는 않는다.
+결함을 찾지 않아도 되는 경로다. 변경 목록에서 빼지는 않는다. 보안 검증에는 적용하지 않는다.
 
-- `codex/plugins/dev-workflow/` — 생성본이다. 원본(`commands/`·`codex/skills/` 등)과 일치하는지는 `node scripts/sync-workflow.mjs --check` 가 맡는다.
+- `codex/plugins/dev-workflow/skills/`·`codex/plugins/dev-workflow/commands/` — 생성본이다. 원본(`codex/skills/`·`commands/`)과 일치하는지는 `node scripts/sync-workflow.mjs --check` 가 맡는다. 같은 디렉터리의 `.codex-plugin/plugin.json` 같은 다른 파일은 원본이 없으므로 리뷰한다.
 - `tmp/`, `CHANGELOG.md` 의 문체.
 
 ## Nit
