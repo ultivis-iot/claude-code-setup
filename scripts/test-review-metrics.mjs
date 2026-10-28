@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { aggregate, formatMarkdown, gitChangedNear, summarize } from './review-metrics.mjs';
+import { aggregate, formatMarkdown, gitChangedNear, originSlug, summarize } from './review-metrics.mjs';
 
 const tool = path.join(path.dirname(fileURLToPath(import.meta.url)), 'review-metrics.mjs');
 let count = 0;
@@ -205,12 +205,13 @@ try {
     const work = path.join(dir, 'work');
     mkdirSync(path.join(work, 'tmp'), { recursive: true });
     spawnSync('git', ['init', '-q'], { cwd: work });
+    spawnSync('git', ['remote', 'add', 'origin', 'https://github.com/o/local.git'], { cwd: work });
     writeFileSync(path.join(work, 'tmp', 'review-findings-7.json'), JSON.stringify(ledger));
     const bin = path.join(dir, 'bin');
     mkdirSync(bin, { recursive: true });
     writeFileSync(path.join(bin, 'gh'), `#!${process.execPath}
 const args = process.argv.slice(2);
-if (args[0] === 'repo') process.stdout.write('o/local\\n');
+if (args[0] === 'repo') process.stdout.write((process.env.GH_REPO || 'o/local') + '\\n');
 else if (args[0] === 'api') for (const c of ${JSON.stringify(comments)}) process.stdout.write(JSON.stringify(c) + '\\n');
 else process.exit(1);
 `, { mode: 0o755 });
@@ -221,9 +222,23 @@ else process.exit(1);
     const other = run('--repo', 'o/other');
     assert.equal(other.status, 0, other.stderr);
     assert.match(other.stderr, /처리 기록과 git 비교를 쓰지 않습니다/);
+    // gh 의 GH_REPO 가 다른 저장소를 가리켜도 checkout 은 origin 주소로 판단한다
+    const spoofed = spawnSync(process.execPath, [tool, '--pr', '7', '--json', '--repo', 'o/other'], { cwd: work, encoding: 'utf8', env: { ...process.env, GH_REPO: 'o/other', PATH: bin + path.delimiter + process.env.PATH } });
+    assert.equal(JSON.parse(spoofed.stdout).prs[0].human.undecided, 6);
     const out = JSON.parse(other.stdout).prs[0];
     assert.equal(out.human.undecided, 6);
     assert.equal(out.later_rounds.earlier_code + out.later_rounds.changed_code, 1);  // 바뀐 부분만 리뷰한 라운드의 1건만
+  });
+  check('origin slug is read from https and ssh remotes', () => {
+    const r = path.join(dir, 'slug');
+    mkdirSync(r, { recursive: true });
+    spawnSync('git', ['init', '-q'], { cwd: r });
+    assert.equal(originSlug(r), null);
+    for (const [url, slug] of [['https://github.com/ultivis-iot/claude-code-setup.git', 'ultivis-iot/claude-code-setup'], ['git@github.com:o/r.git', 'o/r'], ['https://github.com/o/r', 'o/r']]) {
+      spawnSync('git', ['remote', 'remove', 'origin'], { cwd: r });
+      spawnSync('git', ['remote', 'add', 'origin', url], { cwd: r });
+      assert.equal(originSlug(r), slug, url);
+    }
   });
   check('cli rejects bad arguments', () => {
     const bad = path.join(dir, 'bad.json');
