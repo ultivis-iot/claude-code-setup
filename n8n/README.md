@@ -10,7 +10,7 @@
 | `Webhook _ Notion to Github (Issue).json` | Notion 버튼 클릭 | Task 정보 → Github Issue 생성/업데이트 | Task의 Issue URL |
 | `Webhook _ Github to Notion (Create a branch).json` | Github webhook: branch create | 브랜치 ↔ Task 매칭, Status 진행 중 전환 | Task, Commit |
 | `Webhook _ Github to Notion (Commit).json` | Github webhook: push | Commit DB에 행 추가, Task 자동 연결 | Commit |
-| `Webhook _ Github to Notion (PR Create _ Synchronize).json` | Github webhook: PR opened/updated | Task → AI검토중, Claude Code 서브워크플로우 호출, PR 코멘트 | Task |
+| `Webhook _ Github to Notion (PR Create _ Synchronize).json` | Github webhook: PR opened/synchronize/ready_for_review/reopened | Task → AI검토중, Claude Code 서브워크플로우 호출, PR 코멘트 | Task |
 | `Webhook _ Github to Notion (PR Evaluation).json` | Github webhook: PR closed | merged → 완료 / 그냥 닫힘 → 미완료 | Task |
 
 ## 자동 상태 전이
@@ -19,7 +19,7 @@
 시작 전
   ↓ (브랜치 생성)
 진행 중
-  ↓ (PR opened)
+  ↓ (PR opened·synchronize·ready_for_review·reopened)
 AI검토중  ← Claude Code 서브워크플로우가 자동 코드 리뷰 → Github PR 코멘트
   ↓ (PR closed)
 완료 (merged) / 미완료 (closed without merge)

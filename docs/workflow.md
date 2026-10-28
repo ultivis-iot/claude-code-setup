@@ -315,7 +315,7 @@ dw <target>
 |---|---|
 | 브랜치 생성 | Task → `진행 중` |
 | push | Commit DB 적재 |
-| PR opened | Task → `AI검토중` + Claude Code AI 리뷰 |
+| PR opened·push·ready_for_review·reopened | Task → `AI검토중` + AI 리뷰 |
 | PR merged/closed | Task → `완료` / `미완료` |
 
 파일 export는 `n8n/` 디렉토리 참고.
