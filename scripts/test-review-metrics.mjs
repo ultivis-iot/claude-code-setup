@@ -234,7 +234,8 @@ else process.exit(1);
     mkdirSync(r, { recursive: true });
     spawnSync('git', ['init', '-q'], { cwd: r });
     assert.equal(originSlug(r), null);
-    for (const [url, slug] of [['https://github.com/ultivis-iot/claude-code-setup.git', 'ultivis-iot/claude-code-setup'], ['git@github.com:o/r.git', 'o/r'], ['https://github.com/o/r', 'o/r']]) {
+    for (const [url, slug] of [['https://github.com/ultivis-iot/claude-code-setup.git', 'ultivis-iot/claude-code-setup'], ['git@github.com:o/r.git', 'o/r'], ['https://github.com/o/r', 'o/r'],
+      ['ssh://git@github.com/o/r.git', 'o/r'], ['git@gitlab.com:o/r.git', null], ['/srv/o/r.git', null], ['https://example.com/github.com/o/r', null]]) {
       spawnSync('git', ['remote', 'remove', 'origin'], { cwd: r });
       spawnSync('git', ['remote', 'add', 'origin', url], { cwd: r });
       assert.equal(originSlug(r), slug, url);

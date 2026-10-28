@@ -229,11 +229,11 @@ export function gitChangedNear() {
   };
 }
 
-// git remote origin 주소(https·ssh)에서 owner/name. 알 수 없으면 null.
+// git remote origin 주소(github.com 의 https·ssh)에서 owner/name. GitHub 가 아니거나 알 수 없으면 null.
 export function originSlug(cwd = process.cwd()) {
   const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf8" });
   if (r.status !== 0) return null;
-  const m = r.stdout.trim().match(/[/:]([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/);
+  const m = r.stdout.trim().match(/^(?:https:\/\/(?:[^@/]+@)?github\.com\/|(?:ssh:\/\/)?git@github\.com[:/])([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/i);
   return m ? `${m[1]}/${m[2]}` : null;
 }
 
