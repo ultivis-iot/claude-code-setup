@@ -146,7 +146,7 @@ function classify(finding, { ledger, changedSince, partial, prFiles, authorAssoc
  * resolved·rejected·pre_existing 은 리뷰 봇(통합 pass)의 판정을 그대로 믿는다. 완료는 merge 전 사람 확인을
  * 대신하지 않는다.
  */
-export function assess({ headSha, comments, checks = [], requiredChecks = [], bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null, authorAssociation = null }) {
+export function assess({ headSha, comments, checks = [], requiredChecks = null, bot = DEFAULT_BOT, ledger = { decisions: {} }, roundCap = DEFAULT_ROUND_CAP, changedSince = () => false, prFiles = null, authorAssociation = null }) {
   const reports = comments
     .filter((c) => c.login === bot && isReport(c.body))
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
@@ -228,11 +228,14 @@ function ghTry(argv) {
 function requiredChecksFor(slug, base) {
   if (typeof base !== "string" || !base) return null;
   const branch = encodeURIComponent(base);
-  const rules = ghTry(["api", `repos/${slug}/rules/branches/${branch}`, "--paginate"]);
+  // 한 페이지(100개)로 읽는다. 꽉 차면 뒤에 더 있을 수 있으므로 모름으로 본다.
+  const rules = ghTry(["api", `repos/${slug}/rules/branches/${branch}?per_page=100`]);
   if (rules.error || rules.status !== 0) return null;
   const names = [];
   try {
-    for (const rule of JSON.parse(rules.stdout || "[]")) {
+    const list = JSON.parse(rules.stdout);
+    if (!Array.isArray(list) || list.length >= 100) return null;
+    for (const rule of list) {
       if (rule?.type !== "required_status_checks") continue;
       for (const c of rule.parameters?.required_status_checks || []) if (typeof c?.context === "string") names.push(c.context);
     }

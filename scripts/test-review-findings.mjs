@@ -24,7 +24,7 @@ const finding = (id, fields = {}) => ({
 const bot = (id, at, body) => ({ id, created_at: at, login: 'isaac-notion-bot', body });
 // 저장소 구성원이 연 PR 이고 지적 위치가 모두 PR 파일 안인 기본 상황. 경계 검사는 아래 케이스가 따로 본다.
 const PR_FILES = ['a.mjs', 'b.mjs', 'scripts/other.mjs'];
-const judge = (o) => assess({ prFiles: PR_FILES, authorAssociation: 'MEMBER', ...o });
+const judge = (o) => assess({ prFiles: PR_FILES, authorAssociation: 'MEMBER', requiredChecks: [], ...o });
 
 // 실제 운영 보고서의 모양(PR #20, A0–A5 적용 브리지): <details> 안에 블록이 있다.
 const PRODUCTION = '## 🤖 AI Code Review Report\n\n### 📝 Summary\n리뷰 대상 1개 파일의 변경 (+38/-0)을 검토했고 보고할 문제 0건을 확인했습니다.\n\n<details>\n<summary><b>💡 Detailed Review (Click to expand)</b></summary>\n\n## Codex PR 코드 리뷰\n\n보고할 문제를 발견하지 못했습니다.\n\n<!-- ocr-review:v1 {"version":1,"head_sha":"4fec245267abbfc4526a4c69e9d84be46b77f42d","round":1,"completeness":"complete","findings":[]} -->\n\n</details>';
@@ -312,6 +312,8 @@ check('required checks must be present and green; unknown requirements are never
   const unknown = judge({ headSha: HEAD, comments: clean, requiredChecks: null });
   assert.equal(unknown.complete, false);
   assert.equal(unknown.checks.required_unknown, true);
+  // 호출자가 필수 check 를 넘기지 않으면 모르는 것으로 본다
+  assert.equal(assess({ headSha: HEAD, comments: clean, prFiles: PR_FILES, authorAssociation: 'MEMBER' }).complete, false);
 });
 
 // CLI: status 는 gh 대신 --input 을 읽고, record 는 저장소의 tmp/ 에 처리 이력을 쓴다.
@@ -401,7 +403,10 @@ const out = (s) => process.stdout.write(s + '\\n');
 if (args[0] === 'pr' && args[1] === 'view') out(${JSON.stringify(JSON.stringify(view))});
 else if (args[0] === 'api' && args[1].endsWith('/comments')) for (const c of ${JSON.stringify(comments)}) out(JSON.stringify(c));
 else if (args[0] === 'api' && args[1].includes('/pulls/')) out('MEMBER');
-else if (args[0] === 'api' && args[1] === 'repos/o/r/rules/branches/main') out(${JSON.stringify(JSON.stringify(rules))});
+else if (args[0] === 'api' && args[1] === 'repos/o/r/rules/branches/main?per_page=100') {
+  if (process.env.FAKE_RULES === 'fail') { process.stderr.write('gh: Server Error (HTTP 500)'); process.exit(1); }
+  out(process.env.FAKE_RULES || ${JSON.stringify(JSON.stringify(rules))});
+}
 else if (args[0] === 'api' && args[1] === 'repos/o/r/branches/main/protection/required_status_checks') {
   if (process.env.FAKE_PROTECTION === 'forbidden') { process.stderr.write('gh: Resource not accessible (HTTP 403)'); process.exit(1); }
   if (process.env.FAKE_PROTECTION) out(process.env.FAKE_PROTECTION);
@@ -425,6 +430,16 @@ else { process.stderr.write('unexpected gh ' + args.join(' ')); process.exit(1);
     assert.deepEqual(both.checks.missing_required, ['build', 'e2e']);
     // 404 가 아닌 오류는 '모름' 이고 완료로 보지 않는다
     assert.equal(status({ FAKE_PROTECTION: 'forbidden' }).checks.required_unknown, true);
+    // 조회 실패·깨진 응답·꽉 찬 페이지는 모두 '모름' 이고 완료가 아니다
+    for (const env of [{ FAKE_RULES: 'fail' }, { FAKE_RULES: 'not json' }, { FAKE_RULES: JSON.stringify(Array.from({ length: 100 }, () => ({ type: 'deletion' }))) },
+      { FAKE_PROTECTION: 'not json' }, { FAKE_PROTECTION: 'null' }]) {
+      const r = status(env);
+      assert.equal(r.checks.required_unknown, true, JSON.stringify(env));
+      assert.equal(r.complete, false, JSON.stringify(env));
+    }
+    // 필수 check 가 하나도 없으면(빈 rules, 보호 404) 보이는 checks 만으로 판정한다
+    const noneRequired = status({ FAKE_RULES: '[]' });
+    assert.deepEqual([noneRequired.checks.required, noneRequired.checks.required_unknown], [[], false]);
     const asked = readFileSync(calls, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
     assert.ok(asked.some((a) => a[0] === 'pr' && a.includes('o/r')), 'pr view uses --repo');
     assert.ok(asked.some((a) => a[1] === 'repos/o/r/issues/21/comments'));
