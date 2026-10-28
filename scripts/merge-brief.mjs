@@ -25,13 +25,13 @@ import { fileURLToPath } from "node:url";
 const CODE_LINES = 150, CODE_FILES = 5, SENSITIVE_LINES = 300;
 const SENSITIVE = new RegExp([
   // hook·스키마·agent 정의·CI·에이전트 설정 디렉터리
-  "(^|/)(hooks|schemas|agents|\\.github|\\.circleci|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
+  "(^|/)(hooks|schemas|agents|\\.github|\\.circleci|\\.buildkite|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
   // 설치·설정·게이트·배포 (디렉터리 이름이나 파일 이름의 앞부분)
   "(^|/)(setup|install|installer|gates?|deploy|release)s?([/._-]|$)",
   // 이 저장소의 검증·리뷰 도구와 Notion 자격 증명을 다루는 스크립트(새로 만들면 여기에 더한다)
   "(^|/)(validation-gate|review[-_]findings|merge-brief|verify-workflow|sync-workflow|graft|ult-notion|ult-flow|notion|review-cycle-ralph-loop)\\.[^/]*$",
   // 패키지·빌드·CI·컨테이너 설정, 환경 파일, 사용자 설정에 설치되는 지시문
-  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|dockerfile|docker-compose[^/]*|\\.gitlab-ci\\.ya?ml|claude\\.md|global-claude\\.md)$",
+  "(^|/)(\\.env[^/]*|package\\.json|\\.npmrc|makefile|dockerfile|docker-compose[^/]*|\\.gitlab-ci\\.ya?ml|\\.travis\\.ya?ml|jenkinsfile|azure-pipelines\\.ya?ml|bitbucket-pipelines\\.ya?ml|claude\\.md|global-claude\\.md)$",
   // 키 파일
   "(\\.(pem|key)|(^|/)id_(rsa|ed25519|ecdsa)[^/]*)$",
   // 인증·비밀·권한·자격 증명 단어
@@ -59,8 +59,9 @@ export function classify(files) {
     throw new Error("files 는 {path, previous_path?, additions, deletions} 목록이어야 합니다");
   }
   const changed = new Set(files.map((f) => f.path));
-  const copyOfChangedSource = (path) => GENERATED.some(([copy, source]) => path.startsWith(copy) && changed.has(source + path.slice(copy.length)));
-  const counted = files.filter((f) => !copyOfChangedSource(f.path))
+  // 이름을 바꿔 생성본 자리로 온 파일은 원본 복사본이 아니므로 빼지 않는다(이전 경로로 분류한다).
+  const copyOfChangedSource = (f) => f.previous_path == null && GENERATED.some(([copy, source]) => f.path.startsWith(copy) && changed.has(source + f.path.slice(copy.length)));
+  const counted = files.filter((f) => !copyOfChangedSource(f))
     .map((f) => ({ path: f.path, lines: f.additions + f.deletions, category: highest([f.path, f.previous_path]) }));
   // 생성본 줄도 센다. 그래서 lines 는 files[].lines 의 합보다 클 수 있다.
   const lines = files.reduce((sum, f) => sum + f.additions + f.deletions, 0);

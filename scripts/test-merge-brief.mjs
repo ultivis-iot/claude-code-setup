@@ -64,7 +64,8 @@ check('validation, install, hook and permission paths ask four, five when large'
     '.env', 'config/.env.production', 'src/credentials.json', 'src/apikey.ts', 'src/password.ts', 'src/keychain.ts',
     '.husky/pre-commit', 'package.json', '.npmrc', 'Makefile', 'scripts/ult-flow.mjs', 'scripts/review-cycle-ralph-loop.mjs', 'scripts/review_findings.mjs',
     'templates/global-claude.md', 'CLAUDE.md',
-    '.gitlab-ci.yml', '.circleci/config.yml', 'Dockerfile', 'docker-compose.yml', 'server.key', 'scripts/x.pem', 'src/ssh/id_rsa', 'src/api-key.ts', 'src/jwt.ts', 'scripts/deploy.sh', 'scripts/release.sh', 'scripts/setups/x.sh', 'scripts/gates/x.mjs']) {
+    '.gitlab-ci.yml', '.circleci/config.yml', 'Dockerfile', 'docker-compose.yml', 'server.key', 'scripts/x.pem', 'src/ssh/id_rsa', 'src/api-key.ts', 'src/jwt.ts', 'scripts/deploy.sh', 'scripts/release.sh', 'scripts/setups/x.sh', 'scripts/gates/x.mjs',
+    'Jenkinsfile', 'ci/Jenkinsfile', 'azure-pipelines.yml', 'bitbucket-pipelines.yml', '.travis.yml', '.buildkite/pipeline.yml']) {
     const r = classify([file(p)]);
     assert.equal(r.tier, 'sensitive', p);
     assert.equal(r.questions, 4, p);
@@ -112,6 +113,10 @@ check('a renamed file is classified by its old path as well', () => {
   assert.equal(classify([{ path: 'scripts/a.mjs', previous_path: 'docs/a.md', additions: 0, deletions: 0 }]).tier, 'code');
   assert.equal(classify([{ path: 'docs/a.md', previous_path: 'scripts/a.mjs', additions: 0, deletions: 0 }]).tier, 'code');
   assert.equal(classify([{ path: 'docs/a.md', previous_path: null, additions: 1, deletions: 0 }]).tier, 'docs');
+  // 민감 파일을 원본이 바뀐 생성본 자리로 옮겨도 빠지지 않는다(기계 리뷰 finding-14894fc820b7697e)
+  const moved = classify([file('commands/x.md', 1), { path: 'codex/plugins/dev-workflow/commands/x.md', previous_path: 'hooks/pre-push', additions: 0, deletions: 0 }]);
+  assert.equal(moved.tier, 'sensitive');
+  assert.equal(moved.questions, 4);
 });
 
 check('malformed file entries are rejected', () => {
