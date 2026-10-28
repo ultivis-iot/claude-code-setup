@@ -64,13 +64,16 @@ check('validation, install, hook and permission paths ask four, five when large'
     '.env', 'config/.env.production', 'src/credentials.json', 'src/apikey.ts', 'src/password.ts', 'src/keychain.ts',
     '.husky/pre-commit', 'package.json', '.npmrc', 'Makefile', 'scripts/ult-flow.mjs', 'scripts/review-cycle-ralph-loop.mjs', 'scripts/review_findings.mjs',
     'templates/global-claude.md', 'CLAUDE.md',
-    '.gitlab-ci.yml', '.circleci/config.yml', 'Dockerfile', 'docker-compose.yml', 'server.key', 'scripts/x.pem', 'src/ssh/id_rsa', 'src/api-key.ts', 'src/jwt.ts', 'scripts/deploy.sh', 'scripts/release.sh']) {
+    '.gitlab-ci.yml', '.circleci/config.yml', 'Dockerfile', 'docker-compose.yml', 'server.key', 'scripts/x.pem', 'src/ssh/id_rsa', 'src/api-key.ts', 'src/jwt.ts', 'scripts/deploy.sh', 'scripts/release.sh', 'scripts/setups/x.sh', 'scripts/gates/x.mjs']) {
     const r = classify([file(p)]);
     assert.equal(r.tier, 'sensitive', p);
     assert.equal(r.questions, 4, p);
   }
   // 이름에 단어로 든 경우만 민감하다(author·tokenizer 는 아님)
-  for (const p of ['docs/references/author-guide.md', 'scripts/tokenizer.mjs']) assert.equal(classify([file(p)]).tier, 'code', p);
+  for (const p of ['docs/references/author-guide.md', 'scripts/tokenizer.mjs', 'src/xhooks/a.mjs', 'src/myinstall.mjs', 'src/setupx.mjs', 'src/xauth.ts',
+    'scripts/merge-briefx.mjs', 'CLAUDE.md.bak']) assert.equal(classify([file(p)]).tier, 'code', p);
+  // 문서 자리의 텍스트 확장자는 끝에 와야 한다
+  assert.equal(classify([file('docs/x.md.bak')]).tier, 'code');
   assert.equal(classify([file('hooks/pre-push', 200, 101)]).questions, 5);
   assert.equal(classify([file('hooks/pre-push', 200, 100)]).questions, 4);
 });
@@ -115,7 +118,7 @@ check('malformed file entries are rejected', () => {
   assert.throws(() => classify(undefined), /files 는/);
   assert.throws(() => classify([{ path: '', additions: 1, deletions: 0 }]), /files 는/);
   for (const bad of [null, {}, [{ path: '' }], [{ path: 'a', additions: -1, deletions: 0 }], [{ path: 'a', additions: 1.5, deletions: 0 }], [{ path: 'a', additions: '1', deletions: 0 }],
-    [{ path: 'a', previous_path: '', additions: 1, deletions: 0 }], [{ path: 'a', previous_path: 3, additions: 1, deletions: 0 }]]) {
+    [{ path: 'a', previous_path: '', additions: 1, deletions: 0 }], [{ path: 'a', previous_path: 3, additions: 1, deletions: 0 }], [null]]) {
     assert.throws(() => classify(bad), /files 는 \{path/, JSON.stringify(bad));
   }
 });
@@ -136,7 +139,7 @@ try {
   check('the CLI rejects missing or valueless options and bad input', () => {
     // 각 오류는 gh 를 부르기 전에 그 검사의 메시지로 멈춘다(gh 가 없어도 같은 결과).
     for (const [argv, message] of [[['tier'], /--pr <번호> 또는 --input/], [['tier', '--pr'], /--pr 에 값이/], [['tier', '--input'], /--input 에 값이/],
-      [['tier', '--pr', 'x'], /--pr 은 PR 번호/], [['tier', '--pr', '1', '--repo'], /--repo 에 값이/], [['tier', '--pr', '1', '--repo', 'bad'], /--repo 는 owner\/name/],
+      [['tier', '--pr', 'x'], /--pr 은 PR 번호/], [['tier', '--pr', '7abc'], /--pr 은 PR 번호/], [['tier', '--pr', '1', '--repo'], /--repo 에 값이/], [['tier', '--pr', '1', '--repo', 'bad'], /--repo 는 owner\/name/],
       [['other', '--input', input], /사용법/]]) {
       const r = spawnSync(process.execPath, [tool, ...argv], { encoding: 'utf8', env: { ...process.env, PATH: '' } });
       assert.notEqual(r.status, 0, argv.join(' '));
