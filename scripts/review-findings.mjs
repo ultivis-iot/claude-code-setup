@@ -60,8 +60,9 @@ export function parseBlock(body) {
 // 앞 내용이 끝날 때 Markdown 코드 펜스(``` · ~~~, 들여쓰기 3칸까지)가 열려 있는지. 같은 문자로 같거나 더 긴 펜스만 닫는다.
 function inCodeFence(before) {
   let open = null;
-  for (const line of before.split(/\r?\n/)) {
-    const fence = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+  // Markdown 의 줄바꿈은 LF·CR·CRLF 다. 펜스 뒤 내용은 U+2028 같은 문자도 포함해 그대로 받는다.
+  for (const line of before.split(/\r\n?|\n/)) {
+    const fence = /^ {0,3}(`{3,}|~{3,})([^]*)$/.exec(line);
     if (!fence) continue;
     const [, marks, rest] = fence;
     if (!open) open = marks;
