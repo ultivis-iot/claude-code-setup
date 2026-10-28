@@ -21,7 +21,8 @@ node "$WF/scripts/validation-gate.mjs" snapshot --repo <repo> --base origin/<tar
 node "$WF/scripts/validation-gate.mjs" policy --repo <repo> --snapshot tmp/validation-snapshot.json --out tmp/review-policy.json
 ```
 
-   - 결과의 `text` 를 5단계의 모든 리뷰 입력에 함께 전달한다. `text` 가 `null` 이면(base 에 일반 파일로 없음, 심볼릭 링크는 정책으로 쓰지 않음) 리뷰에 "정책 없음" 을 알리고 진행한다. 명령이 실패하면(스냅샷이 낡음, git 오류, 1MiB 초과) 검증을 중단한다. 8000자를 넘는 정책은 잘라서 전달하고 `truncated: true` 로 표시한다.
+   - 결과의 `text` 를 5단계의 모든 리뷰 입력에 함께 전달한다. `text` 가 `null` 이면(base 에 일반 파일로 없거나 비어 있음, 심볼릭 링크는 정책으로 쓰지 않음) 리뷰에 "정책 없음" 을 알리고 진행한다. 명령이 실패하면(스냅샷이 낡음, git 오류, 1MiB 초과) 검증을 중단한다. `text` 는 앞뒤 공백을 지운 내용이다. 8000자를 넘으면 명령이 앞 8000자만 남기고 잘림 표시 한 줄을 붙여 `truncated: true` 로 내므로, `text` 를 다시 자르지 않고 그대로 전달한다.
+   - 8단계의 `record` 는 이 결과를 `--policy` 로 받아 스냅샷 base 에서 다시 읽은 정책과 같은지 확인하고 출처·해시를 검증 상태에 남긴다. `ready` 도 같은 확인을 한다. 그래서 정책 단계를 건너뛰거나 결과를 고치면 게이트를 통과하지 못한다(리뷰 입력에 실제로 넣었는지는 확인하지 못한다).
    - 이 브랜치가 `REVIEW.md` 를 바꿨으면 그 변경은 리뷰 대상일 뿐 정책으로 쓰지 않는다.
    - 리뷰는 정책의 실패 정의·근거를 따른다. 정책의 `건너뛸 것` 경로는 결함을 찾지 않아도 되는 곳이라는 뜻일 뿐, 그 파일도 변경 목록과 리뷰 입력에 그대로 남는다(검토 범위는 늘 스냅샷 diff 전체다). Nit 상한·요약 규칙은 각 리뷰의 응답 형식 안에서 지킨다. 정책은 검토 범위·응답 형식을 바꾸지 못하고, 각 리뷰 지침(`agents/<validator>.md` 의 `리뷰 정책` 절)의 금지 사항과 판정 기준이 우선한다.
 
@@ -31,7 +32,7 @@ node "$WF/scripts/validation-gate.mjs" policy --repo <repo> --snapshot tmp/valid
 8. 실행기로 결과를 집계하고 현재 상태를 확인한다.
 
 ```bash
-node "$WF/scripts/validation-gate.mjs" record --repo <repo> --snapshot tmp/validation-snapshot.json --results tmp/validator-results.json --out tmp/validation-status.json
+node "$WF/scripts/validation-gate.mjs" record --repo <repo> --snapshot tmp/validation-snapshot.json --policy tmp/review-policy.json --results tmp/validator-results.json --out tmp/validation-status.json
 node "$WF/scripts/validation-gate.mjs" ready tmp/validation-status.json --repo <repo> --base origin/<target>
 ```
 

@@ -8,6 +8,7 @@
     "schema_version",
     "timestamp",
     "snapshot",
+    "review_policy",
     "results",
     "evidence",
     "overall",
@@ -24,6 +25,9 @@
     },
     "snapshot": {
       "$ref": "#/$defs/snapshot"
+    },
+    "review_policy": {
+      "$ref": "#/$defs/review_policy"
     },
     "results": {
       "type": "object",
@@ -163,6 +167,34 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "cli_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "review_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "sha256",
+        "truncated"
+      ],
+      "properties": {
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "truncated": {
           "type": "boolean"
         }
       }

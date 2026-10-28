@@ -35,7 +35,9 @@ function fixture() {
   const snapshot = () => ok(invoke('snapshot', '--base', 'main', '--out', 'tmp/snapshot.json'));
   const record = () => {
     writeJson(path.join(repo, 'tmp/results.json'), results);
-    return invoke('record', '--snapshot', 'tmp/snapshot.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json');
+    const policy = invoke('policy', '--snapshot', 'tmp/snapshot.json', '--out', 'tmp/review-policy.json');
+    if (policy.status !== 0) return policy;
+    return invoke('record', '--snapshot', 'tmp/snapshot.json', '--policy', 'tmp/review-policy.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json');
   };
   const ready = () => invoke('ready', 'tmp/validation-status.json', '--base', 'main');
   const readStatus = () => JSON.parse(readFileSync(path.join(repo, 'tmp/validation-status.json')));
@@ -146,7 +148,8 @@ try {
   mkdirSync(path.join(linked, 'tmp'), { recursive: true });
   writeJson(path.join(linked, 'tmp/results.json'), valid.results);
   ok(run(process.execPath, [gate, 'snapshot', '--repo', linked, '--base', 'main', '--out', 'tmp/snapshot.json'], linked));
-  ok(run(process.execPath, [gate, 'record', '--repo', linked, '--snapshot', 'tmp/snapshot.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json'], linked));
+  ok(run(process.execPath, [gate, 'policy', '--repo', linked, '--snapshot', 'tmp/snapshot.json', '--out', 'tmp/review-policy.json'], linked));
+  ok(run(process.execPath, [gate, 'record', '--repo', linked, '--snapshot', 'tmp/snapshot.json', '--policy', 'tmp/review-policy.json', '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json'], linked));
   ok(run('git', ['push', 'origin', 'linked'], linked));
   // post-merge 는 sh 래퍼가 Node 의 graft.mjs 를 호출한다(Graft CLI 가 없어도 종료 코드 0). 예전 bash 갱신 스크립트는 정리된다.
   const customHooks = path.join(temporary, 'custom-hooks');
@@ -200,6 +203,32 @@ try {
   const snapshotFile = path.join(broken.repo, 'tmp/snapshot.json');
   writeJson(snapshotFile, { ...JSON.parse(readFileSync(snapshotFile)), base_sha: '0'.repeat(40) });
   rejected(broken.policy(), /stale/);
+  // 정책 단계를 건너뛰거나 정책 결과·상태를 고치면 record·ready 가 막는다.
+  const bound = policyFixture(repo => writeFileSync(path.join(repo, 'REVIEW.md'), '# bound policy\n'));
+  bound.snapshot();
+  writeJson(path.join(bound.repo, 'tmp/results.json'), bound.results);
+  const recordWith = (...extra) => bound.invoke('record', '--snapshot', 'tmp/snapshot.json', ...extra, '--results', 'tmp/results.json', '--out', 'tmp/validation-status.json');
+  rejected(recordWith(), /--policy/);
+  ok(bound.policy());
+  const policyFile = path.join(bound.repo, 'tmp/review-policy.json');
+  const realPolicy = bound.readPolicy();
+  writeJson(policyFile, { ...realPolicy, text: null, source: null });
+  rejected(recordWith('--policy', 'tmp/review-policy.json'), /does not match/);
+  writeJson(policyFile, { ...realPolicy, text: '# weaker policy' });
+  rejected(recordWith('--policy', 'tmp/review-policy.json'), /does not match/);
+  writeJson(policyFile, { ...realPolicy, base_sha: '0'.repeat(40) });
+  rejected(recordWith('--policy', 'tmp/review-policy.json'), /different snapshot base/);
+  writeJson(policyFile, realPolicy);
+  ok(recordWith('--policy', 'tmp/review-policy.json'));
+  assert.equal(bound.readStatus().review_policy.source, realPolicy.source);
+  ok(bound.ready());
+  const statusFile = path.join(bound.repo, 'tmp/validation-status.json');
+  const realStatus = bound.readStatus();
+  writeJson(statusFile, { ...realStatus, review_policy: { source: null, sha256: null, truncated: false } });
+  rejected(bound.ready(), /does not match/);
+  const { review_policy: _dropped, ...withoutPolicy } = realStatus;
+  writeJson(statusFile, withoutPolicy);
+  rejected(bound.ready(), /review_policy: required/);
   const plan = fixture();
   const planHook = path.join(root, 'hooks/copy-plan-on-accept.mjs');
   const hookInput = JSON.stringify({ tool_name: 'ExitPlanMode', cwd: plan.repo, session_id: 'fixture-session' });
