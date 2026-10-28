@@ -64,6 +64,8 @@ check('a block quoted inside the report body is not the bot block', () => {
   // 뒤에 글자가 붙은 펜스(``` js)는 닫는 펜스가 아니다. CRLF 본문도 같은 규칙이다.
   assert.equal(parseBlock(fenced('```\n``` js')), null);
   assert.equal(parseBlock(fenced('```').replace(/\n/g, '\r\n')), null);
+  // CR 만 쓴 줄바꿈, 펜스 뒤의 U+2028·U+2029 도 펜스를 숨기지 못한다.
+  for (const fence of ['```\rquoted', '~~~\r', '``` x', '``` x']) assert.equal(parseBlock(fenced(fence)), null, JSON.stringify(fence));
   assert.equal(parseBlock(`${LEGACY.slice(0, -'</details>'.length)}\`\`\`\ncode\n\`\`\`\n<!-- ocr-review:v1 ${quoted} -->\n</details>`).head_sha, HEAD);
   const r = judge({ headSha: HEAD, comments: [bot(1, 't', body(`> <!-- ocr-review:v1 ${quoted} -->`))] });
   assert.equal(r.complete, false);
