@@ -403,6 +403,9 @@ try {
     assert.equal(run('record', '--pr', '33', '--id', 'f1', '--decision', 'wrong', '--reason').status, 1);
     // 값을 빠뜨린 --reason 뒤의 옵션은 사유로 삼지 않는다. 빈 값(--key=, "")은 값이 없는 것과 같다.
     assert.equal(run('record', '--pr', '34', '--id', 'f1', '--decision', 'wrong', '--reason', '--commit', 'abc').status, 1);
+    // --key=value 모양의 사유는 옵션 이름 하나가 아니므로 사유로 받는다(기계 리뷰 finding-4c828dbbdb056125)
+    assert.equal(run('record', '--pr', '38', '--id', 'f1', '--decision', 'wrong', '--reason', '--repo=foo').status, 0);
+    assert.equal(read(38).decisions.f1.reason, '--repo=foo');
     assert.equal(run('record', '--pr', '35', '--id', 'f1', '--decision', 'wrong', '--reason=').status, 1);
     assert.equal(run('record', '--pr', '36', '--id', 'f1', '--decision', 'wrong', '--reason', 'r', '--commit=').status, 1);
     assert.equal(run('record', '--pr', '37', '--id', 'f1', '--decision', 'wrong', '--reason', 'r', '--commit', '').status, 1);
