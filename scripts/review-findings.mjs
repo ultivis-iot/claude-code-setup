@@ -4,6 +4,7 @@
 //   node review-findings.mjs status --pr <N> [--repo <o/r>] [--bot <login>] [--round-cap 3] [--input <file>]
 //   node review-findings.mjs record --pr <N> --id <finding id> --decision fixed|wrong|intentional|irrelevant
 //                                   --reason <text> [--commit <sha>]
+//   모든 옵션은 --key=value 형식도 받는다. --reason 은 -- 로 시작하는 문장도 값으로 받는다(옵션 이름 하나뿐이면 거부).
 //   node review-findings.mjs stop-loop
 //
 // status 는 현재 PR HEAD 를 리뷰한 보고서의 <!-- ocr-review:v1 --> 블록을 읽어, 이번 라운드에
@@ -227,10 +228,14 @@ function args(argv) {
     if (!rest[i].startsWith("--")) continue;
     const body = rest[i].slice(2);
     const eq = body.indexOf("=");
-    if (eq !== -1) { opt[body.slice(0, eq)] = body.slice(eq + 1); continue; }
+    // 빈 값(--key= 나 "")은 값이 없는 것과 같다(true). 아래 필수 값 검사가 거부한다.
+    if (eq !== -1) { opt[body.slice(0, eq)] = body.slice(eq + 1) || true; continue; }
     const key = body;
+    const next = rest[i + 1];
     // --reason 은 자유 서술이라 값이 --repo 처럼 옵션 이름으로 시작해도 다음 인자를 값으로 삼는다.
-    const takesNext = i + 1 < rest.length && (key === "reason" || !rest[i + 1].startsWith("--"));
+    // 다만 다음 인자가 옵션 하나(--commit 등)뿐이면 값을 빠뜨린 것이라 받지 않는다.
+    const reasonText = key === "reason" && next !== undefined && !/^--[a-z-]+(=.*)?$/.test(next);
+    const takesNext = next !== undefined && next !== "" && (reasonText || !next.startsWith("--"));
     opt[key] = takesNext ? rest[++i] : true;
   }
   return { cmd, opt };

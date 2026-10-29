@@ -401,6 +401,13 @@ try {
     assert.equal(read(32).decisions.f1.reason, 'r');
     // 값이 없는 --reason(맨 끝)은 그대로 거부한다.
     assert.equal(run('record', '--pr', '33', '--id', 'f1', '--decision', 'wrong', '--reason').status, 1);
+    // 값을 빠뜨린 --reason 뒤의 옵션은 사유로 삼지 않는다. 빈 값(--key=, "")은 값이 없는 것과 같다.
+    assert.equal(run('record', '--pr', '34', '--id', 'f1', '--decision', 'wrong', '--reason', '--commit', 'abc').status, 1);
+    assert.equal(run('record', '--pr', '35', '--id', 'f1', '--decision', 'wrong', '--reason=').status, 1);
+    assert.equal(run('record', '--pr', '36', '--id', 'f1', '--decision', 'wrong', '--reason', 'r', '--commit=').status, 1);
+    assert.equal(run('record', '--pr', '37', '--id', 'f1', '--decision', 'wrong', '--reason', 'r', '--commit', '').status, 1);
+    assert.match(run('status', '--pr', '1', '--input=').stderr, /--input 에 값이 필요합니다/);
+    assert.match(run('status', '--pr', '1', '--input', '').stderr, /--input 에 값이 필요합니다/);
   });
   check('cli reopens the declined finding once its file changes', () => {
     writeFileSync(path.join(dir, 'a.mjs'), 'two\n');
