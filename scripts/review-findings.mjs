@@ -225,8 +225,13 @@ function args(argv) {
   const opt = {};
   for (let i = 0; i < rest.length; i++) {
     if (!rest[i].startsWith("--")) continue;
-    const key = rest[i].slice(2);
-    opt[key] = rest[i + 1] && !rest[i + 1].startsWith("--") ? rest[++i] : true;
+    const body = rest[i].slice(2);
+    const eq = body.indexOf("=");
+    if (eq !== -1) { opt[body.slice(0, eq)] = body.slice(eq + 1); continue; }
+    const key = body;
+    // --reason 은 자유 서술이라 값이 --repo 처럼 옵션 이름으로 시작해도 다음 인자를 값으로 삼는다.
+    const takesNext = i + 1 < rest.length && (key === "reason" || !rest[i + 1].startsWith("--"));
+    opt[key] = takesNext ? rest[++i] : true;
   }
   return { cmd, opt };
 }
