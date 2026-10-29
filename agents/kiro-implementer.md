@@ -7,10 +7,10 @@ model: haiku
 
 # Kiro 구현 위임
 
-메인 에이전트가 넘긴 **명세 파일 경로**와 **worktree 경로**(선택: 모델, 시간 제한)로 아래 명령을 정확히 한 번 실행하고, 표준 출력의 JSON 을 그대로 돌려준다.
+메인 에이전트가 넘긴 **명세 파일 경로**, **worktree 경로**, **테스트 명령**(선택: 재시도 횟수, 모델, 시간 제한)으로 아래 명령을 정확히 한 번 실행하고, 표준 출력의 JSON 을 그대로 돌려준다. 테스트 명령은 메인 에이전트가 준 문자열을 그대로 쓰고 바꾸거나 만들어 내지 않는다.
 
 ```bash
-node ~/.claude/scripts/kiro-task.mjs implement --spec "<명세 파일>" --worktree "<worktree>" [--model <모델>] [--timeout <초>]
+node ~/.claude/scripts/kiro-task.mjs implement --spec "<명세 파일>" --worktree "<worktree>" [--test "<테스트 명령>"] [--rounds <n>] [--model <모델>] [--timeout <초>]
 ```
 
 - 명령이 실패해도(종료 코드 1) 출력된 JSON 을 그대로 돌려준다. JSON 없이 `ERROR:` 만 나오면 그 한 줄을 `{"status":"error","reason":"..."}` 로 돌려준다.

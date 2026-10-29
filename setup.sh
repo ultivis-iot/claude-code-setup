@@ -241,7 +241,14 @@ fi
 echo "5-1. Kiro agent 설정..."
 if command -v kiro-cli > /dev/null 2>&1; then
     mkdir -p "$HOME/.kiro/agents"
-    cp "$SCRIPT_DIR/templates/kiro/claude-implementer.json" "$HOME/.kiro/agents/claude-implementer.json"
+    KIRO_AGENT="$HOME/.kiro/agents/claude-implementer.json"
+    # 직접 고쳤거나 Kiro 가 바꾼 기존 설정은 덮어쓰기 전에 백업한다
+    if [ -f "$KIRO_AGENT" ] && ! cmp -s "$SCRIPT_DIR/templates/kiro/claude-implementer.json" "$KIRO_AGENT"; then
+        KIRO_BACKUP="$KIRO_AGENT.backup-$(date +%Y%m%d%H%M%S)"
+        cp -p "$KIRO_AGENT" "$KIRO_BACKUP"
+        echo -e "${YELLOW}   기존 Kiro agent 설정 백업: $KIRO_BACKUP${NC}"
+    fi
+    cp "$SCRIPT_DIR/templates/kiro/claude-implementer.json" "$KIRO_AGENT"
     echo -e "${GREEN}   ✓ ~/.kiro/agents/claude-implementer.json${NC}"
 else
     echo -e "${YELLOW}   kiro-cli 없음. 건너뜀 (kiro-implementer 는 쓸 수 없음)${NC}"

@@ -247,7 +247,15 @@ Write-Host "6-2. Kiro agent 설정..."
 if (Get-Command kiro-cli -ErrorAction SilentlyContinue) {
     $KiroAgents = Join-Path $HOME ".kiro/agents"
     New-Item -ItemType Directory -Force -Path $KiroAgents | Out-Null
-    Copy-Item (Join-Path $ScriptDir "templates/kiro/claude-implementer.json") -Destination (Join-Path $KiroAgents "claude-implementer.json") -Force
+    $KiroSource = Join-Path $ScriptDir "templates/kiro/claude-implementer.json"
+    $KiroAgent = Join-Path $KiroAgents "claude-implementer.json"
+    # 직접 고쳤거나 Kiro 가 바꾼 기존 설정은 덮어쓰기 전에 백업한다
+    if ((Test-Path $KiroAgent) -and ((Get-FileHash $KiroAgent).Hash -ne (Get-FileHash $KiroSource).Hash)) {
+        $KiroBackup = "$KiroAgent.backup-$(Get-Date -Format yyyyMMddHHmmss)"
+        Copy-Item $KiroAgent -Destination $KiroBackup
+        Write-Host "   기존 Kiro agent 설정 백업: $KiroBackup" -ForegroundColor Yellow
+    }
+    Copy-Item $KiroSource -Destination $KiroAgent -Force
     Write-Host "   ~/.kiro/agents/claude-implementer.json" -ForegroundColor Green
 } else {
     Write-Host "   kiro-cli 없음. 건너뜀 (kiro-implementer 는 쓸 수 없음)" -ForegroundColor Yellow
