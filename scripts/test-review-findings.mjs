@@ -406,6 +406,14 @@ try {
     // --key=value 모양의 사유는 옵션 이름 하나가 아니므로 사유로 받는다(기계 리뷰 finding-4c828dbbdb056125)
     assert.equal(run('record', '--pr', '38', '--id', 'f1', '--decision', 'wrong', '--reason', '--repo=foo').status, 0);
     assert.equal(read(38).decisions.f1.reason, '--repo=foo');
+    // 값을 받는 옵션마다 --key=value 가 띄어 쓴 형태와 같은 값으로 쓰인다(기계 리뷰 finding-b792ecc9ee772ad9)
+    assert.equal(run('record', '--pr=39', '--id=f9', '--decision=fixed', '--reason=r', '--commit=abc1234').status, 0);
+    assert.deepEqual([read(39).decisions.f9.decision, read(39).decisions.f9.reason, read(39).decisions.f9.commit], ['fixed', 'r', 'abc1234']);
+    const spaced = JSON.parse(run('status', '--pr', '18', '--input', input, '--bot', 'isaac-notion-bot', '--round-cap', '2').stdout);
+    const equals = JSON.parse(run('status', '--pr=18', `--input=${input}`, '--bot=isaac-notion-bot', '--round-cap=2').stdout);
+    assert.deepEqual(equals, spaced);
+    assert.equal(equals.round_cap, 2);
+    assert.equal(JSON.parse(run('status', '--pr=18', `--input=${input}`, '--bot=someone-else').stdout).state, 'no_review');
     assert.equal(run('record', '--pr', '35', '--id', 'f1', '--decision', 'wrong', '--reason=').status, 1);
     assert.equal(run('record', '--pr', '36', '--id', 'f1', '--decision', 'wrong', '--reason', 'r', '--commit=').status, 1);
     assert.equal(run('record', '--pr', '37', '--id', 'f1', '--decision', 'wrong', '--reason', 'r', '--commit', '').status, 1);
@@ -488,6 +496,10 @@ else { process.stderr.write('unexpected gh ' + args.join(' ')); process.exit(1);
     };
     const out = status();
     assert.equal(out.head_sha, head);
+    // --repo=o/r 도 같은 gh 호출로 이어진다
+    const eqRepo = spawnSync(process.execPath, [tool, 'status', '--pr=21', '--repo=o/r'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH } });
+    assert.equal(eqRepo.status, 0, eqRepo.stderr);
+    assert.deepEqual(JSON.parse(eqRepo.stdout).checks, out.checks);
     assert.deepEqual(out.to_fix.map((f) => f.id), ['via-gh']);  // MEMBER 이고 PR 파일 안이라 자동 수정 대상
     // rulesets 의 필수 check(lint)와 브랜치 보호(404 = 없음)를 합친다
     assert.deepEqual(out.checks, { total: 2, not_passed: ['ci'], required: ['lint'], missing_required: [], required_unknown: false });
