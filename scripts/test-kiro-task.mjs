@@ -70,6 +70,18 @@ check('the installed Kiro agent config is checked for shell, auto-approval and p
   assert.match(bad({ mcpServers: { x: {} } }).join(), /mcp/i);
   assert.match(bad({ includeMcpJson: true }).join(), /mcp/i);
   assert.match(agentConfigProblems(null).join(), /읽지 못/);
+  // 경계(./**)와 핵심 금지 경로는 있어야 한다. 지운 설정은 통과하지 않는다(기계 리뷰 finding-bdcac84cea1c1a74)
+  assert.match(bad({ toolsSettings: undefined, permissions: undefined }).join(), /fs_read.*\.\/\*\*|경계/);
+  const noWriteDeny = { ...template, toolsSettings: { ...template.toolsSettings, fs_write: { allowedPaths: ['./**'] } } };
+  assert.match(agentConfigProblems(noWriteDeny).join(), /\.git/);
+  const noReadDeny = { ...template, toolsSettings: { ...template.toolsSettings, fs_read: { allowedPaths: ['./**'] } } };
+  assert.match(agentConfigProblems(noReadDeny).join(), /\.pem|\.env/);
+  // Kiro 가 고쳐 쓴 형식: toolsSettings 없이 permissions 만 있어도 경계와 금지 경로가 있으면 통과한다
+  const permsOnly = { ...template, tools: ['read', 'write'], toolsSettings: {}, permissions: { rules: [
+    { capability: 'fs_read', match: ['./**'], effect: 'allow' }, { capability: 'fs_write', match: ['./**'], effect: 'allow' },
+    { capability: 'fs_read', match: template.toolsSettings.fs_read.deniedPaths, effect: 'deny' },
+    { capability: 'fs_write', match: template.toolsSettings.fs_write.deniedPaths, effect: 'deny' }] } };
+  assert.deepEqual(agentConfigProblems(permsOnly), []);
 });
 
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'kiro-task-'));
@@ -112,6 +124,7 @@ const call = fs.readFileSync(${JSON.stringify(calls)}, 'utf8').trim().split('\\n
 console.log('[INFO] startup');
 if (mode === 'fail') { console.error('[ERROR] auth expired'); process.exit(3); }
 if (mode === 'sleep') { const end = Date.now() + 5000; while (Date.now() < end) {} }
+if (mode === 'commit-only') { execSync('git -c user.name=k -c user.email=k@k commit -q --allow-empty -m kiro'); console.log('SUMMARY: committed'); process.exit(0); }
 if (mode === 'rename') { fs.renameSync('a.mjs', 'b.mjs'); console.log('SUMMARY: renamed'); process.exit(0); }
 const value = mode === 'never' || (mode === 'fix2' && call % 2 === 1) ? 3 : 2;
 fs.writeFileSync('a.mjs', 'export const a = ' + value + ';\\n');
@@ -222,6 +235,15 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       reset();
     });
 
+    check('a commit is reported even when the test command then times out', () => {
+      const out = JSON.parse(run(['implement', '--spec', spec, '--worktree', tree, '--test', 'node -e "setTimeout(()=>{},5000)"', '--timeout', '1'], { FAKE_KIRO: 'commit-only' }).stdout);
+      assert.equal(out.status, 'failed');
+      assert.equal(out.head_unchanged, false);
+      assert.match(out.reason, /HEAD/);
+      git(tree, 'reset', '-q', '--hard', headBefore);
+      reset();
+    });
+
     check('a commit made during the run is reported as a failure', () => {
       const out = JSON.parse(run(['implement', '--spec', spec, '--worktree', tree], { FAKE_KIRO: 'commit' }).stdout);
       assert.equal(out.status, 'failed');
@@ -300,6 +322,14 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       const inside = run(['implement', '--spec', spec, '--worktree', tree]);
       assert.equal(JSON.parse(inside.stdout).status, 'ok', inside.stderr);
       reset();
+      // 읽을 수 없는 디렉터리는 스택 트레이스 대신 ERROR 로 멈춘다(기계 리뷰 finding-00566b2bbadf9032)
+      if (process.getuid && process.getuid() !== 0) {
+        mkdirSync(path.join(tree, 'tmp', 'locked'), { recursive: true });
+        spawnSync('chmod', ['000', path.join(tree, 'tmp', 'locked')]);
+        refuse(['implement', '--spec', spec, '--worktree', tree], /심볼릭 링크를 확인하지 못했습니다/);
+        spawnSync('chmod', ['700', path.join(tree, 'tmp', 'locked')]);
+        reset();
+      }
       refuse(['implement', '--spec', spec], /--worktree/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--timeout', 'x'], /--timeout/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--test', 'true', '--rounds', '9'], /--rounds/);

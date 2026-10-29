@@ -61,6 +61,10 @@ export function buildPrompt(spec, { test = null, failure = null, nonce = randomB
 // 실제로 쓰일 Kiro agent 설정의 뜻을 확인한다(설치 뒤 바뀌었거나 실행기만 복사해 쓰는 경우 대비).
 // Kiro 는 쓸 때마다 설정을 새 형식(tools 이름 read/write, permissions.rules)으로 고쳐 쓰므로 두 형식을 다 본다.
 const FILE_TOOLS = new Set(["fs_read", "fs_write", "read", "write"]);
+const REQUIRED_DENY = {
+  fs_read: ["**/.env", "**/*.pem", "**/*.key", "**/id_rsa*"],
+  fs_write: [".git/**", "**/.env", ".claude/**", "**/CLAUDE.md", "AGENTS.md", ".husky/**", ".github/workflows/**"],
+};
 export function agentConfigProblems(config) {
   if (!config || typeof config !== "object") return ["설정을 읽지 못했습니다"];
   const problems = [];
@@ -77,20 +81,41 @@ export function agentConfigProblems(config) {
     if (rule?.effect === "deny") continue;
     if (!FILE_TOOLS.has(rule?.capability) || !Array.isArray(rule?.match) || !rule.match.every((m) => m === "./**")) problems.push(`permissions 의 허용 규칙은 파일 도구의 ./** 만 허용합니다: ${JSON.stringify(rule)}`);
   }
+  // 경계(./**)와 핵심 금지 경로가 실제로 있어야 한다(지워진 설정을 안전하다고 보지 않는다). 옛 형식(toolsSettings)이나
+  // Kiro 가 고쳐 쓴 형식(permissions.rules) 어느 쪽에 있어도 된다.
+  const rulesFor = (capability, effect) => [
+    ...((config.toolsSettings?.[capability] || config.toolsSettings?.[capability.replace("fs_", "")])?.[effect === "allow" ? "allowedPaths" : "deniedPaths"] || []),
+    ...(config.permissions?.rules || []).filter((r) => r?.capability === capability && r?.effect === effect).flatMap((r) => r.match || []),
+  ];
+  for (const capability of ["fs_read", "fs_write"]) {
+    if (!rulesFor(capability, "allow").includes("./**")) problems.push(`${capability} 를 worktree(./**) 안으로 묶는 경계가 없습니다`);
+  }
+  for (const [capability, required] of Object.entries(REQUIRED_DENY)) {
+    const denied = new Set(rulesFor(capability, "deny"));
+    const missing = required.filter((p) => !denied.has(p));
+    if (missing.length) problems.push(`${capability} 금지 경로가 빠졌습니다: ${missing.join(", ")}`);
+  }
   if (config.mcpServers && Object.keys(config.mcpServers).length) problems.push("mcpServers 는 비어 있어야 합니다");
   if (config.includeMcpJson) problems.push("includeMcpJson 은 false 여야 합니다");
   return problems;
 }
 
 // worktree 안의 심볼릭 링크 중 실제 경로가 worktree 밖인 것(.gitignore 아래 포함, .git 제외).
+// 읽지 못한 경로나 너무 많은 항목은 확인하지 못한 것이라 실패로 본다(fail-closed).
+const MAX_SCAN_ENTRIES = 300000;
 function outsideLinks(root, limit = 3) {
   const found = [], stack = [root], realRoot = realpathSync(root);
+  let scanned = 0;
   while (stack.length && found.length < limit) {
     const dir = stack.pop();
-    for (const name of readdirSync(dir)) {
+    let names;
+    try { names = readdirSync(dir); } catch (error) { throw new Error(`${path.relative(root, dir) || "."} 를 읽지 못했습니다(${error.code || error.message})`); }
+    for (const name of names) {
       if (dir === root && name === ".git") continue;
+      if (++scanned > MAX_SCAN_ENTRIES) throw new Error(`항목이 ${MAX_SCAN_ENTRIES}개를 넘습니다. 큰 무시 디렉터리를 지운 worktree 에서 다시 실행하세요`);
       const full = path.join(dir, name);
-      const st = lstatSync(full);
+      let st;
+      try { st = lstatSync(full); } catch (error) { if (error.code === "ENOENT") continue; throw new Error(`${path.relative(root, full)} 를 읽지 못했습니다(${error.code || error.message})`); }
       if (st.isSymbolicLink()) {
         let real = null;
         try { real = realpathSync(full); } catch { /* 끊긴 링크는 밖으로 본다 */ }
@@ -168,7 +193,8 @@ function checkWorktree(dir) {
   if (index.status !== 0 || index.error) fail("git ls-files 를 읽지 못해 심볼릭 링크를 확인하지 못했습니다");
   const links = index.stdout.split("\0").filter((l) => l.startsWith("120000 "));
   if (links.length) fail(`심볼릭 링크가 있는 worktree 에서는 실행하지 않습니다: ${links.slice(0, 3).map((l) => l.split("\t")[1]).join(", ")}`);
-  const outside = outsideLinks(dir);
+  let outside;
+  try { outside = outsideLinks(dir); } catch (error) { fail(`worktree 의 심볼릭 링크를 확인하지 못했습니다: ${error.message}`); }
   if (outside.length) fail(`worktree 밖을 가리키는 심볼릭 링크가 있어 실행하지 않습니다: ${outside.join(", ")}`);
   if (existsSync(path.join(dir, ".kiro", "agents", `${AGENT}.json`))) fail(`worktree 에 같은 이름의 로컬 Kiro agent(.kiro/agents/${AGENT}.json)가 있어 실행하지 않습니다`);
   return git(dir, "rev-parse", "HEAD").out;
@@ -231,8 +257,12 @@ function main() {
     if (t.error) {
       appendFileSync(log, `=== test (round ${round}) error: ${t.error.code || t.error.message} ===\n${output}\n`);
       const after = statusEntries(worktree) || { changed: [], ignored: [] };
-      const reason = t.error.code === "ETIMEDOUT" ? `테스트가 ${timeout / 1000}초 안에 끝나지 않았습니다` : `테스트 명령을 실행하지 못했습니다: ${t.error.message}`;
-      report({ status: t.error.code === "ETIMEDOUT" ? "timeout" : "failed", reason, rounds: round, test: { command: opt.test, exit_code: null, output_tail: output.slice(-REPORT_TEST_CHARS) },
+      const headUnchanged = git(worktree, "rev-parse", "HEAD").out === headBefore;
+      const timedOut = t.error.code === "ETIMEDOUT";
+      // 커밋(HEAD 변경)이 있었으면 시간 초과보다 그것을 먼저 알린다
+      const reason = !headUnchanged ? "HEAD 가 바뀌었습니다(커밋 금지 위반). 변경을 검토하고 되돌리세요"
+        : timedOut ? `테스트가 ${timeout / 1000}초 안에 끝나지 않았습니다` : `테스트 명령을 실행하지 못했습니다: ${t.error.message}`;
+      report({ status: headUnchanged && timedOut ? "timeout" : "failed", reason, rounds: round, head_unchanged: headUnchanged, test: { command: opt.test, exit_code: null, output_tail: output.slice(-REPORT_TEST_CHARS) },
         changed_files: after.changed, new_ignored_files: after.ignored.filter((f) => !ignoredBefore.has(f)), diff_stat: git(worktree, "diff", "--stat").out,
         kiro_summary: cleanOutput(run.stdout).slice(-SUMMARY_CHARS), log }, false);
     }
