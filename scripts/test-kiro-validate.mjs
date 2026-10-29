@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { agentConfigProblems, buildPrompt, cleanOutput, fitSummary, loadSwitch, parseVerdict } from './kiro-validate.mjs';
+import { agentConfigProblems, buildPrompt, cleanOutput, fitSummary, isSecretPath, loadSwitch, parseVerdict, redact } from './kiro-validate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, 'kiro-validate.mjs');
@@ -58,7 +58,19 @@ await check('the shipped Kiro agent is read-only and the installed config is che
   assert.match(bad({ resources: ['file:///home/u/.ssh/config'] }), /resources/);
   assert.match(bad({ toolAliases: { fs_read: 'write' } }), /toolAliases/);
   assert.match(bad({ toolsSettings: { ...template.toolsSettings, read: { allowedPaths: ['/**'] } } }), /경계/);
+  // 읽기 도구마다 따로 막혀야 한다: fs_read 에만 금지 경로가 있고 read 는 ./** 만 허용하면 거부한다.
+  assert.match(bad({ toolsSettings: { ...template.toolsSettings, read: { allowedPaths: ['./**'] } } }), /toolsSettings\.read: 금지 경로/);
+  assert.match(bad({ permissions: { rules: [{ capability: 'fs_read', match: ['./**'], effect: 'allow' },
+    { capability: 'fs_read', match: ['**/.env', '**/*.pem', '**/*.key', '**/id_rsa*'], effect: 'deny' },
+    { capability: 'read', match: ['./**'], effect: 'allow' }] } }), /permissions\(read\): 금지 경로/);
   assert.match(agentConfigProblems(null).join(), /읽지 못/);
+});
+
+await check('secret-looking paths are refused and keys or tokens in the diff and test log are masked', () => {
+  for (const f of ['.env', 'app/.env.local', 'certs/server.pem', 'k/tls.key', '.ssh/id_rsa.pub', 'config/credentials.json', 'secrets/db.yml']) assert.ok(isSecretPath(f), f);
+  for (const f of ['a.txt', 'src/env.mjs', 'docs/keys.md', '']) assert.ok(!isSecretPath(f), f);
+  const masked = redact('x AKIAABCDEFGHIJKLMNOP y\n-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----\nghp_' + 'a'.repeat(36));
+  assert.equal(masked, 'x [REDACTED] y\n[REDACTED]\n[REDACTED]');
 });
 
 await check('the summary stays under 1KB even with long Korean reasons repeated per validator', () => {
@@ -190,6 +202,14 @@ await check('setup-kiro.sh turns delegation on only when asked, keeps other swit
   assert.equal(setupKiro('--update').status, 0);
   assert.equal(existsSync(switchFile), false, 'install/update does not turn it on');
   assert.equal(existsSync(agentFile), false);
+  const stale = setupKiro('--validation-on');
+  assert.equal(stale.status, 1, 'without the installed runner and contract it stays off');
+  assert.match(stale.stdout, /setup\.sh --update/);
+  assert.equal(existsSync(switchFile), false);
+  mkdirSync(path.join(env.home, '.claude', 'scripts'), { recursive: true });
+  mkdirSync(path.join(env.home, '.claude', 'docs', 'references'), { recursive: true });
+  writeFileSync(path.join(env.home, '.claude', 'scripts', 'kiro-validate.mjs'), '');
+  writeFileSync(path.join(env.home, '.claude', 'docs', 'references', 'validation-contract.md'), 'node kiro-validate.mjs run\n');
   assert.equal(setupKiro('--validation-on').status, 0);
   assert.deepEqual(JSON.parse(readFileSync(switchFile, 'utf8')), { enabled: true });
   assert.deepEqual(agentConfigProblems(JSON.parse(readFileSync(agentFile, 'utf8'))), []);
@@ -247,6 +267,19 @@ await check('tracked symlinks or a repo .kiro/ keep Kiro off', () => {
   mkdirSync(path.join(env.repo, '.kiro', 'agents'), { recursive: true });
   writeFileSync(path.join(env.repo, '.kiro', 'agents', 'claude-validator.json'), '{}');
   assert.match(run(env, 'ok', 'doc').json.reason, /\.kiro\//);
+  rmSync(env.root, { recursive: true, force: true });
+});
+
+await check('a change to a secret-looking file goes to Claude without writing the diff for Kiro', () => {
+  const env = setup();
+  sh(env.repo, 'echo TOKEN=x > .env && git add -f .env && git commit -qm env');
+  const snapshotFile = path.join(env.repo, 'tmp', 'validation-snapshot.json');
+  writeFileSync(snapshotFile, JSON.stringify({ ...JSON.parse(readFileSync(snapshotFile, 'utf8')), head_sha: sh(env.repo, 'git rev-parse HEAD') }));
+  const r = run(env, 'ok', 'doc');
+  assert.equal(r.json.backend, 'claude');
+  assert.match(r.json.reason, /비밀 파일.*\.env/);
+  assert.equal(existsSync(path.join(env.repo, 'tmp', 'kiro')), false);
+  assert.doesNotMatch(calls(env), /chat/);
   rmSync(env.root, { recursive: true, force: true });
 });
 
