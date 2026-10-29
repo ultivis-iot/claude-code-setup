@@ -15,7 +15,7 @@ Claude Code, Codex, Kiro 개발 플로우 설정 도구 저장소입니다.
 ├── codex/              # Codex rules/skills
 ├── setup.sh            # Linux/Mac 설치 스크립트
 ├── setup-codex.sh      # Codex 설치 스크립트
-├── setup-kiro.sh       # Kiro 스킬 설치 스크립트 (codex/skills → ~/.kiro/skills)
+├── setup-kiro.sh       # Kiro 스킬 설치 스크립트 (codex/skills → ~/.kiro/skills), --validation-on/off 로 검증 위임(templates/kiro/) 켜고 끄기
 └── setup.ps1           # Windows 설치 스크립트
 ```
 
@@ -69,7 +69,7 @@ git push origin master --tags
 ### 테스트
 - 설치: `./setup.sh`
 - Codex 설치: `./setup-codex.sh`
-- Kiro 스킬 설치: `./setup-kiro.sh` (정본 `codex/skills/` 를 `~/.kiro/skills/` 로 복사)
+- Kiro 스킬 설치: `./setup-kiro.sh` (정본 `codex/skills/` 를 `~/.kiro/skills/` 로 복사). 검증 위임은 `./setup-kiro.sh --validation-on`·`--validation-off`
 - 업데이트: `./setup.sh --update`
 - 워크플로우 검증: `./scripts/verify-workflow.sh`
 - CLAUDE.md 설치기 테스트: `node scripts/test-install-claude-md.mjs` (워크플로우 검증에 포함)

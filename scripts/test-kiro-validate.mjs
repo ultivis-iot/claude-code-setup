@@ -92,7 +92,7 @@ function setup({ switchOn = true, agent = template, kiro = true } = {}) {
   if (agent) writeFileSync(path.join(home, '.kiro', 'agents', 'claude-validator.json'), JSON.stringify(agent));
   // 가짜 kiro-cli: FAKE_KIRO 로 동작을 정하고, 받은 인자를 calls.log 에 남긴다.
   if (kiro) writeFileSync(path.join(bin, 'kiro-cli'), `#!/bin/sh
-echo "$*" | head -c 300 >> "${root}/calls.log"; echo >> "${root}/calls.log"
+echo "$*" >> "${root}/calls.log"
 case "$1" in --version) echo "kiro-cli 2.35.1"; exit 0;; whoami) [ "$FAKE_KIRO" = nologin ] && exit 1; echo ok; exit 0;; esac
 model=""; prev=""; for a in "$@"; do [ "$prev" = "--model" ] && model="$a"; prev="$a"; done
 case "$FAKE_KIRO" in
@@ -114,10 +114,16 @@ esac
   return { root, home, bin, repo };
 }
 
+function fakeEnv(env, mode) {
+  const e = { ...process.env, HOME: env.home, PATH: `${env.bin}:/usr/bin:/bin`, FAKE_KIRO: mode };
+  delete e.KIRO_HOME;
+  return e;
+}
+
 function run(env, mode, validators = 'doc,security,code-simplifier,test', extra = []) {
   const r = spawnSync(process.execPath, [tool, 'run', '--repo', env.repo, '--snapshot', 'tmp/validation-snapshot.json', '--policy', 'tmp/review-policy.json',
     '--validators', validators, '--plan', 'tmp/current-plan.md', '--out', 'tmp/kiro/results.json', ...extra],
-  { encoding: 'utf8', env: { ...process.env, HOME: env.home, PATH: `${env.bin}:/usr/bin:/bin`, FAKE_KIRO: mode } });
+  { encoding: 'utf8', env: fakeEnv(env, mode) });
   return { ...r, json: r.stdout ? JSON.parse(r.stdout) : null };
 }
 const results = (env) => JSON.parse(readFileSync(path.join(env.repo, 'tmp', 'kiro', 'results.json'), 'utf8'));
@@ -160,6 +166,41 @@ await check('Kiro verdicts are written in the contract input format with the bac
   rmSync(env.root, { recursive: true, force: true });
 });
 
+await check('a failing or unfinished test command is recorded from the runner, not from Kiro', () => {
+  const env = setup();
+  let r = run(env, 'ok', 'test', ['--test', 'echo boom; exit 3']);
+  assert.deepEqual({ ...results(env)['test-validator'].test_execution, log: undefined }, { ran: true, command: 'echo boom; exit 3', exit_code: 3, log: undefined });
+  assert.match(calls(env), /exit 3/);
+  r = run(env, 'ok', 'test', ['--test', 'sleep 10']);
+  assert.equal(r.json.backend, 'kiro');
+  assert.deepEqual({ ...results(env)['test-validator'].test_execution, log: undefined }, { ran: false, command: 'sleep 10', exit_code: null, log: undefined });
+  assert.match(calls(env), /not finished \(5초 초과\)/);
+  rmSync(env.root, { recursive: true, force: true });
+});
+
+await check('setup-kiro.sh turns delegation on only when asked, keeps other switch values and turns it off', () => {
+  const env = setup({ switchOn: false, agent: null });
+  const setupKiro = (...a) => spawnSync('bash', [path.join(here, '..', 'setup-kiro.sh'), ...a], { encoding: 'utf8', env: fakeEnv(env, 'ok') });
+  const switchFile = path.join(env.home, '.claude', 'kiro-validation.json');
+  const agentFile = path.join(env.home, '.kiro', 'agents', 'claude-validator.json');
+  assert.equal(setupKiro('--update').status, 0);
+  assert.equal(existsSync(switchFile), false, 'install/update does not turn it on');
+  assert.equal(existsSync(agentFile), false);
+  assert.equal(setupKiro('--validation-on').status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(switchFile, 'utf8')), { enabled: true });
+  assert.deepEqual(agentConfigProblems(JSON.parse(readFileSync(agentFile, 'utf8'))), []);
+  writeFileSync(switchFile, JSON.stringify({ enabled: true, model: 'claude-opus-4.8' }));
+  assert.equal(setupKiro('--validation-off').status, 0);
+  assert.deepEqual(JSON.parse(readFileSync(switchFile, 'utf8')), { enabled: false, model: 'claude-opus-4.8' });
+  assert.equal(setupKiro('--update').status, 0);
+  assert.equal(JSON.parse(readFileSync(switchFile, 'utf8')).enabled, false, 'update keeps it off');
+  rmSync(path.join(env.bin, 'kiro-cli'));
+  const noKiro = setupKiro('--validation-on');
+  assert.equal(noKiro.status, 1);
+  assert.equal(JSON.parse(readFileSync(switchFile, 'utf8')).enabled, false);
+  rmSync(env.root, { recursive: true, force: true });
+});
+
 await check('a broken answer retries with the fallback model, then hands the validator to Claude', () => {
   let env = setup();
   let r = run(env, 'primaryfail', 'intent');
@@ -190,7 +231,7 @@ await check('a working tree changed during the Kiro run discards every verdict',
   rmSync(env.root, { recursive: true, force: true });
 });
 
-await check('tracked symlinks or a same-name repo agent keep Kiro off', () => {
+await check('tracked symlinks or a repo .kiro/ keep Kiro off', () => {
   let env = setup();
   sh(env.repo, 'ln -s /etc/hostname link && git add link && git commit -qm link');
   assert.match(run(env, 'ok', 'doc').json.reason, /심볼릭 링크/);
@@ -198,7 +239,7 @@ await check('tracked symlinks or a same-name repo agent keep Kiro off', () => {
   env = setup();
   mkdirSync(path.join(env.repo, '.kiro', 'agents'), { recursive: true });
   writeFileSync(path.join(env.repo, '.kiro', 'agents', 'claude-validator.json'), '{}');
-  assert.match(run(env, 'ok', 'doc').json.reason, /같은 이름/);
+  assert.match(run(env, 'ok', 'doc').json.reason, /\.kiro\//);
   rmSync(env.root, { recursive: true, force: true });
 });
 
@@ -212,7 +253,7 @@ await check('bad arguments are refused', () => {
   const r = spawnSync(process.execPath, [tool, 'run', '--repo', env.repo, '--bogus', 'x'], { encoding: 'utf8' });
   assert.match(r.stderr, /모르는 옵션/);
   const missing = spawnSync(process.execPath, [tool, 'run', '--repo', env.repo, '--snapshot', 'tmp/none.json', '--policy', 'tmp/review-policy.json', '--validators', 'doc', '--out', 'tmp/o.json'],
-    { encoding: 'utf8', env: { ...process.env, HOME: env.home, PATH: `${env.bin}:/usr/bin:/bin`, FAKE_KIRO: 'ok' } });
+    { encoding: 'utf8', env: fakeEnv(env, 'ok') });
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /^ERROR: 스냅샷/);
   assert.equal(readdirSync(path.join(env.repo, 'tmp')).includes('kiro'), false);

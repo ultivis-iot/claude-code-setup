@@ -5,8 +5,8 @@
 //                              --validators <intent|doc,security,code-simplifier,test> [--plan tmp/current-plan.md]
 //                              [--test "<명령>"] --out tmp/kiro/results.json
 //
-// 스위치 ~/.claude/kiro-validation.json 이 없거나 꺼져 있거나, kiro-cli 가 없거나 로그인이 끊겼거나, Kiro agent 설정이
-// 읽기 전용이 아니면 {"backend":"claude"} 만 내고 끝난다. 그러면 메인은 기존 Claude subagent 로 검증한다.
+// 스위치 ~/.claude/kiro-validation.json(`./setup-kiro.sh --validation-on` 이 만듦)이 없거나 꺼져 있거나, kiro-cli 가 없거나 로그인이 끊겼거나, Kiro agent 설정이
+// 읽기 전용이 아니면, 검증 대상 저장소에 .kiro/ 나 추적되는 심볼릭 링크가 있으면 {"backend":"claude"} 만 내고 끝난다. 그러면 메인은 기존 Claude subagent 로 검증한다.
 // 켜져 있으면 검증마다 kiro-cli 를 하나씩(품질 검증은 병렬로) 띄운다. 기준은 설치본 ~/.claude/agents/<validator>.md 다.
 // Kiro 는 파일 읽기 도구만 있고 cwd(검증 대상 저장소) 밖은 비대화형이라 거부된다. diff·Plan·정책·테스트 로그는
 // tmp/kiro/<run>/ 에 써서 Kiro 가 읽게 한다. 테스트는 Kiro 가 아니라 이 실행기가 --test 명령으로 돌린다.
@@ -28,7 +28,7 @@ const DEFAULTS = { enabled: false, model: "claude-opus-5.5", fallback_model: "cl
 const TEST_LOG_CHARS = 200000, MAX_SUMMARY_BYTES = 1024;
 
 const claudeHome = () => path.join(os.homedir(), ".claude");
-const kiroAgentFile = () => path.join(os.homedir(), ".kiro", "agents", `${AGENT}.json`);
+const kiroAgentFile = () => path.join(process.env.KIRO_HOME || path.join(os.homedir(), ".kiro"), "agents", `${AGENT}.json`);
 
 // 스위치를 읽는다. 없거나 깨졌으면 꺼진 것으로 본다.
 export function loadSwitch(file = path.join(claudeHome(), "kiro-validation.json")) {
@@ -53,7 +53,8 @@ export function agentConfigProblems(config) {
   const tools = Array.isArray(config.tools) ? config.tools : [];
   if (!tools.length) problems.push("tools 가 비었습니다");
   for (const t of tools) if (!READ_TOOLS.has(t)) problems.push(`허용하지 않는 도구: ${t}`);
-  if (Array.isArray(config.allowedTools) ? config.allowedTools.length : config.allowedTools !== undefined) problems.push("allowedTools 는 비어 있어야 합니다");
+  const autoApproved = Array.isArray(config.allowedTools) ? config.allowedTools.length > 0 : config.allowedTools !== undefined;
+  if (autoApproved) problems.push("allowedTools 는 비어 있어야 합니다");
   for (const name of Object.keys(config.toolsSettings || {})) if (!READ_TOOLS.has(name)) problems.push(`허용하지 않는 도구 설정: ${name}`);
   const settings = config.toolsSettings?.fs_read || config.toolsSettings?.read || {};
   const rules = config.permissions?.rules || [];
@@ -197,8 +198,8 @@ function unavailable(repo, config) {
   try { agentConfig = JSON.parse(readFileSync(kiroAgentFile(), "utf8")); } catch { /* 아래에서 거부 */ }
   const problems = agentConfigProblems(agentConfig);
   if (problems.length) return `Kiro agent 설정(${kiroAgentFile()})이 읽기 전용이 아닙니다: ${problems.join("; ")}. ./setup-kiro.sh 로 다시 설치하세요`;
-  // 저장소에 같은 이름의 agent 가 있으면 Kiro 가 그것을 쓸 수 있다.
-  if (existsSync(path.join(repo, ".kiro", "agents", `${AGENT}.json`))) return `저장소에 같은 이름의 Kiro agent(.kiro/agents/${AGENT}.json)가 있습니다`;
+  // 저장소의 .kiro/(같은 이름 agent·steering·settings 등)가 Kiro 세션에 섞여 판정을 바꿀 수 있다.
+  if (existsSync(path.join(repo, ".kiro"))) return "저장소에 .kiro/ 가 있어 Kiro 세션 설정이 섞일 수 있습니다";
   // 추적되는 심볼릭 링크는 cwd 경계 밖을 읽게 할 수 있다.
   const links = git(repo, "ls-files", "-s", "-z");
   if (!links.ok) return "git ls-files 를 읽지 못했습니다";
