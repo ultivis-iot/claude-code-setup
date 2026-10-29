@@ -233,8 +233,8 @@ function args(argv) {
     const key = body;
     const next = rest[i + 1];
     // --reason 은 자유 서술이라 값이 --repo 처럼 옵션 이름으로 시작해도 다음 인자를 값으로 삼는다.
-    // 다만 다음 인자가 옵션 하나(--commit 등)뿐이면 값을 빠뜨린 것이라 받지 않는다.
-    const reasonText = key === "reason" && next !== undefined && !/^--[a-z-]+(=.*)?$/.test(next);
+    // 다만 다음 인자가 값 없는 옵션 이름 하나(--commit 등)뿐이면 값을 빠뜨린 것이라 받지 않는다(--repo=foo 같은 문장은 사유로 받는다).
+    const reasonText = key === "reason" && next !== undefined && !/^--[a-z-]+$/.test(next);
     const takesNext = next !== undefined && next !== "" && (reasonText || !next.startsWith("--"));
     opt[key] = takesNext ? rest[++i] : true;
   }
