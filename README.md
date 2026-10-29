@@ -288,13 +288,13 @@ Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고
 
 #### Kiro 검증 위임 (선택, 한시)
 
-Claude 토큰을 아끼려고 `/commit-and-verify` 의 검증 5개를 Kiro(`claude-opus-5.5`, 실패하면 `claude-opus-4.8`)에 맡깁니다. 기준은 Claude 와 같은 설치본 `~/.claude/agents/<validator>.md` 이고, 결과는 같은 게이트(`record`·`ready`)를 거칩니다. Kiro agent 는 파일 읽기만 하고(쓰기·셸 없음) 저장소 밖은 읽지 못합니다. 테스트는 Kiro 가 아니라 실행기(`scripts/kiro-validate.mjs`)가 메인이 정한 명령으로 돌리고 그 로그를 Kiro 가 판정합니다. 각 결과의 근거 첫 줄에 `backend: kiro/<모델>` 이 남습니다.
+Claude 토큰을 아끼려고 `/commit-and-verify` 의 검증 5개를 Kiro(`claude-opus-5.5`, 실패하면 `claude-opus-4.8`)에 맡깁니다. 기준은 Claude 와 같은 설치본 `~/.claude/agents/<validator>.md` 이고, 결과는 같은 게이트(`record`·`ready`)를 거칩니다. Kiro agent 는 파일 읽기만 하고(쓰기·셸·hook·MCP 없음) 저장소 밖 읽기는 Kiro 의 경로 승인(`./**`)이 거부합니다(kiro-cli 2.35.1 에서 확인). 테스트는 Kiro 가 아니라 실행기(`scripts/kiro-validate.mjs`)가 메인이 정한 명령으로 돌리고 그 로그를 Kiro 가 판정합니다. 각 결과의 근거 첫 줄에 `backend: kiro/<모델>` 이 남습니다.
 
 - 켜기: `kiro-cli` 로그인 후 `./setup-kiro.sh --validation-on`. 읽기 전용 agent 를 설치하고 `~/.claude/kiro-validation.json` 을 `enabled: true` 로 둡니다. 기본 설치·`--update` 는 새로 켜지 않습니다. 모델·시간 제한은 스위치에 `model`·`fallback_model`·`timeout`(초) 으로 바꿀 수 있습니다.
 - 자동으로 원래대로: 스위치가 없거나 꺼졌을 때, `kiro-cli` 가 없을 때, 로그인이 끊겼을 때(`kiro-cli whoami`), agent 설정이 읽기 전용이 아닐 때, 검증 대상 저장소에 `.kiro/` 나 추적되는 심볼릭 링크가 있을 때는 전부 Claude subagent 로 검증합니다. Kiro 가 시간 초과되거나 결과 형식이 틀리면 그 검증만 Claude 로 돕니다.
 - 끄기: `./setup-kiro.sh --validation-off`. 다시 켜려면 `--validation-on`.
 - 주의: 검증할 코드가 Kiro(AWS)로 전송됩니다. 허용되지 않은 저장소에서는 끄세요. 읽기 경계(`./**`)는 Kiro 의 경로 승인에 기대며, 무시되는 경로(`node_modules/` 등)의 심볼릭 링크가 저장소 밖을 가리키면 그 내용이 읽힐 수 있습니다.
-- 완전 제거: 이 기능을 더한 커밋을 revert 하고 `rm ~/.claude/kiro-validation.json ~/.kiro/agents/claude-validator.json*`. 검증 기준·게이트는 바꾸지 않았으므로 그대로 Claude 검증으로 돌아갑니다.
+- 완전 제거: 이 기능을 더한 커밋을 revert 하고 `rm ~/.claude/kiro-validation.json "${KIRO_HOME:-$HOME/.kiro}"/agents/claude-validator.json*`. 검증 기준·게이트는 바꾸지 않았으므로 그대로 Claude 검증으로 돌아갑니다.
 
 설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `node`가 있으면 `ult-notion.mjs cache-refresh`로 warm-up을 시도합니다.
 

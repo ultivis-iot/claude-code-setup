@@ -25,7 +25,7 @@ const VALIDATORS = { intent: "intent-validator", doc: "doc-validator", security:
 const STATUSES = new Set(["PASS", "WARN", "FAIL", "SKIP"]);
 const OPTIONS = new Set(["repo", "snapshot", "policy", "validators", "plan", "test", "out"]);
 const DEFAULTS = { enabled: false, model: "claude-opus-5.5", fallback_model: "claude-opus-4.8", timeout: 900 };
-const TEST_LOG_CHARS = 200000, MAX_SUMMARY_BYTES = 1024;
+const TEST_LOG_CHARS = 200000, MAX_SUMMARY_BYTES = 1024, MAX_BUFFER = 256 * 1024 * 1024;
 
 const claudeHome = () => path.join(os.homedir(), ".claude");
 const kiroAgentFile = () => path.join(process.env.KIRO_HOME || path.join(os.homedir(), ".kiro"), "agents", `${AGENT}.json`);
@@ -55,18 +55,23 @@ export function agentConfigProblems(config) {
   for (const t of tools) if (!READ_TOOLS.has(t)) problems.push(`허용하지 않는 도구: ${t}`);
   const autoApproved = Array.isArray(config.allowedTools) ? config.allowedTools.length > 0 : config.allowedTools !== undefined;
   if (autoApproved) problems.push("allowedTools 는 비어 있어야 합니다");
-  for (const name of Object.keys(config.toolsSettings || {})) if (!READ_TOOLS.has(name)) problems.push(`허용하지 않는 도구 설정: ${name}`);
-  const settings = config.toolsSettings?.fs_read || config.toolsSettings?.read || {};
+  const settings = Object.entries(config.toolsSettings || {});
+  for (const [name] of settings) if (!READ_TOOLS.has(name)) problems.push(`허용하지 않는 도구 설정: ${name}`);
   const rules = config.permissions?.rules || [];
-  for (const rule of rules) {
-    if (rule?.effect === "deny") continue;
+  const allowRules = rules.filter((r) => r?.effect !== "deny"), denyRules = rules.filter((r) => r?.effect === "deny");
+  for (const rule of allowRules) {
     if (!READ_TOOLS.has(rule?.capability) || !Array.isArray(rule?.match) || !rule.match.every((m) => m === "./**")) problems.push(`허용 규칙은 읽기 도구의 ./** 만 됩니다: ${JSON.stringify(rule)}`);
   }
-  const allowed = [...(settings.allowedPaths || []), ...rules.filter((r) => r?.effect !== "deny").flatMap((r) => r.match || [])];
+  // 읽기 도구 설정이 둘(fs_read·read) 있으면 둘 다 경계를 지켜야 한다.
+  const allowed = [...settings.flatMap(([, s]) => s?.allowedPaths || []), ...allowRules.flatMap((r) => r.match || [])];
   if (!allowed.includes("./**") || !allowed.every((p) => p === "./**")) problems.push("읽기 경계는 ./** 만 있어야 합니다");
-  const denied = new Set([...(settings.deniedPaths || []), ...rules.filter((r) => r?.effect === "deny").flatMap((r) => r.match || [])]);
+  const denied = new Set([...settings.flatMap(([, s]) => s?.deniedPaths || []), ...denyRules.flatMap((r) => r.match || [])]);
   const missing = REQUIRED_DENY.filter((p) => !denied.has(p));
   if (missing.length) problems.push(`금지 경로가 빠졌습니다: ${missing.join(", ")}`);
+  // hook 은 셸 명령을 돌리고, resources 는 경계 밖 파일을 컨텍스트에 넣고, 별칭은 도구 이름을 바꾼다.
+  if (config.hooks && Object.keys(config.hooks).length) problems.push("hooks 는 비어 있어야 합니다");
+  if (config.resources && (!Array.isArray(config.resources) || config.resources.length)) problems.push("resources 는 비어 있어야 합니다");
+  if (config.toolAliases && Object.keys(config.toolAliases).length) problems.push("toolAliases 는 비어 있어야 합니다");
   if (config.mcpServers && Object.keys(config.mcpServers).length) problems.push("mcpServers 는 비어 있어야 합니다");
   if (config.includeMcpJson) problems.push("includeMcpJson 은 false 여야 합니다");
   return problems;
@@ -148,7 +153,7 @@ function args(argv) {
 }
 
 function git(cwd, ...argv) {
-  const r = spawnSync("git", argv, { cwd, encoding: "utf8", maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+  const r = spawnSync("git", argv, { cwd, encoding: "utf8", maxBuffer: MAX_BUFFER, windowsHide: true });
   return { ok: r.status === 0, out: r.stdout || "" };
 }
 
@@ -248,7 +253,7 @@ async function main() {
 
   let test = null;
   if (opt.test && validators.includes("test-validator")) {
-    const t = spawnSync(opt.test, { cwd: repo, shell: true, encoding: "utf8", timeout: config.timeout * 1000, maxBuffer: 256 * 1024 * 1024, windowsHide: true });
+    const t = spawnSync(opt.test, { cwd: repo, shell: true, encoding: "utf8", timeout: config.timeout * 1000, maxBuffer: MAX_BUFFER, windowsHide: true });
     const output = `${t.stdout || ""}${t.stderr || ""}`;
     writeFileSync(path.join(runDir, "test.log"), output.slice(-TEST_LOG_CHARS));
     test = { command: opt.test, exit_code: t.error ? null : t.status, log: path.join(runRel, "test.log"), error: t.error ? (t.error.code === "ETIMEDOUT" ? `${config.timeout}초 초과` : t.error.message) : null };
