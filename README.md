@@ -1,6 +1,6 @@
-# Claude Code / Codex 표준 개발 플로우 설정
+# Claude Code / Codex / Kiro 표준 개발 플로우 설정
 
-표준화된 개발 플로우를 위한 Claude Code / Codex 설정 패키지입니다.
+표준화된 개발 플로우를 위한 Claude Code / Codex / Kiro 설정 패키지입니다.
 
 ## 개요
 
@@ -78,6 +78,16 @@ cd claude-code-setup
 
 Codex에서는 `skill + plugin marketplace + minimal rules` 형태로 같은 워크플로우를 적용합니다. 기본 진입점은 `ultivis-flow` skill과 자연어 요청이며, plugin은 이 skill을 설치/공유하기 위한 패키지입니다.
 
+### Kiro (Linux / macOS)
+
+```bash
+git clone https://github.com/ultivis-iot/claude-code-setup.git
+cd claude-code-setup
+./setup-kiro.sh
+```
+
+Kiro에는 정본 스킬(`codex/skills/`)을 user-level 스킬 경로 `~/.kiro/skills/` 로 복사합니다. 새 Kiro 세션을 시작하면 자동으로 discover되고, 요청 내용이 스킬 description과 맞으면 자동 활성화됩니다. 워크스페이스 전용으로 덮어쓰려면 해당 저장소의 `.kiro/skills/` 에 같은 이름으로 두세요. (Kiro 대상은 스킬만 배포하며 commands/agents/hooks는 포함하지 않습니다.) `KIRO_HOME` 환경변수로 대상 경로를 바꿀 수 있습니다.
+
 ### Linux / macOS
 
 ```bash
@@ -127,6 +137,14 @@ git pull
 cd claude-code-setup
 git pull
 ./setup-codex.sh --update
+```
+
+### Kiro (Linux / macOS)
+
+```bash
+cd claude-code-setup
+git pull
+./setup-kiro.sh --update
 ```
 
 ### Windows (PowerShell)
@@ -230,6 +248,20 @@ Codex 설치 시:
 └── marketplace.json
 ```
 
+Kiro 설치 시 (스킬만 배포):
+
+```text
+~/.kiro/
+└── skills/
+    ├── ultivis-flow/
+    │   ├── SKILL.md
+    │   └── references/
+    ├── tdd/
+    ├── diagnosing-bugs/
+    ├── improve-codebase-architecture/
+    └── ...                        # codex/skills 의 정본 세트 전체
+```
+
 ## 사용 방법
 
 ### Codex
@@ -247,6 +279,10 @@ Codex 설치 시:
 - "사용자 시나리오를 확정하고 UX 리뷰 영상과 교육 영상을 만들어줘"
 
 Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고, 같은 세트를 `~/.codex/plugins/ult` plugin에도 포함합니다. plugin은 `~/.agents/plugins/marketplace.json`를 통해 Codex의 `/plugins` 화면에서 확인/설치할 수 있습니다. `~/.codex/rules/dev-workflow.rules`는 Codex 시작 시 파싱 오류를 막기 위한 최소 안전 파일로 유지합니다. 이전 실험에서 쓰던 `/ult:...` 형태의 plugin command 파일은 호환용으로만 남겨두며 기본 사용법으로 문서화하지 않습니다.
+
+### Kiro
+
+`setup-kiro.sh` 실행 후 새 Kiro 세션을 시작하면 `~/.kiro/skills/*`의 스킬이 자동으로 discover됩니다. 요청 내용이 스킬 description과 맞으면 자동 활성화되고, 슬래시로 직접 호출할 수도 있습니다. Kiro 대상은 정본 스킬(`codex/skills/`)만 복사하며 commands/agents/hooks는 포함하지 않습니다. 특정 저장소에서만 다른 버전을 쓰려면 그 저장소의 `.kiro/skills/`에 같은 이름으로 두면 user-level보다 우선합니다. 대상 경로는 `KIRO_HOME`으로 바꿀 수 있습니다.
 
 설치 시 Notion token을 찾을 수 있으면 사용자별 `notion-cache/`를 한 번 준비합니다. token이 없으면 설치는 계속 진행되고, 첫 Notion 관련 명령 실행 시 cache가 자동 생성됩니다. Windows `setup.ps1`은 `~/.claude/scripts`와 cache 디렉토리를 만들고, `node`가 있으면 `ult-notion.mjs cache-refresh`로 warm-up을 시도합니다.
 
