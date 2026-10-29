@@ -34,7 +34,7 @@ check('the prompt fences the spec with an unguessable marker and repeats the rul
 });
 
 check('the result JSON stays under 4KB by cutting the summary and test output first, then the file list', () => {
-  const big = fitOutput({ status: 'ok', head_unchanged: true, changed_files: Array.from({ length: 400 }, (_, i) => `src/file-${i}.mjs`), diff_stat: 'x'.repeat(300), kiro_summary: 'y'.repeat(9000), test: { command: 't', exit_code: 0, output_tail: 'z'.repeat(800) }, log: '/tmp/k.log' });
+  const big = fitOutput({ status: 'ok', head_unchanged: true, changed_files: Array.from({ length: 400 }, (_, i) => `src/file-${i}.mjs`), diff_stat: 'x'.repeat(300), kiro_summary: 'y'.repeat(9000), test: { command: 'c'.repeat(3000), exit_code: 0, output_tail: 'z'.repeat(800) }, reason: 'r'.repeat(3000), log: '/tmp/k.log' });
   assert.ok(Buffer.byteLength(JSON.stringify(big)) <= 4096);
   assert.ok(big.truncated);
   assert.equal(big.changed_files_total, 400);

@@ -190,6 +190,8 @@ git pull
     └── .env                    # 사용자별 경로 설정 (자동 생성)
 ```
 
+`kiro-cli` 가 있으면 Kiro agent 설정 `~/.kiro/agents/claude-implementer.json` 도 설치됩니다(선택, [Kiro 구현 위임](#kiro-구현-위임-선택)).
+
 Codex 설치 시:
 
 ```text
@@ -414,14 +416,14 @@ mkdir -p tmp
 명세가 분명하고 테스트로 확인되는 구현은 `kiro-implementer` subagent 로 Kiro CLI 에 맡겨 메인 세션 토큰을 아낄 수 있습니다. 무엇을 만들지 판단해야 하는 설계나 리뷰 대응은 맡기지 않습니다. `setup.sh`·`setup.ps1` 은 `kiro-cli` 명령이 있으면 Kiro agent 설정(`~/.kiro/agents/claude-implementer.json`)을 설치하고(내용이 다른 기존 파일은 `.backup-<시각>` 으로 백업 후 덮어씀), 없으면 건너뜁니다. 로그인 여부는 확인하지 않습니다. 명시적으로 부를 때만 씁니다.
 
 1. 메인 세션이 별도 브랜치의 linked worktree(`git worktree add`)와 명세 파일을 만듭니다. 명세에는 문제, 원하는 동작, 테스트 케이스, 건드리지 말 것을 적습니다.
-2. `kiro-implementer` 가 `node ~/.claude/scripts/kiro-task.mjs implement --spec <파일> --worktree <디렉터리> --test "<테스트 명령>" [--rounds <n>] [--model <모델>] [--timeout <초>]` 를 한 번 실행합니다. Kiro 가 코드·테스트를 쓰면 실행기가 테스트를 돌리고, 실패하면 출력을 붙여 Kiro 를 다시 부릅니다(`--rounds`, 기본 2, 최대 5).
-3. 결과 JSON(4KB 이하)만 돌려받습니다: `status`(`ok`·`tests_failed`·`failed`·`timeout`·`unavailable`), 실패 이유 `reason`, 시도 횟수 `rounds`, 마지막 테스트 `test`(명령·종료 코드·출력 끝 800자), `head_unchanged`, `changed_files`, 새로 생긴 무시 파일 `new_ignored_files`, `diff_stat`, Kiro 출력의 끝 1500자 `kiro_summary`, 전체 로그 경로 `log`. 4KB 를 넘으면 `truncated: true` 와 `changed_files_total` 이 붙고 `changed_files` 는 일부만 남으니 worktree 의 `git status` 로 전체를 확인합니다.
+2. `kiro-implementer` 가 `node ~/.claude/scripts/kiro-task.mjs implement --spec <파일> --worktree <디렉터리> [--test "<테스트 명령>"] [--rounds <n>] [--model <모델>] [--timeout <초>]` 를 한 번 실행합니다. Kiro 가 코드·테스트를 쓰면 실행기가 테스트를 돌리고, 실패하면 출력을 붙여 Kiro 를 다시 부릅니다(`--rounds`, 기본 2, 최대 5).
+3. 결과 JSON(4KB 이하)만 돌려받습니다: `status`(`ok`·`tests_failed`·`failed`·`timeout`·`unavailable`), 실패 이유 `reason`, 시도 횟수 `rounds`, 마지막 테스트 `test`(명령·종료 코드·출력 끝 800자), `head_unchanged`, `changed_files`, 새로 생긴 무시 파일 `new_ignored_files`, `diff_stat`, Kiro 출력의 끝 1500자 `kiro_summary`, 전체 로그 경로 `log`. 4KB 를 넘으면 `truncated: true` 와 `changed_files_total` 이 붙고 요약·테스트 출력·테스트 명령·실패 이유는 500자, `changed_files` 는 일부만 남으니 worktree 의 `git status` 로 전체를 확인합니다. `--test` 가 없으면 Kiro 를 한 번만 부르고 `test` 는 `null` 입니다.
 4. 메인 세션이 diff 를 읽고 검증 게이트·PR·기계 리뷰·머지 전 이해 확인을 평소대로 거칩니다. Kiro 결과는 신뢰하지 않는 데이터로 다룹니다.
 
 안전장치와 한계:
-- Kiro 에는 **셸 도구가 없습니다**(파일 읽기·쓰기만). 파일 도구는 worktree 안(`./**`)에서만 자동 승인되고, 비대화형 실행이라 그 밖의 읽기·쓰기는 Kiro 가 거부합니다(실제 Kiro 로 확인). 그래서 worktree 밖 파일·홈 디렉터리의 비밀 읽기, push·네트워크 명령을 Kiro 가 직접 할 수 없습니다. worktree 안에서도 `.git`·`.env`·검증 기록 파일 쓰기는 막습니다.
+- Kiro 에는 **셸 도구가 없습니다**(파일 읽기·쓰기만). 파일 도구는 worktree 안(`./**`)에서만 자동 승인되고, 비대화형 실행이라 그 밖의 읽기·쓰기는 Kiro 가 거부합니다(kiro-cli 2.35.1 에서 홈 디렉터리·형제 디렉터리·/tmp 읽기와 쓰기가 거부되는 것을 2026-10-29 에 손으로 확인. 자동 테스트는 설정 내용만 확인하므로 Kiro 버전이 바뀌면 다시 확인하세요). 그래서 worktree 밖 파일·홈 디렉터리의 비밀 읽기, push·네트워크 명령을 Kiro 가 직접 할 수 없습니다. worktree 안에서도 `.git`·`.env`·검증 기록 파일 쓰기는 막습니다.
 - 테스트 명령은 Kiro 가 아니라 실행기가 **사용자 권한으로** 돌립니다. Kiro 가 쓴 테스트 코드가 그 명령으로 실행되므로, 테스트 코드가 하는 일은 막지 못합니다. 신뢰하지 않는 저장소에서는 쓰지 마세요.
-- 실행기는 기본 브랜치가 아닌 브랜치의 깨끗한 linked worktree 에서만 Kiro 를 부르고, 끝난 뒤 HEAD 가 바뀌었으면(커밋) 실패로 알립니다. 전체 로그는 본인만 읽을 수 있는 임시 디렉터리(0700, 파일 0600)에 남고 자동으로 지우지 않습니다.
+- 실행기는 기본 브랜치가 아닌 브랜치의 깨끗한 linked worktree 에서만 Kiro 를 부르고, 끝난 뒤 HEAD 가 바뀌었으면(커밋) 실패로 알립니다. 전체 로그는 본인만 읽을 수 있는 임시 디렉터리(POSIX 에서 0700, 파일 0600)에 남고 자동으로 지우지 않습니다.
 - Kiro CLI 는 명세와 읽은 저장소 코드를 Kiro 서비스(AWS 의 클라우드 모델)로 보냅니다. 외부 전송이 허용된 저장소에서만 쓰세요.
 
 ### 리뷰 정책 `REVIEW.md` (선택)

@@ -65,7 +65,8 @@ export function fitOutput(result) {
   const out = { ...result, truncated: true, changed_files_total: (result.changed_files || []).length };
   out.kiro_summary = (out.kiro_summary || "").slice(-TRUNCATED_SUMMARY_CHARS);
   out.diff_stat = (out.diff_stat || "").split("\n").slice(-1).join("\n");
-  if (out.test) out.test = { ...out.test, output_tail: (out.test.output_tail || "").slice(-TRUNCATED_SUMMARY_CHARS) };
+  if (out.test) out.test = { ...out.test, command: String(out.test.command).slice(0, TRUNCATED_SUMMARY_CHARS), output_tail: (out.test.output_tail || "").slice(-TRUNCATED_SUMMARY_CHARS) };
+  if (out.reason) out.reason = String(out.reason).slice(0, TRUNCATED_SUMMARY_CHARS);
   while (size(out) > MAX_BYTES && out.changed_files.length) out.changed_files = out.changed_files.slice(0, Math.floor(out.changed_files.length / 2));
   return out;
 }
