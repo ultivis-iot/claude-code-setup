@@ -62,12 +62,19 @@ export function agentConfigProblems(config) {
   for (const rule of allowRules) {
     if (!READ_TOOLS.has(rule?.capability) || !Array.isArray(rule?.match) || !rule.match.every((m) => m === "./**")) problems.push(`허용 규칙은 읽기 도구의 ./** 만 됩니다: ${JSON.stringify(rule)}`);
   }
-  // 읽기 도구 설정이 둘(fs_read·read) 있으면 둘 다 경계를 지켜야 한다.
-  const allowed = [...settings.flatMap(([, s]) => s?.allowedPaths || []), ...allowRules.flatMap((r) => r.match || [])];
-  if (!allowed.includes("./**") || !allowed.every((p) => p === "./**")) problems.push("읽기 경계는 ./** 만 있어야 합니다");
-  const denied = new Set([...settings.flatMap(([, s]) => s?.deniedPaths || []), ...denyRules.flatMap((r) => r.match || [])]);
-  const missing = REQUIRED_DENY.filter((p) => !denied.has(p));
-  if (missing.length) problems.push(`금지 경로가 빠졌습니다: ${missing.join(", ")}`);
+  // 읽기 도구 설정이 둘(fs_read·read) 있으면 각각이 따로 경계와 금지 경로를 지켜야 한다(합치면 한쪽만 막혀도 통과한다).
+  const scopes = [
+    ...settings.map(([name, s]) => [`toolsSettings.${name}`, s?.allowedPaths || [], s?.deniedPaths || []]),
+    ...[...new Set(rules.map((r) => r?.capability))].map((cap) => [`permissions(${cap})`,
+      allowRules.filter((r) => r?.capability === cap).flatMap((r) => r.match || []),
+      denyRules.filter((r) => r?.capability === cap).flatMap((r) => r.match || [])]),
+  ];
+  if (!scopes.length) problems.push("읽기 경계 설정이 없습니다");
+  for (const [where, allowed, denied] of scopes) {
+    if (!allowed.length || !allowed.every((p) => p === "./**")) problems.push(`${where}: 읽기 경계는 ./** 만 있어야 합니다`);
+    const missing = REQUIRED_DENY.filter((p) => !denied.includes(p));
+    if (missing.length) problems.push(`${where}: 금지 경로가 빠졌습니다: ${missing.join(", ")}`);
+  }
   // hook 은 셸 명령을 돌리고, resources 는 경계 밖 파일을 컨텍스트에 넣고, 별칭은 도구 이름을 바꾼다.
   if (config.hooks && Object.keys(config.hooks).length) problems.push("hooks 는 비어 있어야 합니다");
   if (config.resources && (!Array.isArray(config.resources) || config.resources.length)) problems.push("resources 는 비어 있어야 합니다");
@@ -76,6 +83,21 @@ export function agentConfigProblems(config) {
   if (config.includeMcpJson) problems.push("includeMcpJson 은 false 여야 합니다");
   return problems;
 }
+
+// agent 설정의 금지 경로(templates/kiro/claude-validator.json)와 같은 비밀 파일 이름. 경로의 어느 부분이 걸려도 비밀로 본다.
+const SECRET_NAME = /^(\.env(\..*)?|.*\.pem|.*\.key|id_rsa.*|id_ed25519.*|\.netrc|credentials.*|secrets.*)$/i;
+export const isSecretPath = (file) => Boolean(file) && file.split("/").some((part) => SECRET_NAME.test(part));
+
+// diff·테스트 로그에 섞인 개인키와 흔한 토큰 형식을 가린다. 휴리스틱이라 모든 비밀을 잡지는 못한다.
+const SECRET_TEXT = [
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
+  /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g,
+  /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g,
+  /\bsk-[A-Za-z0-9_-]{20,}\b/g,
+];
+export const redact = (text) => SECRET_TEXT.reduce((t, re) => t.replace(re, "[REDACTED]"), String(text));
 
 // Kiro 의 실행 로그(`[INFO]` 등), 도구 진행 줄, 색 코드를 지운다.
 export function cleanOutput(text) {
@@ -239,12 +261,16 @@ async function main() {
   // 입력 파일은 저장소의 무시되는 tmp/kiro/<run>/ 에 둔다(Kiro 는 cwd 안만 읽는다).
   const runRel = path.join("tmp", "kiro", `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
   const runDir = path.join(repo, runRel);
-  mkdirSync(runDir, { recursive: true, mode: 0o700 });
   if (!git(repo, "check-ignore", "-q", path.join(runRel, "probe")).ok) claudeAll("tmp/ 가 git 에서 무시되지 않아 입력 파일을 둘 수 없습니다");
   const range = `${snap.base_sha}...${snap.head_sha}`;
   const diff = git(repo, "diff", range), files = git(repo, "diff", "--name-status", range);
-  if (!diff.ok || !files.ok) claudeAll(`git diff ${range} 를 만들지 못했습니다`);
-  writeFileSync(path.join(runDir, "diff.patch"), diff.out);
+  const changed = git(repo, "diff", "--name-only", "--no-renames", "-z", range);
+  if (!diff.ok || !files.ok || !changed.ok) claudeAll(`git diff ${range} 를 만들지 못했습니다`);
+  // agent 의 금지 경로는 원본 파일만 막는다. 비밀 파일의 변경이 diff.patch 로 복사돼 넘어가지 않게 한다.
+  const secretFiles = changed.out.split("\0").filter(isSecretPath);
+  if (secretFiles.length) claudeAll(`비밀 파일로 보이는 경로가 바뀌어 Kiro 에 넘기지 않습니다: ${secretFiles.slice(0, 3).join(", ")}`);
+  mkdirSync(runDir, { recursive: true, mode: 0o700 });
+  writeFileSync(path.join(runDir, "diff.patch"), redact(diff.out));
   writeFileSync(path.join(runDir, "files.txt"), files.out);
   const planFile = opt.plan && existsSync(path.resolve(repo, opt.plan)) ? path.join(runRel, "plan.md") : null;
   if (planFile) writeFileSync(path.join(repo, planFile), readFileSync(path.resolve(repo, opt.plan)));
@@ -255,7 +281,7 @@ async function main() {
   if (opt.test && validators.includes("test-validator")) {
     const t = spawnSync(opt.test, { cwd: repo, shell: true, encoding: "utf8", timeout: config.timeout * 1000, maxBuffer: MAX_BUFFER, windowsHide: true });
     const output = `${t.stdout || ""}${t.stderr || ""}`;
-    writeFileSync(path.join(runDir, "test.log"), output.slice(-TEST_LOG_CHARS));
+    writeFileSync(path.join(runDir, "test.log"), redact(output.slice(-TEST_LOG_CHARS)));
     test = { command: opt.test, exit_code: t.error ? null : t.status, log: path.join(runRel, "test.log"), error: t.error ? (t.error.code === "ETIMEDOUT" ? `${config.timeout}초 초과` : t.error.message) : null };
   }
 

@@ -38,6 +38,11 @@ if [ "$1" = "--validation-on" ]; then
         echo -e "${YELLOW}kiro-cli 가 없어 켜지 않습니다. kiro-cli 를 설치하고 로그인한 뒤 다시 실행하세요.${NC}"
         exit 1
     fi
+    # 실행기와 그것을 부르는 계약 단락은 setup.sh 가 설치한다. 없으면 켜도 Kiro 가 불리지 않는다.
+    if [ ! -f "$HOME/.claude/scripts/kiro-validate.mjs" ] || ! grep -q "kiro-validate" "$HOME/.claude/docs/references/validation-contract.md" 2>/dev/null; then
+        echo -e "${YELLOW}설치된 Claude Code 설정에 Kiro 실행기가 없어 켜지 않습니다. ./setup.sh --update 를 먼저 실행하세요.${NC}"
+        exit 1
+    fi
     install_validator_agent
     set_switch true
     echo -e "${GREEN}✓ Kiro 검증 위임을 켰습니다 (~/.kiro/agents/claude-validator.json, ~/.claude/kiro-validation.json)${NC}"
