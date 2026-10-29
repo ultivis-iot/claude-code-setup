@@ -70,6 +70,9 @@ try {
     writeFileSync(path.join(main, 'a.mjs'), 'export const a = 1;\n');
     git(main, 'add', '-A');
     git(main, 'commit', '-qm', 'base');
+    // 기본 브랜치는 origin/HEAD 로 정한다(원격 추적 ref 를 직접 만든다)
+    git(main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+    git(main, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
     const tree = path.join(temporary, 'tree');
     git(main, 'worktree', 'add', '-qb', 'feature', tree);
     const spec = path.join(temporary, 'spec.md');
@@ -225,6 +228,15 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       git(linked, 'add', 'outside');
       git(linked, 'commit', '-qm', 'link');
       refuse(['implement', '--spec', spec, '--worktree', linked], /심볼릭 링크/);
+      // origin/HEAD 가 가리키는 기본 브랜치(develop 등)도, origin/HEAD 를 모를 때도 부르지 않는다
+      git(main, 'update-ref', 'refs/remotes/origin/develop', 'HEAD');
+      git(main, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/develop');
+      const onDevelop = path.join(temporary, 'on-develop');
+      git(main, 'worktree', 'add', '-qb', 'develop', onDevelop);
+      refuse(['implement', '--spec', spec, '--worktree', onDevelop], /기본 브랜치\(develop\)/);
+      git(main, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
+      refuse(['implement', '--spec', spec, '--worktree', tree], /origin\/HEAD/);
+      git(main, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
       refuse(['implement', '--spec', spec], /--worktree/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--timeout', 'x'], /--timeout/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--test', 'true', '--rounds', '9'], /--rounds/);

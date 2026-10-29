@@ -113,12 +113,17 @@ function checkWorktree(dir) {
   if (gitDir.out === common.out) fail("linked worktree 에서만 실행합니다(git worktree add 로 만든 작업 트리)");
   const branch = git(dir, "symbolic-ref", "--quiet", "--short", "HEAD");
   if (!branch.ok) fail("브랜치가 아닌 상태(detached HEAD)에서는 실행하지 않습니다");
-  const remoteDefault = git(dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD").out.replace(/^origin\//, "");
+  // 기본 브랜치는 origin/HEAD 로 정한다. 모르면 부르지 않는다(develop·trunk 같은 기본 브랜치를 놓치지 않게).
+  const remoteHead = git(dir, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD");
+  if (!remoteHead.ok || !remoteHead.out) fail("origin/HEAD 를 알 수 없어 기본 브랜치를 정하지 못했습니다(git remote set-head origin --auto 후 다시 실행)");
+  const remoteDefault = remoteHead.out.replace(/^origin\//, "");
   if (["main", "master", remoteDefault].includes(branch.out)) fail(`기본 브랜치(${branch.out})에서는 실행하지 않습니다`);
   const status = git(dir, "status", "--porcelain", "--untracked-files=all");
   if (!status.ok || status.out) fail("작업 트리가 깨끗하지 않습니다(커밋하거나 정리한 뒤 실행)");
   // 추적되는 심볼릭 링크가 worktree 밖을 가리키면 Kiro 의 경로 승인을 우회할 수 있다. 있으면 부르지 않는다.
-  const links = git(dir, "ls-files", "-s").out.split("\n").filter((l) => l.startsWith("120000 "));
+  const index = spawnSync("git", ["ls-files", "-s", "-z"], { cwd: dir, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+  if (index.status !== 0 || index.error) fail("git ls-files 를 읽지 못해 심볼릭 링크를 확인하지 못했습니다");
+  const links = index.stdout.split("\0").filter((l) => l.startsWith("120000 "));
   if (links.length) fail(`심볼릭 링크가 있는 worktree 에서는 실행하지 않습니다: ${links.slice(0, 3).map((l) => l.split("\t")[1]).join(", ")}`);
   return git(dir, "rev-parse", "HEAD").out;
 }
