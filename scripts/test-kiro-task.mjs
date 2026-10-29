@@ -2,11 +2,11 @@
 // kiro-task.mjs (Kiro CLI 에 명세 구현을 맡기는 실행기) 테스트. 가짜 kiro-cli 를 PATH 에 두므로 네트워크·Kiro 로그인 불필요.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPrompt, cleanOutput, fitOutput } from './kiro-task.mjs';
+import { agentConfigProblems, buildPrompt, cleanOutput, fitOutput } from './kiro-task.mjs';
 
 const tool = path.join(path.dirname(fileURLToPath(import.meta.url)), 'kiro-task.mjs');
 let count = 0;
@@ -53,6 +53,25 @@ check('the Kiro agent has file tools only, approved inside the worktree, and no 
   for (const p of ['**/.env', '**/*.pem', '**/*.key', '**/id_rsa*', '**/.netrc']) assert.ok(config.toolsSettings.fs_read.deniedPaths.includes(p), p);
 });
 
+// 실행 전에 실제 Kiro agent 설정의 뜻을 확인한다. Kiro 는 쓸 때마다 설정을 새 형식(permissions)으로 고쳐 쓰므로 그 형식도 받는다.
+check('the installed Kiro agent config is checked for shell, auto-approval and paths outside the worktree', () => {
+  const template = JSON.parse(readFileSync(path.join(path.dirname(tool), '..', 'templates', 'kiro', 'claude-implementer.json'), 'utf8'));
+  assert.deepEqual(agentConfigProblems(template), []);
+  const upgraded = { ...template, tools: ['read', 'write'], permissions: { rules: [
+    { capability: 'fs_read', match: ['./**'], effect: 'allow' }, { capability: 'fs_write', match: ['.git/**'], effect: 'deny' }] } };
+  assert.deepEqual(agentConfigProblems(upgraded), []);
+  const bad = (change) => agentConfigProblems({ ...template, ...change });
+  assert.match(bad({ tools: ['fs_read', 'fs_write', 'execute_bash'] }).join(), /execute_bash/);
+  assert.match(bad({ tools: ['read', 'shell'] }).join(), /shell/);
+  assert.match(bad({ allowedTools: ['fs_read'] }).join(), /allowedTools/);
+  assert.match(bad({ toolsSettings: { fs_write: { allowedPaths: ['./**', '/home/**'] } } }).join(), /allowedPaths/);
+  assert.match(bad({ permissions: { rules: [{ capability: 'fs_write', match: ['~/**'], effect: 'allow' }] } }).join(), /permissions/);
+  assert.match(bad({ permissions: { rules: [{ capability: 'execute_bash', match: ['**'], effect: 'allow' }] } }).join(), /permissions/);
+  assert.match(bad({ mcpServers: { x: {} } }).join(), /mcp/i);
+  assert.match(bad({ includeMcpJson: true }).join(), /mcp/i);
+  assert.match(agentConfigProblems(null).join(), /읽지 못/);
+});
+
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'kiro-task-'));
 try {
   if (process.platform === 'win32') {
@@ -93,6 +112,7 @@ const call = fs.readFileSync(${JSON.stringify(calls)}, 'utf8').trim().split('\\n
 console.log('[INFO] startup');
 if (mode === 'fail') { console.error('[ERROR] auth expired'); process.exit(3); }
 if (mode === 'sleep') { const end = Date.now() + 5000; while (Date.now() < end) {} }
+if (mode === 'rename') { fs.renameSync('a.mjs', 'b.mjs'); console.log('SUMMARY: renamed'); process.exit(0); }
 const value = mode === 'never' || (mode === 'fix2' && call % 2 === 1) ? 3 : 2;
 fs.writeFileSync('a.mjs', 'export const a = ' + value + ';\\n');
 fs.writeFileSync('a.test.mjs', 'import "./a.mjs";\\n');
@@ -102,7 +122,12 @@ if (mode === 'commit') execSync('git -c user.name=k -c user.email=k@k commit -qa
 console.log('[tool] Write File');
 console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
 `, { mode: 0o755 });
-    const env = (extra = {}) => ({ ...process.env, PATH: bin + path.delimiter + process.env.PATH, ...extra });
+    const home = path.join(temporary, 'home');
+    mkdirSync(path.join(home, '.kiro', 'agents'), { recursive: true });
+    const agentFile = path.join(home, '.kiro', 'agents', 'claude-implementer.json');
+    const template = readFileSync(path.join(path.dirname(tool), '..', 'templates', 'kiro', 'claude-implementer.json'), 'utf8');
+    writeFileSync(agentFile, template);
+    const env = (extra = {}) => ({ ...process.env, HOME: home, PATH: bin + path.delimiter + process.env.PATH, ...extra });
     const run = (args, extra) => spawnSync(process.execPath, [tool, ...args], { encoding: 'utf8', env: env(extra) });
     const kiroCalls = () => readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
     const reset = () => {
@@ -181,6 +206,22 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       reset();
     });
 
+    check('an unstaged rename lists the new path once', () => {
+      const out = JSON.parse(run(['implement', '--spec', spec, '--worktree', tree], { FAKE_KIRO: 'rename' }).stdout);
+      assert.deepEqual(out.changed_files.sort(), ['a.mjs', 'b.mjs']);
+      reset();
+    });
+
+    check('a test command that times out is reported as timeout, not as failing tests', () => {
+      const r = run(['implement', '--spec', spec, '--worktree', tree, '--test', 'node -e "setTimeout(()=>{},5000)"', '--timeout', '1']);
+      assert.notEqual(r.status, 0);
+      const out = JSON.parse(r.stdout);
+      assert.equal(out.status, 'timeout');
+      assert.match(out.reason, /테스트/);
+      assert.equal(kiroCalls().length, 1);
+      reset();
+    });
+
     check('a commit made during the run is reported as a failure', () => {
       const out = JSON.parse(run(['implement', '--spec', spec, '--worktree', tree], { FAKE_KIRO: 'commit' }).stdout);
       assert.equal(out.status, 'failed');
@@ -237,6 +278,28 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       git(main, 'symbolic-ref', '--delete', 'refs/remotes/origin/HEAD');
       refuse(['implement', '--spec', spec, '--worktree', tree], /origin\/HEAD/);
       git(main, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main');
+      // 실제 Kiro agent 설정이 셸을 허용하거나 없으면, worktree 에 같은 이름의 로컬 Kiro agent 가 있으면 부르지 않는다
+      writeFileSync(agentFile, JSON.stringify({ ...JSON.parse(template), tools: ['fs_read', 'fs_write', 'execute_bash'] }));
+      refuse(['implement', '--spec', spec, '--worktree', tree], /Kiro agent 설정.*execute_bash/);
+      rmSync(agentFile);
+      refuse(['implement', '--spec', spec, '--worktree', tree], /Kiro agent 설정/);
+      writeFileSync(agentFile, template);
+      const local = path.join(temporary, 'local-agent');
+      git(main, 'worktree', 'add', '-qb', 'with-local-agent', local);
+      mkdirSync(path.join(local, '.kiro', 'agents'), { recursive: true });
+      writeFileSync(path.join(local, '.kiro', 'agents', 'claude-implementer.json'), template);
+      git(local, 'add', '-A');
+      git(local, 'commit', '-qm', 'local agent');
+      refuse(['implement', '--spec', spec, '--worktree', local], /로컬 Kiro agent/);
+      // .gitignore 아래라도 worktree 밖을 가리키는 심볼릭 링크가 있으면 부르지 않는다(안을 가리키는 링크는 괜찮다)
+      mkdirSync(path.join(tree, 'tmp'), { recursive: true });
+      symlinkSync('/etc', path.join(tree, 'tmp', 'escape'));
+      refuse(['implement', '--spec', spec, '--worktree', tree], /밖을 가리키는 심볼릭 링크.*tmp\/escape/);
+      rmSync(path.join(tree, 'tmp', 'escape'));
+      symlinkSync(path.join(tree, 'a.mjs'), path.join(tree, 'tmp', 'inside'));
+      const inside = run(['implement', '--spec', spec, '--worktree', tree]);
+      assert.equal(JSON.parse(inside.stdout).status, 'ok', inside.stderr);
+      reset();
       refuse(['implement', '--spec', spec], /--worktree/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--timeout', 'x'], /--timeout/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--test', 'true', '--rounds', '9'], /--rounds/);

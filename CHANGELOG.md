@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Kiro 구현 위임 추가(선택). 명세가 분명한 구현을 `kiro-implementer` subagent 가 Kiro CLI(`kiro-cli chat --no-interactive`)에 맡기고, 결과는 4KB 이하 JSON(테스트 결과, 바뀐 파일, 새 무시 파일, diff 통계, Kiro 출력 끝, 커밋 여부)으로만 받아 메인 세션 토큰을 아낀다. Kiro 에는 셸이 없고 파일 읽기·쓰기는 worktree 안에서만 승인된다(그 밖은 Kiro 가 거부). 테스트는 실행기 `scripts/kiro-task.mjs` 가 `--test` 명령으로 사용자 권한으로 돌리고, 실패하면 출력을 붙여 Kiro 를 다시 부른다(`--rounds`, 기본 2). 실행기는 기본 브랜치가 아닌 깨끗한 linked worktree 에서만 동작하고 로그는 본인만 읽는다. Kiro agent 설정(`templates/kiro/claude-implementer.json`)은 kiro-cli 가 있을 때만 `~/.kiro/agents/` 에 설치된다(다른 기존 파일은 백업).
+- Kiro 구현 위임 추가(선택). 명세가 분명한 구현을 `kiro-implementer` subagent 가 Kiro CLI(`kiro-cli chat --no-interactive`)에 맡기고, 결과는 4KB 이하 JSON(테스트 결과, 바뀐 파일, 새 무시 파일, diff 통계, Kiro 출력 끝, 커밋 여부)으로만 받아 메인 세션 토큰을 아낀다. Kiro 에는 셸이 없고 파일 읽기·쓰기는 worktree 안에서만 승인된다(그 밖은 Kiro 가 거부). 테스트는 실행기 `scripts/kiro-task.mjs` 가 `--test` 명령으로 사용자 권한으로 돌리고, 실패하면 출력을 붙여 Kiro 를 다시 부른다(`--rounds`, 기본 2). 실행기는 기본 브랜치(`origin/HEAD` 필요)가 아닌 깨끗한 linked worktree 에서만 동작하고, 실제 Kiro agent 설정이 셸·자동 승인·worktree 밖 경로를 허용하거나 worktree 밖을 가리키는 심볼릭 링크가 있으면 거부한다. 로그는 본인만 읽는다. Kiro agent 설정(`templates/kiro/claude-implementer.json`)은 kiro-cli 가 있을 때만 `~/.kiro/agents/` 에 설치된다(다른 기존 파일은 백업).
 
 ## v1.3.0 (2026-10-28)
 

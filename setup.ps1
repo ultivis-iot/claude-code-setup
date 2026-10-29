@@ -251,7 +251,10 @@ if (Get-Command kiro-cli -ErrorAction SilentlyContinue) {
     $KiroAgent = Join-Path $KiroAgents "claude-implementer.json"
     # 직접 고쳤거나 Kiro 가 바꾼 기존 설정은 덮어쓰기 전에 백업한다
     if ((Test-Path $KiroAgent) -and ((Get-FileHash $KiroAgent).Hash -ne (Get-FileHash $KiroSource).Hash)) {
-        $KiroBackup = "$KiroAgent.backup-$(Get-Date -Format yyyyMMddHHmmss)"
+        $Stamp = Get-Date -Format yyyyMMddHHmmss
+        $KiroBackup = "$KiroAgent.backup-$Stamp"
+        $n = 0
+        while (Test-Path $KiroBackup) { $n++; $KiroBackup = "$KiroAgent.backup-$Stamp-$n" }
         Copy-Item $KiroAgent -Destination $KiroBackup
         Write-Host "   기존 Kiro agent 설정 백업: $KiroBackup" -ForegroundColor Yellow
     }

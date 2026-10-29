@@ -245,6 +245,8 @@ if command -v kiro-cli > /dev/null 2>&1; then
     # 직접 고쳤거나 Kiro 가 바꾼 기존 설정은 덮어쓰기 전에 백업한다
     if [ -f "$KIRO_AGENT" ] && ! cmp -s "$SCRIPT_DIR/templates/kiro/claude-implementer.json" "$KIRO_AGENT"; then
         KIRO_BACKUP="$KIRO_AGENT.backup-$(date +%Y%m%d%H%M%S)"
+        n=0
+        while [ -e "$KIRO_BACKUP" ]; do n=$((n + 1)); KIRO_BACKUP="$KIRO_AGENT.backup-$(date +%Y%m%d%H%M%S)-$n"; done
         cp -p "$KIRO_AGENT" "$KIRO_BACKUP"
         echo -e "${YELLOW}   기존 Kiro agent 설정 백업: $KIRO_BACKUP${NC}"
     fi
