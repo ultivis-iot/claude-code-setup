@@ -288,7 +288,7 @@ Codex에서는 `~/.codex/skills/*`에 전체 skill 세트를 직접 설치하고
 
 #### Kiro 검증 위임 (선택, 한시)
 
-Claude 토큰을 아끼려고 `/commit-and-verify` 의 검증 5개를 Kiro(`claude-opus-5.5`, 실패하면 `claude-opus-4.8`)에 맡깁니다. 기준은 Claude 와 같은 설치본 `~/.claude/agents/<validator>.md` 이고, 결과는 같은 게이트(`record`·`ready`)를 거칩니다. Kiro agent 는 파일 읽기만 하고(쓰기·셸·hook·MCP 없음) 저장소 밖 읽기는 Kiro 의 경로 승인(`./**`)이 거부합니다(kiro-cli 2.35.1 에서 확인). 테스트는 Kiro 가 아니라 실행기(`scripts/kiro-validate.mjs`)가 메인이 정한 명령으로 돌리고 그 로그를 Kiro 가 판정합니다. 각 결과의 근거 첫 줄에 `backend: kiro/<모델>` 이 남습니다.
+Claude 토큰을 아끼려고 `/commit-and-verify` 의 검증 5개를 Kiro(`claude-opus-5.5`, 실패하면 `claude-opus-4.8`)에 맡깁니다. 기준은 Claude 와 같은 설치본 `~/.claude/agents/<validator>.md` 이고, 결과는 같은 게이트(`record`·`ready`)를 거칩니다. Kiro agent 는 파일 읽기만 하고(쓰기·셸·hook·MCP 없음) 저장소 밖 읽기는 Kiro 의 경로 승인(`./**`)이 거부합니다(kiro-cli 2.35.1 에서 확인). 테스트는 Kiro 가 아니라 실행기(`scripts/kiro-validate.mjs`)가 메인이 정한 명령으로 돌리고 그 로그를 Kiro 가 판정합니다. 테스트가 실패하거나 시간을 넘기면 Kiro 판정과 상관없이 FAIL 이고, 테스트 명령이 없으면 test 검증은 Claude 가 맡습니다. 각 결과의 근거 첫 줄에 `backend: kiro/<모델>` 이 남습니다.
 
 - 켜기: `./setup.sh --update` 로 실행기를 설치하고 `kiro-cli` 로그인 후 `./setup-kiro.sh --validation-on`. 설치본에 실행기·계약 단락이 없으면 켜지 않습니다. 읽기 전용 agent 를 설치하고 `~/.claude/kiro-validation.json` 을 `enabled: true` 로 둡니다. 기본 설치·`--update` 는 새로 켜지 않습니다. 모델·시간 제한은 스위치에 `model`·`fallback_model`·`timeout`(초) 으로 바꿀 수 있습니다.
 - 자동으로 원래대로: 스위치가 없거나 꺼졌을 때, `kiro-cli` 가 없을 때, 로그인이 끊겼을 때(`kiro-cli whoami`), agent 설정이 읽기 전용이 아닐 때, 검증 대상 저장소에 `.kiro/` 나 추적되는 심볼릭 링크가 있을 때, 바뀐 파일 이름이 비밀 파일로 보일 때(`.env*`·`*.pem`·`*.key`·`id_rsa*`·`credentials*`·`secrets*` 등)는 전부 Claude subagent 로 검증합니다. Kiro 가 시간 초과되거나 결과 형식이 틀리면 그 검증만 Claude 로 돕니다.

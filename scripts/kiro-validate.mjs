@@ -46,7 +46,8 @@ export function loadSwitch(file = path.join(claudeHome(), "kiro-validation.json"
 // Kiro agent 설정이 읽기 전용(파일 읽기만, cwd 경계, 비밀 파일 금지)인지. Kiro 가 쓸 때마다 설정을 새 형식
 // (tools 이름 read, permissions.rules)으로 고쳐 쓰므로 두 형식을 다 본다.
 const READ_TOOLS = new Set(["fs_read", "read"]);
-const REQUIRED_DENY = ["**/.env", "**/*.pem", "**/*.key", "**/id_rsa*"];
+// 비밀 파일 금지 경로. templates/kiro/claude-validator.json 의 deniedPaths 와 같아야 하고(테스트가 확인), 바뀐 경로 검사(isSecretPath)도 같은 이름을 본다.
+export const REQUIRED_DENY = [".env", ".env.*", "**/.env", "**/.env.*", "**/*.pem", "**/*.key", "**/id_rsa*", "**/id_ed25519*", "**/.netrc", "**/credentials*", "**/secrets*"];
 export function agentConfigProblems(config) {
   if (!config || typeof config !== "object") return ["설정을 읽지 못했습니다"];
   const problems = [];
@@ -84,7 +85,7 @@ export function agentConfigProblems(config) {
   return problems;
 }
 
-// agent 설정의 금지 경로(templates/kiro/claude-validator.json)와 같은 비밀 파일 이름. 경로의 어느 부분이 걸려도 비밀로 본다.
+// REQUIRED_DENY 와 같은 비밀 파일 이름. 경로의 어느 부분이 걸려도 비밀로 본다.
 const SECRET_NAME = /^(\.env(\..*)?|.*\.pem|.*\.key|id_rsa.*|id_ed25519.*|\.netrc|credentials.*|secrets.*)$/i;
 export const isSecretPath = (file) => Boolean(file) && file.split("/").some((part) => SECRET_NAME.test(part));
 
@@ -193,11 +194,11 @@ function kiro(argv, cwd, timeoutMs) {
 }
 
 // 검증 하나를 Kiro 로 돌린다. 기본 모델이 실패하면 fallback 모델로 한 번 더 한다.
-async function review(validator, prompt, { repo, config, runDir }) {
+async function review(validator, prompt, { repo, config, runDir, tools }) {
   const models = [config.model, config.fallback_model].filter((m, i, all) => m && all.indexOf(m) === i);
   const reasons = [];
   for (const model of models) {
-    const r = await kiro(["chat", "--no-interactive", "--agent", AGENT, "--trust-tools=fs_read", "--model", model, prompt], repo, config.timeout * 1000);
+    const r = await kiro(["chat", "--no-interactive", "--agent", AGENT, `--trust-tools=${tools.join(",")}`, "--model", model, prompt], repo, config.timeout * 1000);
     writeFileSync(path.join(runDir, `${validator}.${model}.log`), `${r.stdout || ""}\n--- stderr ---\n${r.stderr || ""}\n`, { mode: 0o600 });
     const why = r.error ? `실행 실패(${r.error})` : r.timedOut ? `${config.timeout}초 초과` : r.code !== 0 ? `exit ${r.code}` : null;
     const verdict = why ? null : parseVerdict(r.stdout);
@@ -214,15 +215,17 @@ function treeState(repo) {
   return status.ok && head.ok ? `${head.out.trim()}\n${status.out}` : null;
 }
 
+function readAgentConfig() {
+  try { return JSON.parse(readFileSync(kiroAgentFile(), "utf8")); } catch { return null; }
+}
+
 // Kiro 를 쓸 수 없는 이유. 없으면 null.
-function unavailable(repo, config) {
+function unavailable(repo, config, agentConfig) {
   if (!config.enabled) return config.reason;
   const probe = spawnSync("kiro-cli", ["--version"], { encoding: "utf8", windowsHide: true });
   if (probe.error || probe.status !== 0) return "kiro-cli 를 찾을 수 없습니다";
   const who = spawnSync("kiro-cli", ["whoami"], { encoding: "utf8", windowsHide: true, timeout: 30000 });
   if (who.error || who.status !== 0) return "Kiro 로그인이 확인되지 않습니다(kiro-cli whoami 실패)";
-  let agentConfig = null;
-  try { agentConfig = JSON.parse(readFileSync(kiroAgentFile(), "utf8")); } catch { /* 아래에서 거부 */ }
   const problems = agentConfigProblems(agentConfig);
   if (problems.length) return `Kiro agent 설정(${kiroAgentFile()})이 읽기 전용이 아닙니다: ${problems.join("; ")}. ./setup-kiro.sh 로 다시 설치하세요`;
   // 저장소의 .kiro/(같은 이름 agent·steering·settings 등)가 Kiro 세션에 섞여 판정을 바꿀 수 있다.
@@ -250,8 +253,11 @@ async function main() {
   if (!existsSync(opt.repo)) fail(`저장소가 없습니다: ${opt.repo}`);
   const repo = realpathSync(path.resolve(opt.repo));
   const config = loadSwitch();
-  const why = unavailable(repo, config);
+  const agentConfig = readAgentConfig();
+  const why = unavailable(repo, config, agentConfig);
   if (why) claudeAll(why);
+  // 검사한 설정의 읽기 도구 이름(fs_read 또는 Kiro 가 고쳐 쓴 read)을 그대로 신뢰한다.
+  const tools = agentConfig.tools;
 
   const snapshot = readJson(path.resolve(repo, opt.snapshot), "스냅샷");
   const snap = snapshot.snapshot || snapshot;
@@ -277,6 +283,9 @@ async function main() {
   const policyFile = policy.text ? path.join(runRel, "policy.md") : null;
   if (policyFile) writeFileSync(path.join(repo, policyFile), policy.text);
 
+  // 테스트 명령과 Kiro 가 작업 트리나 HEAD 를 바꾸면 결과를 믿지 않는다. 기준은 테스트 실행 전이다.
+  const before = treeState(repo);
+  if (before === null) claudeAll("작업 트리 상태를 읽지 못했습니다");
   let test = null;
   if (opt.test && validators.includes("test-validator")) {
     const t = spawnSync(opt.test, { cwd: repo, shell: true, encoding: "utf8", timeout: config.timeout * 1000, maxBuffer: MAX_BUFFER, windowsHide: true });
@@ -290,27 +299,32 @@ async function main() {
     `diff (${range}): ${path.join(runRel, "diff.patch")}; changed files (name-status): ${path.join(runRel, "files.txt")}`,
     planFile ? `approved plan / success criteria: ${planFile}` : "approved plan: none provided (judge against the commit messages and diff, and say so)",
     policyFile ? `review policy (repository REVIEW.md from the default branch): ${policyFile}` : "review policy: 정책 없음",
-    ...(validator === "test-validator" ? [test
-      ? `tests run by the requester: \`${test.command}\` → ${test.error ? `not finished (${test.error})` : `exit ${test.exit_code}`}; output (tail): ${test.log}`
-      : "tests: the requester ran no test command"] : []),
+    ...(validator === "test-validator" ? [`tests run by the requester: \`${test.command}\` → ${test.error ? `not finished (${test.error})` : `exit ${test.exit_code}`}; output (tail): ${test.log}`] : []),
   ];
 
-  const before = treeState(repo);
-  const runs = await Promise.all(validators.map(async (validator) => {
+  // Kiro 는 테스트를 돌릴 수 없다. 테스트 명령이 없으면 test-validator 는 Claude 가 맡는다.
+  const noTest = validators.includes("test-validator") && !test ? [{ validator: "test-validator", reason: "테스트 명령(--test)이 없어 Kiro 가 테스트를 판정할 수 없습니다" }] : [];
+  const runs = await Promise.all(validators.filter((v) => !noTest.some((n) => n.validator === v)).map(async (validator) => {
     const guidelineFile = path.join(claudeHome(), "agents", `${validator}.md`);
     if (!existsSync(guidelineFile)) return { validator, reason: `검증 기준이 없습니다: ${guidelineFile}` };
     const prompt = buildPrompt(validator, readFileSync(guidelineFile, "utf8"), inputs(validator));
-    return { validator, ...(await review(validator, prompt, { repo, config, runDir })) };
+    return { validator, ...(await review(validator, prompt, { repo, config, runDir, tools })) };
   }));
-  // Kiro 는 쓰기 도구가 없지만, 실행 중 작업 트리나 HEAD 가 바뀌었으면 결과를 믿지 않는다.
-  if (before === null || treeState(repo) !== before) claudeAll("Kiro 실행 중 작업 트리나 HEAD 가 바뀌었습니다");
+  if (treeState(repo) !== before) claudeAll("테스트나 Kiro 실행 중 작업 트리나 HEAD 가 바뀌었습니다");
 
-  const results = {}, claude = [];
+  const results = {}, claude = [...noTest];
   for (const r of runs) {
     if (!r.verdict) { claude.push({ validator: r.validator, reason: r.reason }); continue; }
     const entry = { status: r.verdict.status, evidence: [`backend: kiro/${r.model}`, ...r.verdict.evidence], findings: r.verdict.findings };
     // 테스트 실행 기록은 Kiro 의 말이 아니라 실행기가 직접 돌린 결과로 쓴다.
-    if (r.validator === "test-validator") entry.test_execution = test ? { ran: test.exit_code !== null, command: test.command, exit_code: test.exit_code, log: test.log } : { ran: false };
+    if (r.validator === "test-validator") {
+      entry.test_execution = { ran: test.exit_code !== null, command: test.command, exit_code: test.exit_code, log: test.log };
+      // 테스트가 실패했거나 끝나지 않았으면 Kiro 가 뭐라 하든 FAIL 이다.
+      if (test.exit_code !== 0 && entry.status !== "FAIL") {
+        entry.evidence.splice(1, 0, `실행기: 테스트가 ${test.error ? `끝나지 않아(${test.error})` : `exit ${test.exit_code} 로 실패해`} Kiro 판정 ${entry.status} 를 FAIL 로 바꿉니다`);
+        entry.status = "FAIL";
+      }
+    }
     results[r.validator] = entry;
   }
   const out = path.resolve(repo, opt.out);

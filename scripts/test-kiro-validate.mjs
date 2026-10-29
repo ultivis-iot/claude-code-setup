@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { agentConfigProblems, buildPrompt, cleanOutput, fitSummary, isSecretPath, loadSwitch, parseVerdict, redact } from './kiro-validate.mjs';
+import { REQUIRED_DENY, agentConfigProblems, buildPrompt, cleanOutput, fitSummary, isSecretPath, loadSwitch, parseVerdict, redact } from './kiro-validate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, 'kiro-validate.mjs');
@@ -43,8 +43,14 @@ await check('the shipped Kiro agent is read-only and the installed config is che
   assert.deepEqual(template.tools, ['fs_read']);
   assert.deepEqual(agentConfigProblems(template), []);
   const upgraded = { ...template, tools: ['read'], toolsSettings: {}, permissions: { rules: [
-    { capability: 'read', match: ['./**'], effect: 'allow' }, { capability: 'read', match: ['**/.env', '**/*.pem', '**/*.key', '**/id_rsa*'], effect: 'deny' }] } };
+    { capability: 'read', match: ['./**'], effect: 'allow' }, { capability: 'read', match: REQUIRED_DENY, effect: 'deny' }] } };
   assert.deepEqual(agentConfigProblems(upgraded), []);
+  // 금지 경로는 템플릿과 한 목록이고, 하나라도 빠지면 거부한다.
+  assert.deepEqual(template.toolsSettings.fs_read.deniedPaths, REQUIRED_DENY);
+  for (const p of REQUIRED_DENY) {
+    const denied = REQUIRED_DENY.filter((d) => d !== p);
+    assert.match(agentConfigProblems({ ...template, toolsSettings: { fs_read: { allowedPaths: ['./**'], deniedPaths: denied } } }).join(), /금지 경로/, p);
+  }
   const bad = (change) => agentConfigProblems({ ...template, ...change }).join();
   assert.match(bad({ tools: ['fs_read', 'fs_write'] }), /fs_write/);
   assert.match(bad({ tools: ['read', 'shell'] }), /shell/);
@@ -61,7 +67,7 @@ await check('the shipped Kiro agent is read-only and the installed config is che
   // 읽기 도구마다 따로 막혀야 한다: fs_read 에만 금지 경로가 있고 read 는 ./** 만 허용하면 거부한다.
   assert.match(bad({ toolsSettings: { ...template.toolsSettings, read: { allowedPaths: ['./**'] } } }), /toolsSettings\.read: 금지 경로/);
   assert.match(bad({ permissions: { rules: [{ capability: 'fs_read', match: ['./**'], effect: 'allow' },
-    { capability: 'fs_read', match: ['**/.env', '**/*.pem', '**/*.key', '**/id_rsa*'], effect: 'deny' },
+    { capability: 'fs_read', match: REQUIRED_DENY, effect: 'deny' },
     { capability: 'read', match: ['./**'], effect: 'allow' }] } }), /permissions\(read\): 금지 경로/);
   assert.match(agentConfigProblems(null).join(), /읽지 못/);
 });
@@ -182,15 +188,43 @@ await check('Kiro verdicts are written in the contract input format with the bac
   rmSync(env.root, { recursive: true, force: true });
 });
 
-await check('a failing or unfinished test command is recorded from the runner, not from Kiro', () => {
+await check('a failing or unfinished test command is recorded from the runner and fails even when Kiro says PASS', () => {
   const env = setup();
-  run(env, 'ok', 'test', ['--test', 'echo boom; exit 3']);
+  let r = run(env, 'ok', 'test', ['--test', 'echo boom; exit 3']);
+  assert.deepEqual(r.json.results, { 'test-validator': 'FAIL' });
   assert.deepEqual({ ...results(env)['test-validator'].test_execution, log: undefined }, { ran: true, command: 'echo boom; exit 3', exit_code: 3, log: undefined });
+  assert.match(results(env)['test-validator'].evidence[1], /exit 3 로 실패해 Kiro 판정 PASS 를 FAIL/);
   assert.match(calls(env), /exit 3/);
-  const r = run(env, 'ok', 'test', ['--test', 'sleep 10']);
-  assert.equal(r.json.backend, 'kiro');
+  r = run(env, 'ok', 'test', ['--test', 'sleep 10']);
+  assert.deepEqual(r.json.results, { 'test-validator': 'FAIL' });
   assert.deepEqual({ ...results(env)['test-validator'].test_execution, log: undefined }, { ran: false, command: 'sleep 10', exit_code: null, log: undefined });
   assert.match(calls(env), /not finished \(5초 초과\)/);
+  rmSync(env.root, { recursive: true, force: true });
+});
+
+await check('without a test command the test validator goes to Claude, and the others stay with Kiro', () => {
+  const env = setup();
+  const r = run(env, 'ok', 'doc,test');
+  assert.deepEqual(r.json.results, { 'doc-validator': 'PASS' });
+  assert.deepEqual(r.json.claude.map((c) => c.validator), ['test-validator']);
+  assert.match(r.json.claude[0].reason, /--test/);
+  rmSync(env.root, { recursive: true, force: true });
+});
+
+await check('a test command that changes the tree or HEAD discards every verdict', () => {
+  for (const cmd of ['echo x >> a.txt', 'git commit -q --allow-empty -m moved']) {
+    const env = setup();
+    const r = run(env, 'ok', 'doc,test', ['--test', cmd]);
+    assert.equal(r.json.backend, 'claude', cmd);
+    assert.match(r.json.reason, /작업 트리나 HEAD/);
+    rmSync(env.root, { recursive: true, force: true });
+  }
+});
+
+await check('the read tool named in the checked agent config is the one trusted', () => {
+  const env = setup({ agent: { ...template, tools: ['read'] } });
+  run(env, 'ok', 'doc');
+  assert.match(calls(env), /--trust-tools=read --model/);
   rmSync(env.root, { recursive: true, force: true });
 });
 
