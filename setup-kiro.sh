@@ -2,7 +2,9 @@
 
 # Kiro 스킬 설치 스크립트
 # codex/skills/ 의 정본 스킬을 Kiro user-level 스킬 경로(~/.kiro/skills)로 배포한다.
-# 사용법: ./setup-kiro.sh [--update|-u]
+# 사용법: ./setup-kiro.sh [--update|-u] | --validation-off
+#   kiro-cli 가 있으면 Claude Code 검증 위임용 Kiro agent(claude-validator)와 스위치(~/.claude/kiro-validation.json)도 설치한다.
+#   --validation-off: 스위치를 꺼서 검증을 원래 Claude subagent 로 되돌린다(다른 설치는 하지 않음).
 
 set -e
 
@@ -17,6 +19,15 @@ NC='\033[0m'
 UPDATE_MODE=false
 if [ "$1" = "--update" ] || [ "$1" = "-u" ]; then
     UPDATE_MODE=true
+fi
+
+SWITCH_FILE="$HOME/.claude/kiro-validation.json"
+if [ "$1" = "--validation-off" ]; then
+    if [ -f "$SWITCH_FILE" ]; then
+        node -e 'const f=process.argv[1],fs=require("fs");const c=JSON.parse(fs.readFileSync(f,"utf8"));c.enabled=false;fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")' "$SWITCH_FILE"
+    fi
+    echo -e "${GREEN}✓ Kiro 검증 위임을 껐습니다. 검증은 Claude subagent 로 돕니다.${NC}"
+    exit 0
 fi
 
 echo "==================================="
@@ -44,6 +55,22 @@ for skill_dir in "$SKILLS_SOURCE"/*/; do
 done
 echo -e "${GREEN}   총 $INSTALLED개 스킬 설치${NC}"
 echo -e "${YELLOW}     codex/skills/ 의 정본 스킬을 그대로 복사합니다. Kiro가 쓰지 않는 agents/openai.yaml 등도 함께 복사되지만 무해합니다.${NC}"
+
+echo "3. Claude Code 검증 위임 (선택)..."
+if command -v kiro-cli >/dev/null 2>&1; then
+    mkdir -p "$KIRO_DIR/agents" "$HOME/.claude"
+    cp "$SCRIPT_DIR/templates/kiro/claude-validator.json" "$KIRO_DIR/agents/claude-validator.json"
+    echo -e "${GREEN}   ✓ ~/.kiro/agents/claude-validator.json (읽기 전용)${NC}"
+    if [ ! -f "$SWITCH_FILE" ]; then
+        printf '%s\n' '{"enabled": true, "model": "claude-opus-5.5", "fallback_model": "claude-opus-4.8", "timeout": 900}' > "$SWITCH_FILE"
+        echo -e "${GREEN}   ✓ ~/.claude/kiro-validation.json (켜짐)${NC}"
+    else
+        echo -e "${YELLOW}   - ~/.claude/kiro-validation.json 이 있어 그대로 둡니다${NC}"
+    fi
+    echo -e "${YELLOW}     검증할 코드가 Kiro(AWS)로 전송됩니다. 허용되지 않은 저장소에서는 ./setup-kiro.sh --validation-off${NC}"
+else
+    echo -e "${YELLOW}   - kiro-cli 가 없어 건너뜁니다${NC}"
+fi
 
 echo ""
 echo "==================================="
