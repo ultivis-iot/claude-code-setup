@@ -1,20 +1,61 @@
 {
   "name": "claude-implementer",
   "description": "Implements a spec handed over by Claude Code's kiro-implementer subagent inside an isolated git worktree. File read/write tools only (no shell); reads and writes are auto-approved inside the current directory only, so in non-interactive mode anything outside it is refused.",
-  "prompt": "You implement exactly the spec you are given, inside the current directory only. You have file read and write tools only and cannot run commands; the requester runs the tests after you finish. Write tests first. Never touch .git, .env files or anything outside the current directory. End with a line starting SUMMARY:.",
+  "prompt": "You implement exactly the spec you are given, inside the current directory only. You have file read and write tools only and cannot run commands; the requester runs the tests after you finish. Write tests first. Never touch .git, .env, secret or key files, agent settings (.claude, CLAUDE.md, AGENTS.md, .mcp.json, .kiro), git hooks, CI workflows or anything outside the current directory. End with a line starting SUMMARY:.",
   "mcpServers": {},
-  "tools": ["fs_read", "fs_write"],
+  "tools": [
+    "fs_read",
+    "fs_write"
+  ],
   "toolAliases": {},
   "allowedTools": [],
   "resources": [],
   "toolsSettings": {
     "fs_read": {
-      "allowedPaths": ["./**"],
-      "deniedPaths": [".env", ".env.*", "**/.env", "**/.env.*"]
+      "allowedPaths": [
+        "./**"
+      ],
+      "deniedPaths": [
+        ".env",
+        ".env.*",
+        "**/.env",
+        "**/.env.*",
+        "**/*.pem",
+        "**/*.key",
+        "**/id_rsa*",
+        "**/id_ed25519*",
+        "**/.netrc",
+        "**/credentials*",
+        "**/secrets*"
+      ]
     },
     "fs_write": {
-      "allowedPaths": ["./**"],
-      "deniedPaths": [".git", ".git/**", ".env", ".env.*", "**/.env", "**/.env.*", "tmp/validation-*", "tmp/review-policy.json", "tmp/review-findings-*.json"]
+      "allowedPaths": [
+        "./**"
+      ],
+      "deniedPaths": [
+        ".git",
+        ".git/**",
+        ".env",
+        ".env.*",
+        "**/.env",
+        "**/.env.*",
+        ".envrc",
+        ".npmrc",
+        ".claude/**",
+        "**/.claude/**",
+        "CLAUDE.md",
+        "**/CLAUDE.md",
+        "AGENTS.md",
+        "**/AGENTS.md",
+        ".mcp.json",
+        ".kiro/**",
+        ".husky/**",
+        ".github/workflows/**",
+        "tmp/validation-*",
+        "tmp/review-policy.json",
+        "tmp/review-findings-*.json"
+      ]
     }
   },
   "includeMcpJson": false,

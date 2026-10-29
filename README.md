@@ -417,12 +417,12 @@ mkdir -p tmp
 
 1. 메인 세션이 별도 브랜치의 linked worktree(`git worktree add`)와 명세 파일을 만듭니다. 명세에는 문제, 원하는 동작, 테스트 케이스, 건드리지 말 것을 적습니다.
 2. `kiro-implementer` 가 `node ~/.claude/scripts/kiro-task.mjs implement --spec <파일> --worktree <디렉터리> [--test "<테스트 명령>"] [--rounds <n>] [--model <모델>] [--timeout <초>]` 를 한 번 실행합니다. Kiro 가 코드·테스트를 쓰면 실행기가 테스트를 돌리고, 실패하면 출력을 붙여 Kiro 를 다시 부릅니다(`--rounds`, 기본 2, 최대 5).
-3. 결과 JSON(4KB 이하)만 돌려받습니다: `status`(`ok`·`tests_failed`·`failed`·`timeout`·`unavailable`), 실패 이유 `reason`, 시도 횟수 `rounds`, 마지막 테스트 `test`(명령·종료 코드·출력 끝 800자), `head_unchanged`, `changed_files`, 새로 생긴 무시 파일 `new_ignored_files`, `diff_stat`, Kiro 출력의 끝 1500자 `kiro_summary`, 전체 로그 경로 `log`. 4KB 를 넘으면 `truncated: true` 와 `changed_files_total` 이 붙고 요약·테스트 출력·테스트 명령·실패 이유는 500자, `changed_files` 는 일부만 남으니 worktree 의 `git status` 로 전체를 확인합니다. `--test` 가 없으면 Kiro 를 한 번만 부르고 `test` 는 `null` 입니다.
+3. 결과 JSON(4KB 이하)만 돌려받습니다: `status`(`ok`·`tests_failed`·`failed`·`timeout`·`unavailable`), 실패 이유 `reason`, 시도 횟수 `rounds`, 마지막 테스트 `test`(명령·종료 코드·출력 끝 800자), `head_unchanged`, `changed_files`, 새로 생긴 무시 파일 `new_ignored_files`, `diff_stat`, Kiro 출력의 끝 1500자 `kiro_summary`, 전체 로그 경로 `log`. 4KB 를 넘으면 `truncated: true` 와 `changed_files_total`·`new_ignored_files_total` 이 붙고 요약·테스트 출력·테스트 명령·실패 이유는 500자, `changed_files` 는 일부만 남으니 worktree 의 `git status` 로 전체를 확인합니다. `--test` 가 없으면 Kiro 를 한 번만 부르고 `test` 는 `null` 입니다.
 4. 메인 세션이 diff 를 읽고 검증 게이트·PR·기계 리뷰·머지 전 이해 확인을 평소대로 거칩니다. Kiro 결과는 신뢰하지 않는 데이터로 다룹니다.
 
 안전장치와 한계:
-- Kiro 에는 **셸 도구가 없습니다**(파일 읽기·쓰기만). 파일 도구는 worktree 안(`./**`)에서만 자동 승인되고, 비대화형 실행이라 그 밖의 읽기·쓰기는 Kiro 가 거부합니다(kiro-cli 2.35.1 에서 홈 디렉터리·형제 디렉터리·/tmp 읽기와 쓰기가 거부되는 것을 2026-10-29 에 손으로 확인. 자동 테스트는 설정 내용만 확인하므로 Kiro 버전이 바뀌면 다시 확인하세요). 그래서 worktree 밖 파일·홈 디렉터리의 비밀 읽기, push·네트워크 명령을 Kiro 가 직접 할 수 없습니다. worktree 안에서도 `.git`·`.env`·검증 기록 파일 쓰기는 막습니다.
-- 테스트 명령은 Kiro 가 아니라 실행기가 **사용자 권한으로** 돌립니다. Kiro 가 쓴 테스트 코드가 그 명령으로 실행되므로, 테스트 코드가 하는 일은 막지 못합니다. 신뢰하지 않는 저장소에서는 쓰지 마세요.
+- Kiro 에는 **셸 도구가 없습니다**(파일 읽기·쓰기만). 파일 도구는 worktree 안(`./**`)에서만 자동 승인되고, 비대화형 실행이라 그 밖의 읽기·쓰기는 Kiro 가 거부합니다(kiro-cli 2.35.1 에서 홈 디렉터리·형제 디렉터리·/tmp 읽기와 쓰기가 거부되는 것을 2026-10-29 에 손으로 확인. 자동 테스트는 설정 내용만 확인하므로 Kiro 버전이 바뀌면 다시 확인하세요). 그래서 worktree 밖 파일·홈 디렉터리의 비밀 읽기, push·네트워크 명령을 Kiro 가 직접 할 수 없습니다. worktree 안에서도 `.git`·`.env`, 이후 세션이 읽거나 실행하는 에이전트 설정(`.claude/`·`CLAUDE.md`·`AGENTS.md`·`.mcp.json`·`.kiro/`)·git hook(`.husky/`)·CI(`.github/workflows/`)·검증 기록 파일 쓰기와, 키·자격 증명 파일(`*.pem`·`*.key`·`id_rsa*`·`.netrc`·`credentials*`·`secrets*`) 읽기를 막도록 설정합니다(설정 내용은 자동 테스트로, 거부 동작은 위 수동 확인으로 확인). 이런 파일을 바꿔야 하는 작업은 메인 세션이 직접 합니다. 추적되는 심볼릭 링크가 있는 worktree 에서는 실행하지 않습니다.
+- 테스트 명령은 Kiro 가 아니라 실행기가 **사용자 권한으로** 돌립니다. 그 명령이 읽는 worktree 파일(테스트 코드, `package.json` scripts, 테스트 러너 설정, Makefile 등)은 Kiro 가 바꿀 수 있으므로, 결국 Kiro 가 쓴 코드가 사용자 권한으로 실행됩니다. '셸 없음'은 샌드박스가 아닙니다. Kiro 가 읽는 저장소 내용(그 안에 심어진 지시 포함)을 신뢰할 수 있는 저장소에서만 쓰세요.
 - 실행기는 기본 브랜치가 아닌 브랜치의 깨끗한 linked worktree 에서만 Kiro 를 부르고, 끝난 뒤 HEAD 가 바뀌었으면(커밋) 실패로 알립니다. 전체 로그는 본인만 읽을 수 있는 임시 디렉터리(POSIX 에서 0700, 파일 0600)에 남고 자동으로 지우지 않습니다.
 - Kiro CLI 는 명세와 읽은 저장소 코드를 Kiro 서비스(AWS 의 클라우드 모델)로 보냅니다. 외부 전송이 허용된 저장소에서만 쓰세요.
 

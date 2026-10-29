@@ -49,7 +49,8 @@ check('the Kiro agent has file tools only, approved inside the worktree, and no 
   assert.deepEqual(config.allowedTools, []);
   assert.equal(config.toolsSettings.execute_bash, undefined);
   for (const name of ['fs_read', 'fs_write']) assert.deepEqual(config.toolsSettings[name].allowedPaths, ['./**'], name);
-  for (const p of ['.git/**', '**/.env', 'tmp/validation-*']) assert.ok(config.toolsSettings.fs_write.deniedPaths.includes(p), p);
+  for (const p of ['.git/**', '**/.env', 'tmp/validation-*', '.claude/**', '**/CLAUDE.md', 'AGENTS.md', '.mcp.json', '.husky/**', '.github/workflows/**']) assert.ok(config.toolsSettings.fs_write.deniedPaths.includes(p), p);
+  for (const p of ['**/.env', '**/*.pem', '**/*.key', '**/id_rsa*', '**/.netrc']) assert.ok(config.toolsSettings.fs_read.deniedPaths.includes(p), p);
 });
 
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'kiro-task-'));
@@ -93,7 +94,7 @@ const value = mode === 'never' || (mode === 'fix2' && call % 2 === 1) ? 3 : 2;
 fs.writeFileSync('a.mjs', 'export const a = ' + value + ';\\n');
 fs.writeFileSync('a.test.mjs', 'import "./a.mjs";\\n');
 if (mode === 'ignored') { fs.mkdirSync('tmp', { recursive: true }); fs.writeFileSync('tmp/hidden.txt', 'x'); }
-if (mode === 'big') { for (let i = 0; i < 300; i++) fs.writeFileSync('generated-file-' + i + '.mjs', ''); console.log('x'.repeat(8000)); }
+if (mode === 'big') { fs.mkdirSync('tmp', { recursive: true }); for (let i = 0; i < 300; i++) { fs.writeFileSync('generated-file-' + i + '.mjs', ''); fs.writeFileSync('tmp/ignored-file-' + i + '.txt', ''); } console.log('x'.repeat(8000)); }
 if (mode === 'commit') execSync('git -c user.name=k -c user.email=k@k commit -qam kiro');
 console.log('[tool] Write File');
 console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
@@ -172,6 +173,8 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       const out = JSON.parse(r.stdout);
       assert.equal(out.truncated, true);
       assert.equal(out.changed_files_total, 302);
+      assert.equal(out.new_ignored_files_total, 300);
+      assert.ok(out.new_ignored_files.length < 300);
       reset();
     });
 
@@ -215,6 +218,13 @@ console.log('SUMMARY: set a to ' + value + ', added a.test.mjs');
       const detached = path.join(temporary, 'detached');
       git(main, 'worktree', 'add', '-q', '--detach', detached);
       refuse(['implement', '--spec', spec, '--worktree', detached], /브랜치/);
+      // 추적되는 심볼릭 링크가 있으면 부르지 않는다
+      const linked = path.join(temporary, 'linked');
+      git(main, 'worktree', 'add', '-qb', 'with-link', linked);
+      spawnSync('ln', ['-s', '/etc/hosts', 'outside'], { cwd: linked });
+      git(linked, 'add', 'outside');
+      git(linked, 'commit', '-qm', 'link');
+      refuse(['implement', '--spec', spec, '--worktree', linked], /심볼릭 링크/);
       refuse(['implement', '--spec', spec], /--worktree/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--timeout', 'x'], /--timeout/);
       refuse(['implement', '--spec', spec, '--worktree', tree, '--test', 'true', '--rounds', '9'], /--rounds/);

@@ -13,7 +13,7 @@
 // Kiro 결과는 신뢰하지 않는 데이터다. 부른 쪽이 diff 를 읽고 검증을 다시 돌린다.
 import { randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,7 +38,7 @@ export function buildPrompt(spec, { test = null, failure = null, nonce = randomB
   const rules = [
     "- Work only inside the current directory (a git worktree). You have file read/write tools only; you cannot run commands.",
     "- Implement exactly what the spec asks, nothing more. Write or update the tests first, then the code.",
-    "- Do not touch .git, .env files or files outside the current directory.",
+    "- Do not touch .git, .env, secret or key files, agent settings (.claude, CLAUDE.md, AGENTS.md, .mcp.json, .kiro), git hooks, CI workflows or files outside the current directory.",
     "- Finish with a line starting `SUMMARY:` that lists the files you changed and anything left undone.",
   ];
   return [
@@ -67,7 +67,11 @@ export function fitOutput(result) {
   out.diff_stat = (out.diff_stat || "").split("\n").slice(-1).join("\n");
   if (out.test) out.test = { ...out.test, command: String(out.test.command).slice(0, TRUNCATED_SUMMARY_CHARS), output_tail: (out.test.output_tail || "").slice(-TRUNCATED_SUMMARY_CHARS) };
   if (out.reason) out.reason = String(out.reason).slice(0, TRUNCATED_SUMMARY_CHARS);
-  while (size(out) > MAX_BYTES && out.changed_files.length) out.changed_files = out.changed_files.slice(0, Math.floor(out.changed_files.length / 2));
+  if (out.new_ignored_files) { out.new_ignored_files_total = out.new_ignored_files.length; }
+  while (size(out) > MAX_BYTES && (out.changed_files.length || out.new_ignored_files?.length)) {
+    out.changed_files = out.changed_files.slice(0, Math.floor(out.changed_files.length / 2));
+    if (out.new_ignored_files) out.new_ignored_files = out.new_ignored_files.slice(0, Math.floor(out.new_ignored_files.length / 2));
+  }
   return out;
 }
 
@@ -113,14 +117,18 @@ function checkWorktree(dir) {
   if (["main", "master", remoteDefault].includes(branch.out)) fail(`기본 브랜치(${branch.out})에서는 실행하지 않습니다`);
   const status = git(dir, "status", "--porcelain", "--untracked-files=all");
   if (!status.ok || status.out) fail("작업 트리가 깨끗하지 않습니다(커밋하거나 정리한 뒤 실행)");
+  // 추적되는 심볼릭 링크가 worktree 밖을 가리키면 Kiro 의 경로 승인을 우회할 수 있다. 있으면 부르지 않는다.
+  const links = git(dir, "ls-files", "-s").out.split("\n").filter((l) => l.startsWith("120000 "));
+  if (links.length) fail(`심볼릭 링크가 있는 worktree 에서는 실행하지 않습니다: ${links.slice(0, 3).map((l) => l.split("\t")[1]).join(", ")}`);
   return git(dir, "rev-parse", "HEAD").out;
 }
 
 // -z: 경로를 인용하지 않고, 상태 두 글자 + 공백 뒤가 경로다(이름 바꾸기는 다음 항목이 이전 경로).
 // 무시 파일(!!)도 받아, 실행 전후를 비교해 새로 생긴 것을 알린다(.gitignore 에 숨은 변경을 놓치지 않게).
 function statusEntries(worktree) {
-  const out = spawnSync("git", ["status", "--porcelain", "-z", "--untracked-files=all", "--ignored=traditional"], { cwd: worktree, encoding: "utf8" }).stdout || "";
-  const entries = out.split("\0");
+  const r = spawnSync("git", ["status", "--porcelain", "-z", "--untracked-files=all", "--ignored=traditional"], { cwd: worktree, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0) return null;
+  const entries = r.stdout.split("\0");
   const changed = [], ignored = [];
   for (let i = 0; i < entries.length; i++) {
     if (!entries[i]) continue;
@@ -145,7 +153,9 @@ function main() {
   if (!existsSync(opt.spec)) fail(`명세 파일이 없습니다: ${opt.spec}`);
   const worktree = path.resolve(opt.worktree);
   const headBefore = checkWorktree(worktree);
-  const ignoredBefore = new Set(statusEntries(worktree).ignored);
+  const before = statusEntries(worktree);
+  if (!before) fail("git status 를 읽지 못했습니다");
+  const ignoredBefore = new Set(before.ignored);
 
   const spec = readFileSync(opt.spec, "utf8");
   const timeout = Number(opt.timeout || DEFAULT_TIMEOUT) * 1000;
@@ -168,7 +178,9 @@ function main() {
     failure = output.slice(-TEST_TAIL_CHARS);
   }
 
-  const { changed, ignored } = statusEntries(worktree);
+  const after = statusEntries(worktree);
+  if (!after) report({ status: "failed", reason: "실행 뒤 git status 를 읽지 못했습니다. worktree 를 직접 확인하세요", log }, false);
+  const { changed, ignored } = after;
   const result = {
     status: "ok", rounds: Math.min(round, rounds), test, head_unchanged: git(worktree, "rev-parse", "HEAD").out === headBefore,
     changed_files: changed, new_ignored_files: ignored.filter((f) => !ignoredBefore.has(f)),
@@ -181,4 +193,5 @@ function main() {
   report(result, true);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
+// 심볼릭 링크로 불러도 실행되게 실제 경로로 비교한다.
+if (process.argv[1] && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])) main();
