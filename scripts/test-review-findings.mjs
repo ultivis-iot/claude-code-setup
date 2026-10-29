@@ -389,6 +389,19 @@ try {
     assert.equal(ledger.decisions.f1.decision, 'wrong');
     assert.equal(JSON.parse(run('status', '--pr', '18', '--input', input).stdout).state, 'clear');
   });
+  // #23: --reason 은 자유 서술이라 값이 --repo 처럼 옵션 이름으로 시작할 수 있어야 한다. --key=value 형식도 받는다.
+  check('cli record accepts a reason that starts with -- and the key=value form', () => {
+    const read = (pr) => JSON.parse(readFileSync(path.join(dir, 'tmp', `review-findings-${pr}.json`), 'utf8'));
+    const dashReason = '--repo 를 가리키는 사유';
+    assert.equal(run('record', '--pr', '30', '--id', 'f1', '--decision', 'wrong', '--reason', dashReason).status, 0);
+    assert.equal(read(30).decisions.f1.reason, dashReason);
+    assert.equal(run('record', '--pr', '31', '--id', 'f1', '--decision', 'wrong', '--reason=--x y').status, 0);
+    assert.equal(read(31).decisions.f1.reason, '--x y');
+    assert.equal(run('record', '--pr=32', '--id', 'f1', '--decision', 'wrong', '--reason', 'r').status, 0);
+    assert.equal(read(32).decisions.f1.reason, 'r');
+    // 값이 없는 --reason(맨 끝)은 그대로 거부한다.
+    assert.equal(run('record', '--pr', '33', '--id', 'f1', '--decision', 'wrong', '--reason').status, 1);
+  });
   check('cli reopens the declined finding once its file changes', () => {
     writeFileSync(path.join(dir, 'a.mjs'), 'two\n');
     git('commit', '-qam', 'touch a.mjs');

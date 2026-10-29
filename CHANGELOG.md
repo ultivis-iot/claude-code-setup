@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Kiro 설치 대상 추가. `setup-kiro.sh` 가 정본 스킬(`codex/skills/`)을 Kiro user-level 스킬 경로 `~/.kiro/skills/` 로 복사한다(`rm -rf` + `cp -R`, `setup.sh`/`setup-codex.sh` 의 스킬 루프와 같은 방식이라 멱등). Claude/Codex 와 달리 Kiro 대상은 스킬만 배포하고 commands/agents/hooks 는 포함하지 않는다. 대상 경로는 `KIRO_HOME` 으로 바꿀 수 있다. README 에 Kiro 설치·업데이트·설치되는 파일·사용 방법 섹션을, CLAUDE.md 프로젝트 구조·테스트에 `setup-kiro.sh` 를 추가했다.
+- `review-findings.mjs record`: `--reason` 이 `--repo` 처럼 옵션 이름으로 시작하는 자유 서술을 받도록, 다음 인자가 있으면 항상 값으로 삼는다. 모든 옵션이 `--key=value` 형식도 받는다. 다른 옵션은 그대로 `--` 로 시작하는 다음 인자를 값으로 보지 않는다.
 
 ## v1.3.0 (2026-10-28)
 
