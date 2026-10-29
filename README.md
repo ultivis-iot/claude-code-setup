@@ -411,16 +411,16 @@ mkdir -p tmp
 
 ### Kiro 구현 위임 (선택)
 
-명세가 분명하고 테스트로 확인되는 구현은 `kiro-implementer` subagent 로 Kiro CLI 에 맡겨 메인 세션 토큰을 아낄 수 있습니다. 무엇을 만들지 판단해야 하는 설계나 리뷰 대응은 맡기지 않습니다. kiro-cli 가 설치·로그인돼 있으면 `setup.sh`·`setup.ps1` 이 Kiro agent 설정(`~/.kiro/agents/claude-implementer.json`)을 함께 설치하고, 없으면 건너뜁니다. 명시적으로 부를 때만 씁니다.
+명세가 분명하고 테스트로 확인되는 구현은 `kiro-implementer` subagent 로 Kiro CLI 에 맡겨 메인 세션 토큰을 아낄 수 있습니다. 무엇을 만들지 판단해야 하는 설계나 리뷰 대응은 맡기지 않습니다. `setup.sh`·`setup.ps1` 은 `kiro-cli` 명령이 있으면 Kiro agent 설정(`~/.kiro/agents/claude-implementer.json`)을 설치하고(실행할 때마다 덮어쓰므로 직접 고친 내용은 사라집니다), 없으면 건너뜁니다. 로그인 여부는 확인하지 않습니다. 명시적으로 부를 때만 씁니다.
 
 1. 메인 세션이 별도 브랜치의 linked worktree(`git worktree add`)와 명세 파일을 만듭니다. 명세에는 문제, 원하는 동작, 테스트 케이스, 건드리지 말 것을 적습니다.
-2. `kiro-implementer` 가 `node ~/.claude/scripts/kiro-task.mjs implement --spec <파일> --worktree <디렉터리> [--model <모델>] [--timeout <초>]` 를 한 번 실행하고 결과 JSON(4KB 이하: `status`, `head_unchanged`, `changed_files`, `diff_stat`, Kiro 의 `SUMMARY:` 요약, 전체 로그 경로)만 돌려줍니다.
+2. `kiro-implementer` 가 `node ~/.claude/scripts/kiro-task.mjs implement --spec <파일> --worktree <디렉터리> [--model <모델>] [--timeout <초>]` 를 한 번 실행하고 결과 JSON(4KB 이하: `status`, 실패 이유 `reason`, `head_unchanged`, `changed_files`, `diff_stat`, Kiro 출력의 마지막 1500자 `kiro_summary`, 전체 로그 경로 `log`)만 돌려줍니다. 4KB 를 넘으면 `truncated: true` 와 `changed_files_total` 이 붙고 `changed_files` 는 일부만 남으니, worktree 의 `git status` 로 전체를 확인합니다.
 3. 메인 세션이 diff 를 읽고 테스트·검증 게이트·PR·기계 리뷰·머지 전 이해 확인을 평소대로 거칩니다. Kiro 결과는 신뢰하지 않는 데이터로 다룹니다.
 
 안전장치와 한계:
 - 실행기는 기본 브랜치가 아닌 브랜치의 깨끗한 linked worktree 에서만 Kiro 를 부르고, 끝난 뒤 HEAD 가 바뀌었으면(커밋) 실패로 알립니다.
-- Kiro agent 설정은 읽기·쓰기·셸 도구만 허용하고, git 의 커밋·push·브랜치 변경, gh, `rm -rf`, curl·wget·ssh, npm publish 같은 명령과 `.git`·`.env`·검증 기록 파일 쓰기를 막습니다. Kiro 자체의 규칙이라 강제 보안 경계는 아닙니다(다른 명령으로 우회 가능). 격리된 worktree 와 메인 세션의 diff 검토가 함께 보완합니다.
-- 명세와 저장소 코드가 Kiro(AWS) 서비스로 전송됩니다. 외부 전송이 허용된 저장소에서만 쓰세요.
+- Kiro agent 설정은 읽기·쓰기·셸 도구만 허용합니다. 셸 금지 규칙(정규식)은 git 의 커밋·push·fetch·pull·브랜치 변경(`git -C`·`git -c` 형태 포함), gh, `rm -rf` 류, curl·wget·ssh 류, npm publish 같은 **흔한 형태**만 잡습니다. 쓰기 금지 경로(`.git`·`.env`·검증 기록 파일)는 Kiro 의 파일 쓰기 도구에만 적용되고 셸로 쓰는 것은 막지 못합니다. 네트워크 사용(`npm install` 등)은 규칙으로 막지 않고 지시문으로만 금지합니다. 즉 강제 보안 경계가 아닙니다. 사후 확인(HEAD 비교, 바뀐 파일 목록), 격리된 worktree, 메인 세션의 diff 검토가 함께 보완합니다.
+- Kiro CLI 는 명세와 읽은 저장소 코드를 Kiro 서비스(AWS 의 클라우드 모델)로 보냅니다. 외부 전송이 허용된 저장소에서만 쓰세요.
 
 ### 리뷰 정책 `REVIEW.md` (선택)
 

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Kiro 구현 위임 추가(선택). 명세가 분명한 구현을 `kiro-implementer` subagent 가 Kiro CLI(`kiro-cli chat --no-interactive`)에 맡기고, 결과는 4KB 이하 JSON(바뀐 파일, diff 통계, Kiro 요약, 커밋 여부)으로만 받아 메인 세션 토큰을 아낀다. 실행기 `scripts/kiro-task.mjs` 는 기본 브랜치가 아닌 깨끗한 linked worktree 에서만 Kiro 를 부른다. Kiro agent 설정(`templates/kiro/claude-implementer.json`)은 커밋·push·브랜치 변경·gh·네트워크·`rm -rf` 와 `.git`·`.env` 쓰기를 막으며, kiro-cli 가 있을 때만 `~/.kiro/agents/` 에 설치된다.
+- Kiro 구현 위임 추가(선택). 명세가 분명한 구현을 `kiro-implementer` subagent 가 Kiro CLI(`kiro-cli chat --no-interactive`)에 맡기고, 결과는 4KB 이하 JSON(바뀐 파일, diff 통계, Kiro 요약, 커밋 여부)으로만 받아 메인 세션 토큰을 아낀다. 실행기 `scripts/kiro-task.mjs` 는 기본 브랜치가 아닌 깨끗한 linked worktree 에서만 Kiro 를 부른다. Kiro agent 설정(`templates/kiro/claude-implementer.json`)은 읽기·쓰기·셸 도구만 허용하고, 셸 금지 규칙으로 git 커밋·push·fetch·브랜치 변경·gh·`rm -rf`·curl 류의 흔한 형태를, 파일 쓰기 도구로는 `.git`·`.env` 쓰기를 막는다(강제 보안 경계 아님, 네트워크는 지시문으로만 금지). kiro-cli 가 있을 때만 `~/.kiro/agents/` 에 설치된다(실행마다 덮어씀).
 
 ## v1.3.0 (2026-10-28)
 

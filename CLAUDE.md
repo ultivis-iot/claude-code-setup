@@ -76,7 +76,7 @@ git push origin master --tags
 - 기계 리뷰 읽기 도구(`review-findings.mjs`) 테스트: `node scripts/test-review-findings.mjs` (gh 불필요, 워크플로우 검증에 포함)
 - 기계 리뷰 지표 집계(`review-metrics.mjs`) 테스트: `node scripts/test-review-metrics.mjs` (gh 불필요, 워크플로우 검증에 포함)
 - 머지 전 질문 수(`merge-brief.mjs`) 테스트: `node scripts/test-merge-brief.mjs` (gh 불필요, 워크플로우 검증에 포함)
-- Kiro 구현 실행기(`kiro-task.mjs`) 테스트: `node scripts/test-kiro-task.mjs` (가짜 kiro-cli 사용, Kiro 로그인 불필요, 워크플로우 검증에 포함)
+- Kiro 구현 실행기(`kiro-task.mjs`) 테스트: `node scripts/test-kiro-task.mjs` (가짜 kiro-cli 사용, Kiro 로그인 불필요, Windows 에서는 실행 경로를 건너뜀, 워크플로우 검증에 포함)
 
 ### 업데이트 검증
 `./setup.sh --update` 실행 후 아래 항목 확인:

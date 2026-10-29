@@ -7,7 +7,8 @@
 // ~/.kiro/agents/claude-implementer.json 의 제한(쓸 수 있는 도구, 금지 명령, 쓰기 금지 경로)으로 돈다.
 // 끝나면 HEAD 가 그대로인지(커밋하지 않았는지), 바뀐 파일, diff 통계, Kiro 의 마지막 요약을 4KB 이하
 // JSON 으로 낸다. 전체 로그는 임시 디렉터리에 남긴다. Kiro 결과는 신뢰하지 않는 데이터다. 부른 쪽이
-// diff 를 읽고 테스트·검증을 다시 돌린다. 금지 명령·경로는 Kiro 설정이 막을 뿐 강제 보안 경계가 아니다.
+// diff 를 읽고 테스트·검증을 다시 돌린다. 금지 명령은 흔한 형태만 잡는 Kiro 설정 규칙이고, 쓰기 금지 경로는 Kiro 의 파일 쓰기
+// 도구에만 적용된다(셸로 쓰면 못 막음). 강제 보안 경계가 아니다. 사후 확인은 HEAD 비교와 바뀐 파일 목록이다.
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -15,7 +16,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const AGENT = "claude-implementer";
-const MAX_BYTES = 4096, SUMMARY_CHARS = 1500, DEFAULT_TIMEOUT = 900;
+const TRUST_TOOLS = "fs_read,fs_write,execute_bash";
+const MAX_BYTES = 4096, SUMMARY_CHARS = 1500, TRUNCATED_SUMMARY_CHARS = 500, DEFAULT_TIMEOUT = 900;
 const OPTIONS = new Set(["spec", "worktree", "model", "timeout"]);
 
 // Kiro 의 실행 로그(`[INFO]` 등), 도구 진행 줄, Node 경고, 색 코드를 지우고 답만 남긴다.
@@ -47,7 +49,7 @@ export function fitOutput(result) {
   const size = (r) => Buffer.byteLength(JSON.stringify(r));
   if (size(result) <= MAX_BYTES) return result;
   const out = { ...result, truncated: true, changed_files_total: result.changed_files.length };
-  out.kiro_summary = out.kiro_summary.slice(-500);
+  out.kiro_summary = out.kiro_summary.slice(-TRUNCATED_SUMMARY_CHARS);
   out.diff_stat = out.diff_stat.split("\n").slice(-1).join("\n");
   while (size(out) > MAX_BYTES && out.changed_files.length) out.changed_files = out.changed_files.slice(0, Math.floor(out.changed_files.length / 2));
   return out;
@@ -59,7 +61,7 @@ function fail(message) {
 }
 
 function report(result, ok) {
-  process.stdout.write(JSON.stringify(fitOutput(result), null, 2) + "\n");
+  process.stdout.write(JSON.stringify(fitOutput(result)) + "\n");
   process.exit(ok ? 0 : 1);
 }
 
@@ -76,6 +78,7 @@ function args(argv) {
   return { cmd, opt };
 }
 
+// 출력을 trim 한다. 앞 공백이 뜻을 가지는 출력(status --porcelain)에는 쓰지 않는다(changedFiles 참고).
 function git(cwd, ...argv) {
   const r = spawnSync("git", argv, { cwd, encoding: "utf8", windowsHide: true });
   return { ok: r.status === 0, out: (r.stdout || "").trim() };
@@ -97,6 +100,18 @@ function checkWorktree(dir) {
   return git(dir, "rev-parse", "HEAD").out;
 }
 
+// -z: 경로를 인용하지 않고, 상태 두 글자 + 공백 뒤가 경로다(이름 바꾸기는 다음 항목이 이전 경로).
+function changedFiles(worktree) {
+  const entries = (spawnSync("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" }).stdout || "").split("\0");
+  const changed = [];
+  for (let i = 0; i < entries.length; i++) {
+    if (!entries[i]) continue;
+    changed.push(entries[i].slice(3));
+    if (/^[RC]/.test(entries[i])) i++;
+  }
+  return changed;
+}
+
 function main() {
   const { cmd, opt } = args(process.argv.slice(2));
   if (cmd !== "implement") fail("사용법: kiro-task.mjs implement --spec <file> --worktree <dir> [--model <model>] [--timeout <seconds>]");
@@ -111,7 +126,7 @@ function main() {
   const worktree = path.resolve(opt.worktree);
   const headBefore = checkWorktree(worktree);
 
-  const argv = ["chat", "--no-interactive", "--agent", AGENT, "--trust-tools=fs_read,fs_write,execute_bash",
+  const argv = ["chat", "--no-interactive", "--agent", AGENT, `--trust-tools=${TRUST_TOOLS}`,
     ...(opt.model ? ["--model", opt.model] : []), buildPrompt(readFileSync(opt.spec, "utf8"))];
   const timeout = Number(opt.timeout || DEFAULT_TIMEOUT) * 1000;
   const run = spawnSync("kiro-cli", argv, { cwd: worktree, encoding: "utf8", timeout, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
@@ -122,16 +137,8 @@ function main() {
   writeFileSync(log, raw);
 
   const headAfter = git(worktree, "rev-parse", "HEAD").out;
-  // -z: 경로를 인용하지 않고, 상태 두 글자 + 공백 뒤가 경로다(이름 바꾸기는 다음 항목이 이전 경로).
-  const entries = (spawnSync("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: worktree, encoding: "utf8" }).stdout || "").split("\0");
-  const changed = [];
-  for (let i = 0; i < entries.length; i++) {
-    if (!entries[i]) continue;
-    changed.push(entries[i].slice(3));
-    if (/^[RC]/.test(entries[i])) i++;
-  }
   const result = {
-    status: "ok", head_unchanged: headAfter === headBefore, changed_files: changed,
+    status: "ok", head_unchanged: headAfter === headBefore, changed_files: changedFiles(worktree),
     diff_stat: git(worktree, "diff", "--stat").out, kiro_summary: cleanOutput(run.stdout).slice(-SUMMARY_CHARS), log,
   };
   if (run.error?.code === "ETIMEDOUT") report({ ...result, status: "timeout", reason: `${timeout / 1000}초 안에 끝나지 않았습니다` }, false);

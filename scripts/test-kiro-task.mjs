@@ -39,6 +39,21 @@ check('the result JSON stays under 4KB by cutting the summary first, then the fi
   assert.equal(small.truncated, undefined);
 });
 
+// Kiro agent 설정의 금지 명령 정규식: 흔한 우회 형태까지 막고, 테스트·조회 명령은 막지 않는다(Kiro 처럼 전체 일치로 본다).
+check('the Kiro agent deny rules catch common forms and leave test commands alone', () => {
+  const config = JSON.parse(readFileSync(path.join(path.dirname(tool), '..', 'templates', 'kiro', 'claude-implementer.json'), 'utf8'));
+  assert.deepEqual(config.tools, ['fs_read', 'fs_write', 'execute_bash']);
+  const rules = config.toolsSettings.execute_bash.deniedCommands.map((r) => new RegExp(`^(?:${r})$`));
+  const denied = (cmd) => rules.some((r) => r.test(cmd));
+  for (const cmd of ['git commit -m x', 'git -C dir push', 'git -c user.name=x commit -m y', 'echo $(git commit -m x)', '(git push)', 'env git push',
+    'git fetch', 'git pull origin', '/usr/bin/gh pr list', 'gh', 'rm -rf a', 'rm -Rf a', 'rm -r -f a', 'rm -f -r a', 'rm -fr a', 'curl x', 'npm publish']) {
+    assert.ok(denied(cmd), cmd);
+  }
+  for (const cmd of ['git status', 'git diff --stat', 'git log --oneline', 'node scripts/test.mjs', 'npm test', 'rm a.txt', 'rm -f a.txt', 'echo ok > x', 'ls -la']) {
+    assert.ok(!denied(cmd), cmd);
+  }
+});
+
 const temporary = mkdtempSync(path.join(os.tmpdir(), 'kiro-task-'));
 try {
   if (process.platform === 'win32') {
@@ -76,6 +91,7 @@ if (mode === 'fail') { console.error('[ERROR] auth expired'); process.exit(3); }
 if (mode === 'sleep') { const end = Date.now() + 5000; while (Date.now() < end) {} }
 fs.writeFileSync('a.mjs', 'export const a = 2;\\n');
 fs.writeFileSync('a.test.mjs', 'import "./a.mjs";\\n');
+if (mode === 'big') { for (let i = 0; i < 300; i++) fs.writeFileSync('generated-file-' + i + '.mjs', ''); console.log('x'.repeat(8000)); }
 if (mode === 'commit') execSync('git -c user.name=k -c user.email=k@k commit -qam kiro');
 console.log('[tool] Write File');
 console.log('SUMMARY: changed a to 2, added a.test.mjs, ran node a.test.mjs (pass)');
@@ -102,6 +118,17 @@ console.log('SUMMARY: changed a to 2, added a.test.mjs, ran node a.test.mjs (pas
       assert.equal(call.cwd, tree);
       assert.deepEqual(call.args.slice(0, 7), ['chat', '--no-interactive', '--agent', 'claude-implementer', '--trust-tools=fs_read,fs_write,execute_bash', '--model', 'claude-sonnet-5.5']);
       assert.match(call.args.at(-1), /BEGIN SPEC[\s\S]*Change a to 2/);
+      reset();
+    });
+
+    check('a large result is cut to 4KB on stdout and marked truncated', () => {
+      const r = run(['implement', '--spec', spec, '--worktree', tree], { FAKE_KIRO: 'big' });
+      assert.equal(r.status, 0, r.stderr);
+      assert.ok(Buffer.byteLength(r.stdout) <= 4097, String(Buffer.byteLength(r.stdout)));
+      const out = JSON.parse(r.stdout);
+      assert.equal(out.truncated, true);
+      assert.equal(out.changed_files_total, 302);
+      assert.ok(Buffer.byteLength(JSON.stringify(out)) <= 4096);
       reset();
     });
 

@@ -1,26 +1,46 @@
 {
   "name": "claude-implementer",
-  "description": "Implements a spec handed over by Claude Code's kiro-implementer subagent inside an isolated git worktree. No commits, pushes, branch changes or network.",
+  "description": "Implements a spec handed over by Claude Code's kiro-implementer subagent inside an isolated git worktree. The prompt forbids commits, pushes, branch changes and network use; the deny rules below catch common forms only (not a security boundary).",
   "prompt": "You implement exactly the spec you are given, inside the current directory only. Write tests first, run them, and never commit, push, switch branches, change git config, call gh or use the network. End with a line starting SUMMARY:.",
   "mcpServers": {},
-  "tools": ["fs_read", "fs_write", "execute_bash"],
+  "tools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash"
+  ],
   "toolAliases": {},
-  "allowedTools": ["fs_read", "fs_write", "execute_bash"],
+  "allowedTools": [
+    "fs_read",
+    "fs_write",
+    "execute_bash"
+  ],
   "resources": [],
   "toolsSettings": {
     "execute_bash": {
       "autoAllowReadonly": true,
       "deniedCommands": [
-        "^\\s*git\\s+(commit|push|merge|rebase|reset|checkout|switch|tag|worktree|remote|config|branch|stash|cherry-pick|revert|am|apply|clean)\\b.*",
-        ".*[;&|]\\s*git\\s+(commit|push|merge|rebase|reset|checkout|switch|tag|worktree|remote|config|branch|stash|cherry-pick|revert|am|apply|clean)\\b.*",
-        "^\\s*gh\\b.*", ".*[;&|]\\s*gh\\b.*",
-        ".*\\brm\\s+-[a-zA-Z]*r[a-zA-Z]*f.*", ".*\\brm\\s+-[a-zA-Z]*f[a-zA-Z]*r.*",
-        ".*\\b(curl|wget|ssh|scp|sudo|nc)\\b.*",
-        ".*\\bnpm\\s+(publish|login|adduser)\\b.*"
+        ".*\\bgit(\\s+-{1,2}[A-Za-z-]+(=\\S+)?(\\s+[^-\\s]\\S*)?)*\\s+(commit|push|pull|fetch|clone|merge|rebase|reset|checkout|switch|tag|worktree|remote|config|branch|stash|cherry-pick|revert|am|apply|clean|update-ref|symbolic-ref)\\b.*",
+        ".*(^|[\\s;&|(`/])gh\\s.*",
+        ".*(^|[\\s;&|(`/])gh$",
+        ".*\\brm\\s+(-[A-Za-z]*\\s+)*-[A-Za-z]*[rR][A-Za-z]*\\s+(-[A-Za-z]*\\s+)*-?[A-Za-z]*f.*",
+        ".*\\brm\\s+(-[A-Za-z]*\\s+)*-[A-Za-z]*f[A-Za-z]*\\s+(-[A-Za-z]*\\s+)*-[A-Za-z]*[rR].*",
+        ".*\\brm\\s+-[A-Za-z]*([rR][A-Za-z]*f|f[A-Za-z]*[rR]).*",
+        ".*\\b(curl|wget|ssh|scp|sftp|rsync|sudo|nc|ncat|telnet)\\b.*",
+        ".*\\bnpm\\s+(publish|login|adduser|token)\\b.*"
       ]
     },
     "fs_write": {
-      "deniedPaths": [".git/**", "**/.git/**", ".env", ".env.*", "**/.env", "**/.env.*", "tmp/validation-*", "tmp/review-policy.json", "tmp/review-findings-*.json"]
+      "deniedPaths": [
+        ".git/**",
+        "**/.git/**",
+        ".env",
+        ".env.*",
+        "**/.env",
+        "**/.env.*",
+        "tmp/validation-*",
+        "tmp/review-policy.json",
+        "tmp/review-findings-*.json"
+      ]
     }
   },
   "includeMcpJson": false,
