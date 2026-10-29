@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { agentConfigProblems, buildPrompt, cleanOutput, loadSwitch, parseVerdict } from './kiro-validate.mjs';
+import { agentConfigProblems, buildPrompt, cleanOutput, fitSummary, loadSwitch, parseVerdict } from './kiro-validate.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const tool = path.join(here, 'kiro-validate.mjs');
@@ -55,6 +55,15 @@ await check('the shipped Kiro agent is read-only and the installed config is che
   assert.match(bad({ permissions: { rules: [{ capability: 'write', match: ['./**'], effect: 'allow' }] } }), /허용 규칙/);
   assert.match(bad({ mcpServers: { x: {} } }), /mcp/i);
   assert.match(agentConfigProblems(null).join(), /읽지 못/);
+});
+
+await check('the summary stays under 1KB even with long Korean reasons repeated per validator', () => {
+  const reason = '설정 문제: '.repeat(200);
+  const big = fitSummary({ backend: 'claude', reason, claude: ['a', 'b', 'c', 'd'].map((validator) => ({ validator, reason })) });
+  assert.ok(Buffer.byteLength(JSON.stringify(big)) <= 1024);
+  assert.deepEqual(big.claude, [{ validator: 'a' }, { validator: 'b' }, { validator: 'c' }, { validator: 'd' }]);
+  assert.equal(big.truncated, true);
+  assert.equal(fitSummary({ backend: 'kiro', claude: [] }).truncated, undefined);
 });
 
 await check('the switch is off when missing, disabled or malformed', () => {
@@ -202,6 +211,10 @@ await check('bad arguments are refused', () => {
   }
   const r = spawnSync(process.execPath, [tool, 'run', '--repo', env.repo, '--bogus', 'x'], { encoding: 'utf8' });
   assert.match(r.stderr, /모르는 옵션/);
+  const missing = spawnSync(process.execPath, [tool, 'run', '--repo', env.repo, '--snapshot', 'tmp/none.json', '--policy', 'tmp/review-policy.json', '--validators', 'doc', '--out', 'tmp/o.json'],
+    { encoding: 'utf8', env: { ...process.env, HOME: env.home, PATH: `${env.bin}:/usr/bin:/bin`, FAKE_KIRO: 'ok' } });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /^ERROR: 스냅샷/);
   assert.equal(readdirSync(path.join(env.repo, 'tmp')).includes('kiro'), false);
   rmSync(env.root, { recursive: true, force: true });
 });
