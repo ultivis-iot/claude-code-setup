@@ -56,7 +56,7 @@ check('validation, install, hook and permission paths ask four, five when large'
     'schemas/validation-status.schema.json', 'agents/security-validator.md', '.github/workflows/ci.yml',
     'src/auth/login.ts', 'config/secrets.yaml', 'src/permissions.ts', 'lib/token-store.js', 'db/migrations/001.sql',
     // 리뷰·검증 게이트와 그 도구, 자격 증명을 다루는 Notion 스크립트, 에이전트 설정도 민감 경로다(어느 깊이든)
-    'scripts/review-findings.mjs', 'scripts/merge-brief.mjs', 'scripts/graft.mjs', 'scripts/verify-workflow.sh', 'scripts/sync-workflow.mjs',
+    'scripts/review-findings.mjs', 'scripts/merge-brief.mjs', 'scripts/kiro-validate.mjs', 'templates/kiro/claude-validator.json', 'scripts/graft.mjs', 'scripts/verify-workflow.sh', 'scripts/sync-workflow.mjs',
     'scripts/ult-notion.mjs', 'scripts/lib/notion.mjs', '.claude/settings.json', '.codex/config.toml',
     'codex/plugins/dev-workflow/hooks/hooks.json', 'codex/plugins/dev-workflow/.codex-plugin/plugin.json', 'HOOKS/pre-push',
     // 디렉터리 이름으로 든 설치·설정·게이트·인증, 자격 증명·환경 파일, 패키지·hook 설정, 사용자 설정에 설치되는 지시문

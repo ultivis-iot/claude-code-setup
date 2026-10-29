@@ -24,8 +24,8 @@ import { fileURLToPath } from "node:url";
 
 const CODE_LINES = 150, CODE_FILES = 5, SENSITIVE_LINES = 300;
 const SENSITIVE = new RegExp([
-  // hook·스키마·agent 정의·CI·에이전트 설정 디렉터리
-  "(^|/)(hooks|schemas|agents|\\.github|\\.circleci|\\.buildkite|\\.gitea|\\.semaphore|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
+  // hook·스키마·agent 정의(Kiro agent 템플릿 포함)·CI·에이전트 설정 디렉터리
+  "(^|/)(hooks|schemas|agents|kiro|\\.github|\\.circleci|\\.buildkite|\\.gitea|\\.semaphore|\\.claude|\\.codex|\\.codex-plugin|\\.husky)/",
   // 설치·설정·게이트·배포 (디렉터리 이름이나 파일 이름의 앞부분)
   "(^|/)(setup|install|installer|gates?|deploy|release)s?([/._-]|$)",
   // 이 저장소의 검증·리뷰 도구와 Notion 자격 증명을 다루는 스크립트(새로 만들면 여기에 더한다)

@@ -54,6 +54,10 @@ await check('the shipped Kiro agent is read-only and the installed config is che
   assert.match(bad({ toolsSettings: {} }), /경계/);
   assert.match(bad({ permissions: { rules: [{ capability: 'write', match: ['./**'], effect: 'allow' }] } }), /허용 규칙/);
   assert.match(bad({ mcpServers: { x: {} } }), /mcp/i);
+  assert.match(bad({ hooks: { agentSpawn: [{ command: 'curl x' }] } }), /hooks/);
+  assert.match(bad({ resources: ['file:///home/u/.ssh/config'] }), /resources/);
+  assert.match(bad({ toolAliases: { fs_read: 'write' } }), /toolAliases/);
+  assert.match(bad({ toolsSettings: { ...template.toolsSettings, read: { allowedPaths: ['/**'] } } }), /경계/);
   assert.match(agentConfigProblems(null).join(), /읽지 못/);
 });
 
@@ -168,10 +172,10 @@ await check('Kiro verdicts are written in the contract input format with the bac
 
 await check('a failing or unfinished test command is recorded from the runner, not from Kiro', () => {
   const env = setup();
-  let r = run(env, 'ok', 'test', ['--test', 'echo boom; exit 3']);
+  run(env, 'ok', 'test', ['--test', 'echo boom; exit 3']);
   assert.deepEqual({ ...results(env)['test-validator'].test_execution, log: undefined }, { ran: true, command: 'echo boom; exit 3', exit_code: 3, log: undefined });
   assert.match(calls(env), /exit 3/);
-  r = run(env, 'ok', 'test', ['--test', 'sleep 10']);
+  const r = run(env, 'ok', 'test', ['--test', 'sleep 10']);
   assert.equal(r.json.backend, 'kiro');
   assert.deepEqual({ ...results(env)['test-validator'].test_execution, log: undefined }, { ran: false, command: 'sleep 10', exit_code: null, log: undefined });
   assert.match(calls(env), /not finished \(5초 초과\)/);
@@ -194,6 +198,9 @@ await check('setup-kiro.sh turns delegation on only when asked, keeps other swit
   assert.deepEqual(JSON.parse(readFileSync(switchFile, 'utf8')), { enabled: false, model: 'claude-opus-4.8' });
   assert.equal(setupKiro('--update').status, 0);
   assert.equal(JSON.parse(readFileSync(switchFile, 'utf8')).enabled, false, 'update keeps it off');
+  writeFileSync(agentFile, '{}');
+  assert.equal(setupKiro('--update').status, 0);
+  assert.deepEqual(agentConfigProblems(JSON.parse(readFileSync(agentFile, 'utf8'))), [], 'update refreshes the agent once the switch exists');
   rmSync(path.join(env.bin, 'kiro-cli'));
   const noKiro = setupKiro('--validation-on');
   assert.equal(noKiro.status, 1);

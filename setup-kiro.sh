@@ -6,7 +6,7 @@
 #   --validation-on : Claude Code 검증 위임을 켠다. 읽기 전용 Kiro agent(claude-validator)를 설치하고
 #                     스위치 ~/.claude/kiro-validation.json 을 enabled:true 로 둔다. 검증할 코드가 Kiro(AWS)로 전송된다.
 #   --validation-off: 스위치를 꺼서 검증을 원래 Claude subagent 로 되돌린다.
-#   기본 설치·--update 는 검증 위임을 새로 켜지 않는다. 이미 켠 사람에게만 Kiro agent 설정을 갱신한다.
+#   기본 설치·--update 는 검증 위임을 새로 켜지 않는다. 스위치 파일이 있으면(켰다가 끈 경우 포함) Kiro agent 설정만 갱신한다.
 
 set -e
 
@@ -80,6 +80,8 @@ echo "3. Claude Code 검증 위임 (선택)..."
 if [ -f "$SWITCH_FILE" ] && command -v kiro-cli >/dev/null 2>&1; then
     install_validator_agent
     echo -e "${GREEN}   ✓ ~/.kiro/agents/claude-validator.json 갱신 (켜고 끄기는 스위치 그대로)${NC}"
+elif [ -f "$SWITCH_FILE" ]; then
+    echo -e "${YELLOW}   - kiro-cli 가 없어 건너뜁니다 (검증은 Claude subagent 로 돕니다)${NC}"
 else
     echo -e "${YELLOW}   - 켜져 있지 않습니다. 켜려면 ./setup-kiro.sh --validation-on (코드가 Kiro(AWS)로 전송됨)${NC}"
 fi
