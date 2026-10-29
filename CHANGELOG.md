@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Kiro 구현 위임 추가(선택). 명세가 분명한 구현을 `kiro-implementer` subagent 가 Kiro CLI(`kiro-cli chat --no-interactive`)에 맡기고, 결과는 4KB 이하 JSON(바뀐 파일, diff 통계, Kiro 요약, 커밋 여부)으로만 받아 메인 세션 토큰을 아낀다. 실행기 `scripts/kiro-task.mjs` 는 기본 브랜치가 아닌 깨끗한 linked worktree 에서만 Kiro 를 부른다. Kiro agent 설정(`templates/kiro/claude-implementer.json`)은 커밋·push·브랜치 변경·gh·네트워크·`rm -rf` 와 `.git`·`.env` 쓰기를 막으며, kiro-cli 가 있을 때만 `~/.kiro/agents/` 에 설치된다.
+
 ## v1.3.0 (2026-10-28)
 
 - 머지 전 이해 확인 추가. agent 에게 위임한 변경을 사람이 이해하지 못한 채 머지하는 부채를 줄이려고, 머지 요청 시 최종 HEAD 기준 변경 브리프와 변경 범위에 따른 이해 확인 질문(0~5개)을 거치고 PR 코멘트로 기록한다(`docs/references/merge-readiness.md`). 질문 수는 새 `scripts/merge-brief.mjs tier` 가 바뀐 파일 경로(이름을 바꾼 파일은 이전 경로도)·줄 수로 정한다. 같은 PR 에서 원본이 바뀐 생성본은 분류·파일 수에서만 빼고 바뀐 줄로는 센다. GitHub 파일 목록이 잘리면 멈춘다. 도구가 실패하면 질문 4개로 본다. 머지 판단에는 이번 세션에서 직접 한 확인만 쓴다(PR 의 기존 기록으로 건너뛰지 않음). 브리프는 로컬 checkout 이 아니라 리뷰 완료를 확인한 head 와 같은 PR head SHA 의 diff(대상 브랜치 ref 를 갱신해 merge-base 계산)로 쓰고, 기록 직전에 head 를 다시 확인한다. checkout 의 `origin` 이 대상 저장소가 아니면(fork) 멈춘다. merge-brief CLI 는 모르는 옵션·위치 인수·중복 옵션·--pr 와 --input 동시 지정을 거부한다. PR 본문 필수 항목에 바뀐 불변식·결정, 검사가 놓칠 수 있는 것을 더했다. 전역 CLAUDE.md 템플릿에 머지 원칙 한 줄 추가.

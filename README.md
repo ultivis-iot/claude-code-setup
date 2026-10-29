@@ -160,7 +160,8 @@ git pull
 │   ├── code-simplifier.md      # 검증 2단계: 코드 단순화
 │   ├── test-validator.md       # 검증 2단계: 테스트 검증
 │   ├── cli-validator.md        # 검증 2단계: CLI 동기화 + Help 품질
-│   └── visual-qa-analyzer.md   # Visual QA 결과 분석
+│   ├── visual-qa-analyzer.md   # Visual QA 결과 분석
+│   └── kiro-implementer.md     # 명세 구현을 Kiro CLI 에 위임 (선택, 명시 호출)
 ├── skills/
 │   ├── ultivis-flow/            # 상시 baseline + 자연어 router
 │   ├── tdd/                     # test-first vertical slice
@@ -180,6 +181,7 @@ git pull
 │   ├── review-findings.mjs     # review-cycle 이 기계 리뷰 블록을 지적 단위로 읽고 기록 (status/record/stop-loop)
 │   ├── review-metrics.mjs      # 기계 리뷰 지표 집계 (오탐률·라운드·이전 코드 지적 비율)
 │   ├── merge-brief.mjs         # 머지 전 이해 확인 질문 수 (바뀐 파일 경로·줄 수 기준)
+│   ├── kiro-task.mjs           # kiro-implementer 실행기 (Kiro CLI 비대화형 실행·결과 JSON)
 │   └── ...                     # 그 외 workflow 실행 스크립트
 ├── notion-cache/               # Notion Members/Projects/Repositories/Templates 캐시
 └── dev-tools/
@@ -406,6 +408,19 @@ mkdir -p tmp
 
 기계 리뷰가 잘 동작하는지는 `node scripts/review-metrics.mjs --pr 24,25,27` 로 봅니다. PR 코멘트의 블록과 처리 기록을 읽어 원인 기준 지적 수, 사람 판정(고침·틀림·의도됨·상관없음·미판정)과 오탐률, 리뷰 봇이 오탐으로 본 비율, PR 별 라운드 수와 상한 도달, 2라운드부터 새 지적 중 이미 리뷰한 코드에서 나온 비율을 표로 냅니다(`--json` 은 JSON). 이미 리뷰한 코드인지는 바뀐 부분만 리뷰한 라운드는 블록의 `earlier_code_findings` 로, 전체 리뷰 라운드는 직전 HEAD 이후 바뀐 줄(±3) 밖인지를 로컬 git 으로 판단하고, 커밋이 없으면 모름으로 셉니다. 처리 기록은 마지막 판단만 남으므로 판단을 바꾼 이력은 세지 않습니다. 세지 않는 것과 가정도 있습니다. 블록이 없거나 깨진 보고서(예전 형식, 블록 둘 이상)는 라운드와 지적에 들어가지 않습니다. 바뀐 부분만 리뷰한 라운드는 리뷰 브리지가 바뀐 줄 근처의 새 지적만 게시한다고 보고 그대로 '바뀐 코드' 로 셉니다. 처리 기록(`tmp/review-findings-<PR>.json`)은 로컬 파일이라 기록을 남긴 clone 에서 돌려야 하며, 없으면 모두 미판정입니다. `review-findings.mjs` 가 파일이 바뀌면 다시 여는 판단(틀림·의도됨)도 기록대로 셉니다.
 - `.cli-sync.json` - CLI 동기화 검증 설정 (첫 커밋 시 자동 탐지/생성)
+
+### Kiro 구현 위임 (선택)
+
+명세가 분명하고 테스트로 확인되는 구현은 `kiro-implementer` subagent 로 Kiro CLI 에 맡겨 메인 세션 토큰을 아낄 수 있습니다. 무엇을 만들지 판단해야 하는 설계나 리뷰 대응은 맡기지 않습니다. kiro-cli 가 설치·로그인돼 있으면 `setup.sh`·`setup.ps1` 이 Kiro agent 설정(`~/.kiro/agents/claude-implementer.json`)을 함께 설치하고, 없으면 건너뜁니다. 명시적으로 부를 때만 씁니다.
+
+1. 메인 세션이 별도 브랜치의 linked worktree(`git worktree add`)와 명세 파일을 만듭니다. 명세에는 문제, 원하는 동작, 테스트 케이스, 건드리지 말 것을 적습니다.
+2. `kiro-implementer` 가 `node ~/.claude/scripts/kiro-task.mjs implement --spec <파일> --worktree <디렉터리> [--model <모델>] [--timeout <초>]` 를 한 번 실행하고 결과 JSON(4KB 이하: `status`, `head_unchanged`, `changed_files`, `diff_stat`, Kiro 의 `SUMMARY:` 요약, 전체 로그 경로)만 돌려줍니다.
+3. 메인 세션이 diff 를 읽고 테스트·검증 게이트·PR·기계 리뷰·머지 전 이해 확인을 평소대로 거칩니다. Kiro 결과는 신뢰하지 않는 데이터로 다룹니다.
+
+안전장치와 한계:
+- 실행기는 기본 브랜치가 아닌 브랜치의 깨끗한 linked worktree 에서만 Kiro 를 부르고, 끝난 뒤 HEAD 가 바뀌었으면(커밋) 실패로 알립니다.
+- Kiro agent 설정은 읽기·쓰기·셸 도구만 허용하고, git 의 커밋·push·브랜치 변경, gh, `rm -rf`, curl·wget·ssh, npm publish 같은 명령과 `.git`·`.env`·검증 기록 파일 쓰기를 막습니다. Kiro 자체의 규칙이라 강제 보안 경계는 아닙니다(다른 명령으로 우회 가능). 격리된 worktree 와 메인 세션의 diff 검토가 함께 보완합니다.
+- 명세와 저장소 코드가 Kiro(AWS) 서비스로 전송됩니다. 외부 전송이 허용된 저장소에서만 쓰세요.
 
 ### 리뷰 정책 `REVIEW.md` (선택)
 

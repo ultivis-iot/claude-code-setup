@@ -242,6 +242,17 @@ if ($StaleRemoved -eq 0) {
     Write-Host "   정리할 구버전 파일 없음" -ForegroundColor Green
 }
 
+# Kiro 구현 agent 설정 (kiro-cli 가 있을 때만, kiro-implementer subagent 가 쓴다)
+Write-Host "6-2. Kiro agent 설정..."
+if (Get-Command kiro-cli -ErrorAction SilentlyContinue) {
+    $KiroAgents = Join-Path $HOME ".kiro/agents"
+    New-Item -ItemType Directory -Force -Path $KiroAgents | Out-Null
+    Copy-Item (Join-Path $ScriptDir "templates/kiro/claude-implementer.json") -Destination (Join-Path $KiroAgents "claude-implementer.json") -Force
+    Write-Host "   ~/.kiro/agents/claude-implementer.json" -ForegroundColor Green
+} else {
+    Write-Host "   kiro-cli 없음. 건너뜀 (kiro-implementer 는 쓸 수 없음)" -ForegroundColor Yellow
+}
+
 # Plugins 설치
 Write-Host "7. Plugins 설치..."
 $PluginsSource = Join-Path $ScriptDir "plugins"

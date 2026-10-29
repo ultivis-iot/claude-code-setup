@@ -81,7 +81,7 @@ else
 fi
 
 check_file "$WORKFLOW_ROOT/scripts/validation-gate.mjs"
-for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs review-findings.mjs review-metrics.mjs merge-brief.mjs install-settings.mjs; do
+for node_script in ult-notion.mjs ult-flow.mjs graft.mjs lib/notion.mjs review-cycle-ralph-loop.mjs review-findings.mjs review-metrics.mjs merge-brief.mjs kiro-task.mjs install-settings.mjs; do
     check_file "$WORKFLOW_ROOT/scripts/$node_script"
     node --check "$WORKFLOW_ROOT/scripts/$node_script"
 done
@@ -91,6 +91,8 @@ check_file "$WORKFLOW_ROOT/docs/references/create-pr-contract.md"
 check_file "$WORKFLOW_ROOT/docs/references/merge-readiness.md"
 check_file "$WORKFLOW_ROOT/templates/cli-sync.json"
 check_file "$WORKFLOW_ROOT/templates/REVIEW.md"
+check_file "$WORKFLOW_ROOT/templates/kiro/claude-implementer.json"
+node -e "JSON.parse(require(\"fs\").readFileSync(process.argv[1], \"utf8\"))" "$WORKFLOW_ROOT/templates/kiro/claude-implementer.json"
 
 if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/validation-gate.mjs" check "$WORKFLOW_ROOT/fixtures/validation-status.sample.json"
@@ -99,6 +101,7 @@ if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/test-review-findings.mjs"
     node "$WORKFLOW_ROOT/scripts/test-review-metrics.mjs"
     node "$WORKFLOW_ROOT/scripts/test-merge-brief.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-kiro-task.mjs"
     node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"

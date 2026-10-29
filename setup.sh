@@ -237,6 +237,16 @@ if [ -d "$SCRIPT_DIR/schemas" ]; then
     done
 fi
 
+# Kiro 구현 agent 설정 (kiro-cli 가 있을 때만, kiro-implementer subagent 가 쓴다)
+echo "5-1. Kiro agent 설정..."
+if command -v kiro-cli > /dev/null 2>&1; then
+    mkdir -p "$HOME/.kiro/agents"
+    cp "$SCRIPT_DIR/templates/kiro/claude-implementer.json" "$HOME/.kiro/agents/claude-implementer.json"
+    echo -e "${GREEN}   ✓ ~/.kiro/agents/claude-implementer.json${NC}"
+else
+    echo -e "${YELLOW}   kiro-cli 없음. 건너뜀 (kiro-implementer 는 쓸 수 없음)${NC}"
+fi
+
 # Plugins 설치
 echo "6. Plugins 설치..."
 if [ -d "$SCRIPT_DIR/plugins" ]; then
