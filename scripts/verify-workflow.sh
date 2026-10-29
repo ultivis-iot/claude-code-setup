@@ -99,6 +99,7 @@ if [ "$MODE" = "repo" ]; then
     node "$WORKFLOW_ROOT/scripts/test-review-findings.mjs"
     node "$WORKFLOW_ROOT/scripts/test-review-metrics.mjs"
     node "$WORKFLOW_ROOT/scripts/test-merge-brief.mjs"
+    node "$WORKFLOW_ROOT/scripts/test-kiro-validate.mjs"
     node "$WORKFLOW_ROOT/scripts/test-ult-notion.mjs" | tail -n 3
 else
     echo "OK: installed workflow files are present and shell-parse clean"
