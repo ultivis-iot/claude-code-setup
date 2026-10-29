@@ -114,14 +114,23 @@ function fail(message) {
   process.exit(1);
 }
 
-// 요약은 메인 세션이 읽으므로 짧게 둔다(이유 문자열부터 줄인다).
+// 요약은 메인 세션이 읽으므로 1KB 이하로 둔다. 넘으면 검증별 사유를 빼고(전체 사유가 같거나 로그에 있다),
+// 그래도 넘으면 전체 사유를 줄인다.
+export function fitSummary(summary) {
+  const size = (o) => Buffer.byteLength(JSON.stringify(o));
+  if (size(summary) <= MAX_SUMMARY_BYTES) return summary;
+  const out = { ...summary, claude: summary.claude?.map(({ validator }) => ({ validator })), truncated: true };
+  while (size(out) > MAX_SUMMARY_BYTES && out.reason) out.reason = out.reason.slice(0, Math.floor(out.reason.length / 2));
+  return out;
+}
+
 function emit(summary) {
-  let out = summary;
-  if (Buffer.byteLength(JSON.stringify(out)) > MAX_SUMMARY_BYTES) {
-    out = { ...out, reason: out.reason?.slice(0, 200), claude: out.claude?.map((c) => ({ ...c, reason: c.reason.slice(0, 120) })) };
-  }
-  process.stdout.write(JSON.stringify(out) + "\n");
+  process.stdout.write(JSON.stringify(fitSummary(summary)) + "\n");
   process.exit(0);
+}
+
+function readJson(file, what) {
+  try { return JSON.parse(readFileSync(file, "utf8")); } catch (error) { fail(`${what}(${file})를 읽지 못했습니다: ${error.message}`); }
 }
 
 function args(argv) {
@@ -210,15 +219,16 @@ async function main() {
   const validators = names.map((n) => VALIDATORS[n]);
   const claudeAll = (reason) => emit({ backend: "claude", reason, claude: validators.map((validator) => ({ validator, reason })) });
 
+  if (!existsSync(opt.repo)) fail(`저장소가 없습니다: ${opt.repo}`);
   const repo = realpathSync(path.resolve(opt.repo));
   const config = loadSwitch();
   const why = unavailable(repo, config);
   if (why) claudeAll(why);
 
-  const snapshot = JSON.parse(readFileSync(path.resolve(repo, opt.snapshot), "utf8"));
+  const snapshot = readJson(path.resolve(repo, opt.snapshot), "스냅샷");
   const snap = snapshot.snapshot || snapshot;
   if (!/^[0-9a-f]{40}$/.test(snap.base_sha || "") || !/^[0-9a-f]{40}$/.test(snap.head_sha || "")) fail("스냅샷에 base_sha·head_sha 가 없습니다");
-  const policy = JSON.parse(readFileSync(path.resolve(repo, opt.policy), "utf8"));
+  const policy = readJson(path.resolve(repo, opt.policy), "리뷰 정책");
 
   // 입력 파일은 저장소의 무시되는 tmp/kiro/<run>/ 에 둔다(Kiro 는 cwd 안만 읽는다).
   const runRel = path.join("tmp", "kiro", `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomBytes(3).toString("hex")}`);
