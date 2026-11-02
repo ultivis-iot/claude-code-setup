@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- 머지 전 이해 확인 질문을 개념 수준으로 정한다. 질문이 SQL 문 예시·리뷰에서 고친 엣지 케이스처럼 코드를 다시 읽어야 답할 수 있는 세부로 흐르던 것을, 브리프만 읽은 사람이 답할 수 있는 의도·불변식·실패와 되돌리기·검사 한계·일하는 방식의 변화로 묻게 했다. 세부는 브리프의 "검사가 놓칠 수 있는 것"에 적는다(`docs/references/merge-readiness.md`). 질문 수 기준은 그대로다.
+
 ## v1.4.0 (2026-10-30)
 
 - Kiro 검증 위임(선택, 한시). `scripts/kiro-validate.mjs` 가 `/commit-and-verify` 의 검증 5개를 Kiro(`claude-opus-5.5`, 실패 시 `claude-opus-4.8`)로 판정하고 검증 계약의 리뷰 응답 입력 형식으로 쓴다. 기준은 설치본 agent 정의 그대로이고 게이트·스키마는 바꾸지 않았다. Kiro agent(`templates/kiro/claude-validator.json`)는 파일 읽기만 하며, 테스트는 실행기가 돌린다. 켜기는 `./setup-kiro.sh --validation-on`(스위치 `~/.claude/kiro-validation.json`), 끄기는 `--validation-off`. 기본 설치·`--update` 는 새로 켜지 않고, 설치본에 실행기가 없으면 `--validation-on` 도 켜지 않는다. diff·테스트 로그의 개인키·흔한 토큰은 가려서 넘기고, agent 설정은 읽기 도구별로 경계·금지 경로를 따로 확인한다. 테스트가 실패하거나 시간을 넘기면 Kiro 판정과 상관없이 FAIL 이고, 테스트 명령이 없으면 test 검증은 Claude 가 맡는다. 스위치가 없거나 꺼졌거나 kiro-cli·로그인이 없거나 저장소에 `.kiro/`·추적되는 심볼릭 링크가 있거나 비밀 파일로 보이는 경로가 바뀌었거나 Kiro 가 실패하면 원래 Claude subagent 로 검증한다. `merge-brief.mjs` 의 민감 스크립트에 `kiro-validate` 를 더했다.
