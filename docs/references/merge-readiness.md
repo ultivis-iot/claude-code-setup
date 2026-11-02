@@ -8,9 +8,10 @@ Claude/Codex 공통 PR 머지 절차의 원본이다. PR 머지를 요청받았�
 1. **전제**: `node "$WF/scripts/review-findings.mjs" status --pr <N> --repo <o/r>` 이 현재 PR HEAD 에서 `complete: true` 여야 한다. 결과의 `head_sha` 를 이 절차의 head 로 기억한다. 아니면 머지를 안내하지 않고 남은 것을 보고한다. 사람에게 넘긴 지적(`needs_user`·`round_cap`)은 사용자가 처리 방법을 정한 뒤에만 진행한다.
 2. **변경 브리프**를 요청받은 PR 의 정확한 HEAD 기준으로 쓴다. `gh pr view <N> --repo <o/r> --json headRefOid,baseRefName` 로 head SHA 와 대상 브랜치를 읽는다. `headRefOid` 가 1번의 `head_sha` 와 다르면 1번부터 다시 한다. `git remote get-url origin` 이 `<o/r>` 과 같은 GitHub 저장소(`https://github.com/<o/r>(.git)` 또는 `git@github.com:<o/r>(.git)`)가 아니면 멈춘다(fork checkout 에서 base 를 fork 쪽에서 가져오지 않게). `git fetch origin -- "+refs/heads/<baseRefName>:refs/remotes/origin/<baseRefName>" "pull/<N>/head"` 로 대상 브랜치의 원격 추적 ref 를 갱신하고 head 커밋을 받는다. `git cat-file -e <headRefOid>^{commit}` 으로 그 커밋이 로컬에 있는지 확인한다. `git merge-base "origin/<baseRefName>" <headRefOid>` 의 결과(40자리 SHA)를 따로 받아, 실패하거나 비었으면(얕은 clone·관련 없는 이력) 멈춘다. 그다음 `git diff <merge-base>..<headRefOid>` 를 본다. 이 단계의 명령이 하나라도 실패하면 브리프를 쓰지 않고 오류를 보고하며, 로컬 checkout 으로 대신하지 않는다. 로컬 checkout·브랜치의 diff 를 쓰지 않는다. 명령에 넣기 전에 `<o/r>` 은 `owner/name`(`.`·`..` 아님), `<N>` 은 숫자, `<headRefOid>` 는 40자리 16진수, `<baseRefName>` 은 `git check-ref-format --branch` 를 통과하고 `-` 로 시작하지 않는지 확인하고, 아니면 멈춘다. 값은 따옴표로 감싸 한 인자로 넘긴다. 이 절차의 모든 gh 호출(3번 도구 포함)에 같은 `--repo` 를 쓴다. 5~8줄이고 PR 본문을 다시 옮기지 않는다.
    - 무엇이 바뀌었나 / 왜
-   - 바뀐 불변식·결정: 이 PR 이후 항상 참이어야 하는 것
+   - 바뀐 불변식·결정: 이 PR 이후 항상 참이어야 하는 것과 그것을 어디서 지키나
    - 검사가 놓칠 수 있는 것: 테스트·리뷰가 보지 못한 영역
-   - 되돌리는 법
+   - 실패하면 사용자·운영에 무엇이 보이고, 어떻게 되돌리나
+   - 일하는 방식이 달라지는 것(없으면 생략)
    - 리뷰 중에 바뀐 것: PR 을 연 뒤 리뷰 라운드에서 더해진 변경(없으면 생략)
 3. **질문 수**: `node "$WF/scripts/merge-brief.mjs" tier --pr <N> --repo <o/r>` 의 `questions` 가 최소값이다. 바뀐 파일 경로·줄 수로 정하며(최상위 README·CHANGELOG·LICENSE 와 `docs/`(`docs/references/` 제외)의 텍스트 문서만이면 0, 그 밖은 1~3, 검증·설치·hook·권한 등 민감 경로는 4~5. 민감 경로의 전체 목록은 스크립트 머리말), 늘릴 수는 있어도 줄이지 않는다. 이 도구는 이해 확인의 최소값을 정할 뿐 보안 게이트가 아니고 경로 이름만 본다. diff 내용이나 파일 모드(심볼릭 링크 등)가 위험해 보이면 agent 가 늘린다. 도구가 실패하면(gh 오류, 파일 목록 잘림 등) 도구는 결과를 내지 않으므로 agent 가 4개로 보고 오류를 사용자에게 알린다. 예상 답은 답을 받기 전에 보여주지 않는다.
    - **질문 수준**: 머지를 승인하는 사람이 개념으로 알아야 하는 것만 묻는다. 정확성은 검증·기계 리뷰가 이미 맡았으므로, 코드를 다시 읽어야 답할 수 있는 질문은 하지 않는다. 브리프만 읽은 사람이 답할 수 있어야 한다.
