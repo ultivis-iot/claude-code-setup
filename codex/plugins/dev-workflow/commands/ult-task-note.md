@@ -1,12 +1,12 @@
 ---
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(node:*), Read
-description: 작업 중 발견한 사항이나 결정사항을 현재 브랜치의 Notion Task에 코멘트로 추가
+description: 작업 중 발견한 사항이나 결정사항을 현재 브랜치의 Notion Task 페이지 본문에 기록
 argument-hint: <메모 내용>
 ---
 
 # 현재 Task에 메모/결정사항 추가
 
-작업 중 발견한 사항을 현재 브랜치의 Notion Task에 코멘트로 추가합니다.
+작업 중 발견한 사항을 현재 브랜치의 Notion Task 페이지 본문(quote 블록)에 기록합니다.
 
 ## 실행
 
@@ -21,7 +21,7 @@ node ~/.codex/scripts/ult-notion.mjs task-note "<메모 내용>"
 - Issue URL 과 **정확히 일치**하는 Notion Task 검색 (이슈 번호만으로는 찾지 않는다: 저장소마다 번호가 겹친다)
 - 검색 실패 시 title 매칭으로 Issue URL 자동 연결 시도
 - Member 캐시에서 작성자 이름 조회 (GitHub 로그인 → Notion 이름)
-- `[작성자] 내용` 형식으로 코멘트 추가
+- `[작성자] 내용` 형식으로 페이지 본문에 기록
 
 ## 사용 예
 

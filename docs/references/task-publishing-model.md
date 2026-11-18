@@ -23,7 +23,7 @@
 - Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch를 target으로 한다. Story용 GitHub Issue/PR은 만들지 않는다.
 - `Parent Task`는 hierarchy가 아니라 prerequisite/dependency다. dependency가 충족된 Task만 병렬 실행한다.
 - Task `Repository` relation이 repo ownership의 source of truth다. cross-repo reference는 bare issue number가 아니라 `repo#issue` 또는 Issue URL을 쓴다.
-- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지한다. handoff는 Notion Story comment와 각 Task worktree에 남긴다.
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지한다. handoff는 Notion Story 페이지 본문(quote 블록)과 각 Task worktree에 남긴다.
 - review-cycle은 Task PR마다 수행한다. Story 전체 검증은 모든 Task PR이 merge된 뒤 별도 검증 단계로 수행한다.
 - Story/Task Notion page는 configured template을 사용하고, appended markdown은 raw markdown이 아니라 Notion block으로 렌더링한다.
 - 실행 전에는 `/ult-story-run`으로 Ready/Blocked Task를 확인하고 Ready Task별 subagent prompt를 생성한다. 이때 runner는 로컬/GitHub handoff를 먼저 읽고 Notion은 fallback으로만 쓴다.
@@ -41,7 +41,7 @@ dev
 
 - Story에는 GitHub Issue와 PR을 만들지 않는다. Notion Story의 `Issue URL`/`PR URL`은 Story flow의 authoritative field로 쓰지 않는다.
 - Task PR URL은 Notion Task `PR URL`에 기록한다.
-- branch ancestry는 git `branch.<name>.gh-merge-base`, Notion Story comment, Task worktree handoff에 기록한다.
+- branch ancestry는 git `branch.<name>.gh-merge-base`, Notion Story 페이지 본문, Task worktree handoff에 기록한다.
 - 브랜치 이름에 `story/`, `task/` prefix는 필수 아니다. Story/Task 여부는 Notion relation, GitHub issue 관계, PR target branch로 판단한다.
 
 ## Story Handoff
@@ -53,7 +53,7 @@ Story 기반 작업은 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유
 - Task issue, branch, base branch, worktree, status
 - cross-repo dependency 또는 리뷰에서 나온 carryover
 
-초기 handoff는 Notion Story comment와 각 Task worktree에 남긴다. 이후 실행 중 변경사항, PR URL, 리뷰 carryover, 상태 갱신은 Task worktree handoff와 Notion Story comment에 반영한다.
+초기 handoff는 Notion Story 페이지 본문(quote 블록)과 각 Task worktree에 남긴다. 이후 실행 중 변경사항, PR URL, 리뷰 carryover, 상태 갱신은 Task worktree handoff와 Notion Story 페이지 본문에 반영한다.
 
 ## Parent Task Dependency
 
@@ -85,7 +85,7 @@ Story 기반 작업은 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유
 Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만들지 않는다.
 
 - `ult-task-create`는 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행한다.
-- 현재 Task 범위를 벗어난 후속 작업은 새 하위 Task로 만들지 않고 Story handoff와 Notion Story comment에 carryover로 기록한다.
+- 현재 Task 범위를 벗어난 후속 작업은 새 하위 Task로 만들지 않고 Story handoff와 Notion Story 페이지 본문에 carryover로 기록한다.
 - 리뷰에서 발견한 Story-wide 또는 다른 Task 범위의 이슈도 동일하게 carryover로 남긴다.
 
 ## Notion Template and Markdown Rule
@@ -106,7 +106,7 @@ Story 기반 작업은 Task PR마다 review-cycle을 돌린다.
 - Task PR은 `dev` 또는 repository default branch를 target으로 만들고, AI 리뷰/CI가 통과할 때까지 반복한다.
 - Task PR이 통과하면 target branch로 merge한다.
 - 모든 Task PR이 merge된 뒤 Story 단위 통합 검증을 수행한다. 별도 Story PR은 만들지 않는다.
-- Task PR 리뷰에서 Story 전체 설계나 다른 Task 범위의 이슈가 나오면, 해당 Task에서 확장하지 말고 Story handoff와 Notion Story comment에 carryover로 기록한다.
+- Task PR 리뷰에서 Story 전체 설계나 다른 Task 범위의 이슈가 나오면, 해당 Task에서 확장하지 말고 Story handoff와 Notion Story 페이지 본문에 carryover로 기록한다.
 
 명령 선택 기준:
 

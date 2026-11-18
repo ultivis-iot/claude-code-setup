@@ -39,7 +39,7 @@ node ~/.codex/scripts/ult-notion.mjs story-run [task-issue|handoff-json|notion-s
 
 | 옵션 | 동작 |
 |---|---|
-| `--publish` | 실행 요약을 Notion Story에 코멘트로 남김 |
+| `--publish` | 실행 요약을 Notion Story 페이지 본문에 기록 |
 | `--json` | markdown 대신 JSON summary 출력 |
 
 ## 에이전트 실행 규칙

@@ -312,7 +312,7 @@ async function cmdTaskStatus(argv) {
   if (!r?.id) die("상태 업데이트 실패");
 
   const author = await authorName();
-  await N.addComment(task.id, `[${author}] 상태 변경: ${current} → ${newStatus}` + (reason ? `\n사유: ${reason}` : ""));
+  await N.appendCommentNote(task.id, `[${author}] 상태 변경: ${current} → ${newStatus}` + (reason ? `\n사유: ${reason}` : ""));
 
   say(`✓ Task #${issueNum} 상태: ${current} → ${newStatus}`);
   if (reason) say(`  사유: ${reason}`);
@@ -331,8 +331,7 @@ async function cmdTaskNote(argv) {
   }
   const author = await authorName();
   const body = `[${author}] ${content}`;
-  const r = await N.addComment(task.id, body);
-  if (!r?.id) die("코멘트 추가 실패");
+  await N.appendCommentNote(task.id, body);
   say(`✓ Task #${num} (${N.taskName(task)}) 에 코멘트 추가됨`);
   say(`  ${body}`);
 }
@@ -948,7 +947,7 @@ async function cmdStoryCreate(argv) {
       continue;
     }
     const { worktree: wtPath, base: taskBase } = wt.json;
-    try { await N.addComment(r.task_id, `Branch: ${branch}\nBase Branch: ${taskBase}\nWorktree: ${wtPath}\nNotion Story: ${storyUrl}`); } catch { /* best-effort */ }
+    try { await N.appendCommentNote(r.task_id, `Branch: ${branch}\nBase Branch: ${taskBase}\nWorktree: ${wtPath}\nNotion Story: ${storyUrl}`); } catch { /* best-effort */ }
     if (!firstWt) firstWt = wtPath;
     await addTaskToHandoff(handoffFile, { ...base, base_branch: taskBase, worktree: wtPath, status: "Ready" });
     say(`  ✓ #${r.issue_num} → ${wtPath}`);
@@ -956,9 +955,7 @@ async function cmdStoryCreate(argv) {
 
   const hc = await flow("handoff-comment", ["--file", handoffFile]);
   if (hc.ok) {
-    for (const part of hc.json.parts || []) {
-      try { await N.addComment(storyId, part); } catch (e) { warn(`WARN: Story handoff 코멘트 추가 실패: ${e.message}`); break; }
-    }
+    try { await N.appendNoteChunks(storyId, hc.json.body); } catch (e) { warn(`WARN: Story handoff 코멘트 추가 실패: ${e.message}`); }
   }
   cleanup(workdir);
 
@@ -1174,7 +1171,7 @@ async function cmdTaskCreate(argv) {
 
   if (baseUsed) {
     const note = `Branch: ${branch}\nBase Branch: ${baseUsed}` + (wtPath ? `\nWorktree: ${wtPath}` : "");
-    try { await N.addComment(taskId, note); } catch { /* best-effort */ }
+    try { await N.appendCommentNote(taskId, note); } catch { /* best-effort */ }
     await ghIssueComment(githubRepo, issueNum, note);
   }
 
@@ -1192,7 +1189,7 @@ async function cmdTaskCreate(argv) {
       base_branch: baseUsed, worktree: wtPath, parent_task_ids: parentIds, parent_issue_urls: parentUrls, status: "Ready",
     });
     const hc = `Story Handoff Update\n\nAdded Task: ${taskName}\nIssue: ${issueUrl}\nBranch: ${branch}\nBase Branch: ${baseUsed || "-"}` + (wtPath ? `\nWorktree: ${wtPath}` : "");
-    try { await N.addComment(storyId, hc); } catch { /* best-effort */ }
+    try { await N.appendCommentNote(storyId, hc); } catch { /* best-effort */ }
   }
 
   say("");
@@ -1288,7 +1285,7 @@ async function cmdStoryRun(argv) {
     const r = ev.json;
     if (opt.publish) {
       const sid = input.story?.notion_id || N.normalizeNotionPageId(input.story?.notion_url || "");
-      if (sid) { try { await N.addComment(sid, r.summary); } catch (e) { warn(`WARN: Story 코멘트 추가 실패: ${e.message}`); } }
+      if (sid) { try { await N.appendCommentNote(sid, r.summary); } catch (e) { warn(`WARN: Story 코멘트 추가 실패: ${e.message}`); } }
     }
     if (opt.json) say(readFileSync(join(r.output_dir, "summary.json"), "utf8"));
     else {
@@ -1307,7 +1304,7 @@ async function cmdStoryComment(argv) {
   const id = N.normalizeNotionPageId(pos[0] || "");
   if (!id || !opt.file) die("사용법: story-comment <story page id|url> --file <path>");
   const text = readFileSync(opt.file, "utf8");
-  await N.addComment(id, text);
+  await N.appendCommentNote(id, text);
   say(`✓ 코멘트 추가됨: ${id}`);
 }
 

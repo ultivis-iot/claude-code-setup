@@ -8,7 +8,7 @@ argument-hint: [story-title-or-url] [--name <task>] [--topic <topic>]
 
 기존 Story에 Task 1개, GitHub Issue 1개, Issue URL 연결, 브랜치/worktree 생성을 한 번에 처리합니다.
 
-이 명령은 새 Task/Issue/branch/worktree를 만드는 발행 명령입니다. 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행하고, 현재 Task 수행 중 발견한 후속 작업은 임의로 생성하지 말고 Story handoff와 Notion Story comment에 carryover로 기록합니다.
+이 명령은 새 Task/Issue/branch/worktree를 만드는 발행 명령입니다. 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행하고, 현재 Task 수행 중 발견한 후속 작업은 임의로 생성하지 말고 Story handoff와 Notion Story 페이지 본문에 carryover로 기록합니다.
 
 ## 실행
 
@@ -31,7 +31,7 @@ node ~/.codex/scripts/ult-notion.mjs task-create [story-title-or-url] --name "<t
 - Task template을 사용하고 description markdown을 Notion block으로 변환
 - `--parent-task`가 있으면 `Parent Task` dependency 반영
 - 최신 원격 base에서 `<issue_num>-<topic>-<slug>` 브랜치/worktree 생성
-- local handoff가 있으면 새 Task를 append하고 Notion Story comment에 handoff update를 남김
+- local handoff가 있으면 새 Task를 append하고 Notion Story 페이지 본문에 handoff update를 남김
 
 ## Story 선택 원칙
 

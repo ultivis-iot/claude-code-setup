@@ -106,7 +106,7 @@ Plan이 크거나 애매하면 승인/발행 전에 AI가 먼저 질문합니다
 - Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch를 target으로 합니다. Story용 GitHub Issue/PR은 만들지 않습니다.
 - `Parent Task`는 hierarchy가 아니라 prerequisite/dependency입니다. dependency가 충족된 Task만 병렬 실행합니다.
 - Task `Repository` relation이 repo ownership의 source of truth입니다. cross-repo reference는 bare issue number가 아니라 `repo#issue` 또는 Issue URL을 씁니다.
-- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. handoff는 Notion Story comment와 각 Task worktree에 남깁니다.
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. handoff는 Notion Story 페이지 본문과 각 Task worktree에 남깁니다.
 - review-cycle은 Task PR마다 수행합니다. Story 전체 검증은 모든 Task PR이 merge된 뒤 별도 검증 단계로 수행합니다.
 
 ```text
@@ -132,7 +132,7 @@ dev
 - Task branch는 최신 `origin/dev`를 우선 기준으로 만듭니다. `origin/dev`가 없으면 최신 원격 default branch를 사용합니다.
 - Task PR은 `dev` 또는 repository default branch를 target으로 합니다.
 - Task PR URL은 Notion Task의 `PR URL`에 기록합니다.
-- branch ancestry는 `branch.<name>.gh-merge-base`, Notion Story comment, Task worktree handoff에 남깁니다.
+- branch ancestry는 `branch.<name>.gh-merge-base`, Notion Story 페이지 본문, Task worktree handoff에 남깁니다.
 - 브랜치 이름에 `story/`, `task/` prefix는 필수 아닙니다. 중요한 기준은 branch base와 PR target입니다.
 
 ### Dependency 규칙
@@ -150,7 +150,7 @@ Notion의 `Parent Task`를 선행관계로 사용합니다.
 Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만들지 않습니다.
 
 - `ult-task-create`는 사용자가 명시적으로 Task 추가를 승인한 경우에만 실행합니다.
-- 현재 Task 범위를 벗어난 후속 작업은 새 하위 Task로 만들지 않고 Story handoff와 Notion Story comment에 carryover로 기록합니다.
+- 현재 Task 범위를 벗어난 후속 작업은 새 하위 Task로 만들지 않고 Story handoff와 Notion Story 페이지 본문에 carryover로 기록합니다.
 - 리뷰에서 나온 Story-wide 또는 다른 Task 범위의 이슈도 현재 Task에서 억지로 확장하거나 새 Task로 발행하지 않습니다.
 
 ### Cross-Repo Story
@@ -168,14 +168,14 @@ Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만
 
 ### Handoff / Review Cycle
 
-Story 기반 작업은 각 Task worktree의 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. 초기 handoff와 실행 중 변경사항은 Notion Story comment 또는 Task worktree handoff에 남깁니다. `/ult-story-run`은 로컬 handoff를 먼저 읽고 Notion은 handoff가 없을 때 fallback으로 조회합니다.
+Story 기반 작업은 각 Task worktree의 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. 초기 handoff와 실행 중 변경사항은 Notion Story 페이지 본문 또는 Task worktree handoff에 남깁니다. `/ult-story-run`은 로컬 handoff를 먼저 읽고 Notion은 handoff가 없을 때 fallback으로 조회합니다.
 
 리뷰 사이클은 두 단계입니다.
 
 - Task PR review-cycle: 각 Task PR에서 AI 리뷰/CI가 통과할 때까지 반복하고, 통과 후 `dev` 또는 repository default branch로 merge합니다.
 - Story validation: 모든 Task PR이 merge된 뒤 Story 단위 통합 검증을 수행합니다. 별도 Story PR은 만들지 않습니다.
 
-Task PR의 리뷰 코멘트가 Story 전체 설계나 다른 Task 범위에 해당하면, 해당 Task에서 임의로 확장하지 않고 Story handoff와 Notion Story comment에 기록합니다.
+Task PR의 리뷰 코멘트가 Story 전체 설계나 다른 Task 범위에 해당하면, 해당 Task에서 임의로 확장하지 않고 Story handoff와 Notion Story 페이지 본문에 기록합니다.
 
 ---
 

@@ -52,6 +52,7 @@ export function createMock() {
   const conv = (v) => {
     if (v.title) return { type: "title", title: v.title.map((x) => ({ ...x, plain_text: x.text.content })) };
     if (v.rich_text) return { type: "rich_text", rich_text: v.rich_text.map((x) => ({ ...x, plain_text: x.text.content })) };
+    if (v.paragraph) return { type: "paragraph", paragraph: { rich_text: (v.paragraph.rich_text || []).map((x) => ({ ...x, plain_text: x.text?.content ?? "" })) } };
     if ("select" in v) return { type: "select", select: v.select };
     if ("status" in v) return { type: "status", status: v.status };
     if ("url" in v) return { type: "url", url: v.url };

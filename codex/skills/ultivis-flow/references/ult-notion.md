@@ -89,7 +89,7 @@ Use this model for multi-task Story work. These rules are the operating checklis
 - Task branches are created from the latest remote base. Task PRs target `dev` or the repository default branch. Do not create Story GitHub Issues or Story PRs.
 - `Parent Task` means prerequisite/dependency, not hierarchy. Only dependency-ready Tasks may run in parallel.
 - Task `Repository` relation is the source of truth for repo ownership. Cross-repo references must use `repo#issue` or Issue URL, never bare issue numbers.
-- Maintain `tmp/story-handoff.md` and `tmp/story-handoff.json` in each Task worktree. Publish the initial handoff to the Notion Story, then record execution updates in the local handoff and Notion Story comments.
+- Maintain `tmp/story-handoff.md` and `tmp/story-handoff.json` in each Task worktree. Publish the initial handoff to the Notion Story page body (quote blocks), then record execution updates in the local handoff and Notion Story page body.
 - Run review-cycle for each Task PR. After all Task PRs are merged, run Story-level integration validation without creating a Story PR.
 - Story/Task Notion pages must use configured templates; appended markdown must render as Notion blocks, not raw markdown.
 - Before assigning Task work, run the global `ult-notion.mjs story-run` to classify Ready/Blocked Tasks and generate subagent prompts.
@@ -108,7 +108,7 @@ Additional rules:
 
 - Do not create a GitHub Story Issue or Story PR. Notion Story `Issue URL` and `PR URL` are not authoritative for Story flow.
 - Store Task PR URLs on the Notion Task `PR URL`.
-- Preserve branch ancestry with git `branch.<name>.gh-merge-base`, Notion Story comments, and Task worktree handoff.
+- Preserve branch ancestry with git `branch.<name>.gh-merge-base`, Notion Story page body, and Task worktree handoff.
 - Branch names do not need `story/` or `task/` prefixes. Story/Task identity is determined by Notion relation, GitHub issue relation, branch base, and PR target.
 - Agents must not edit another agent's worktree.
 
@@ -122,7 +122,7 @@ The handoff should include:
 - Task issue, branch, base branch, worktree, status, and owner.
 - Cross-repo dependencies and review carryover.
 
-After creation, the local handoff files and Notion Story comments are the mutable handoff sources.
+After creation, the local handoff files and Notion Story page body are the mutable handoff sources.
 
 Use the global `ult-notion.mjs story-run` to generate a current run summary and Ready Task prompts. It reads local handoff first and falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
 

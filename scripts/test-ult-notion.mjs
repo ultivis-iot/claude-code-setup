@@ -111,7 +111,8 @@ function cli(args, { input, env = {}, cwd = REPO, unset = [] } = {}) {
   });
 }
 const ghState = () => JSON.parse(readFileSync(join(GHDIR, "state.json"), "utf8"));
-const commentsOf = (id) => mock.comments.filter((c) => c.page_id === id).map((c) => c.text);
+// Notion 코멘트 API 가 아니라 페이지 블록(quote)으로 기록하는 appendCommentNote 을 검증한다.
+const commentsOf = (id) => (mock.blocks.get(id) || []).filter((b) => b.type === "quote").map((b) => (b.quote.rich_text || []).map((x) => x.plain_text).join(""));
 const children = (id) => mock.blocks.get(id) || [];
 const btext = (b) => (b[b.type].rich_text || []).map((x) => x.plain_text).join("");
 
@@ -186,13 +187,13 @@ try {
     mock.faults.length = 0;
     r = await cli(["task-link-issue", "#7", "--task", "12345678-1234-4234-8234-123456789012"]);
     check("404 -> Korean hint about sharing integration", r.code === 1 && /공유\(연결\)/.test(r.err), r.err);
-    // 코멘트/페이지 생성은 서버에서 이미 처리됐을 수 있으므로 5xx 에 다시 보내지 않는다 (중복 생성 방지)
+    // 페이지 블록 append(appendCommentNote)은 서버에서 이미 처리됐을 수 있으므로 5xx 에 다시 보내지 않는다 (중복 생성 방지)
     const cf = join(ROOT, "retry-comment.md");
     writeFileSync(cf, "재시도 금지 확인");
     await fetch(mock.base.replace("/v1", "") + "/__faults", { method: "POST", body: JSON.stringify({ count: 1, status: 503 }) });
     mock.log.length = 0;
     r = await cli(["story-comment", T1.id, "--file", cf]);
-    check("POST /comments 503 is not retried", r.code === 1 && mock.log.filter((x) => x.path === "/comments").length === 1 && !commentsOf(T1.id).includes("재시도 금지 확인"), `${r.all} log=${mock.log.map((x) => x.path).join()}`);
+    check("page-block append 503 is not retried", r.code === 1 && mock.log.every((x) => x.path !== "/comments") && mock.log.filter((x) => x.path.endsWith("/children") && x.method === "PATCH").length === 1 && !commentsOf(T1.id).includes("재시도 금지 확인"), `${r.all} log=${mock.log.map((x) => x.path).join()}`);
     mock.faults.length = 0;
   }
 
@@ -248,7 +249,7 @@ try {
     r = await cli(["task-note", ""], { cwd: wt7 });
     check("empty note -> usage error", r.code === 1 && /사용법/.test(r.err));
     r = await cli(["task-status", "#7", "done", "--reason", "수동 확인"], { cwd: wt7 });
-    check("task-status: status patched + history comment", r.code === 0 && T1.properties.Status.status.name === "완료" && commentsOf(T1.id).includes("[테스터] 상태 변경: 진행 중 → 완료\n사유: 수동 확인") && /✓ Task #7 상태: 진행 중 → 완료/.test(r.out) && /사유: 수동 확인/.test(r.out) && /현재 상태: 진행 중/.test(r.out), r.all);
+    check("task-status: status patched + history comment (2 quote lines)", r.code === 0 && T1.properties.Status.status.name === "완료" && commentsOf(T1.id).includes("[테스터] 상태 변경: 진행 중 → 완료") && commentsOf(T1.id).includes("사유: 수동 확인") && /✓ Task #7 상태: 진행 중 → 완료/.test(r.out) && /사유: 수동 확인/.test(r.out) && /현재 상태: 진행 중/.test(r.out), r.all);
     r = await cli(["task-status", "reopen"], { cwd: wt7 });
     check("task-status: action only uses current branch issue", r.code === 0 && T1.properties.Status.status.name === "시작 전", r.all);
     r = await cli(["task-status", "#7", "bogus"], { cwd: wt7 });
@@ -339,14 +340,21 @@ try {
     const numA = ia.num, numB = iss.find((i) => i.title === "UI 연결").num;
     const wtA = join(WT, `d-${numA}`), wtB = join(WT, `d-${numB}`);
     check("worktrees created on feature branches from dev", existsSync(wtA) && existsSync(wtB) && g(["branch", "--show-current"], wtA) === `${numA}-feature-api` && g(["branch", "--show-current"], wtB) === `${numB}-fix-ui`, g(["branch", "--show-current"], wtA));
-    check("Task branch comments", commentsOf(taskA.id).some((c) => c.includes(`Branch: ${numA}-feature-api`) && c.includes("Base Branch: dev") && c.includes(`Worktree: ${wtA}`) && c.includes(`Notion Story: ${createdStory.url}`)), JSON.stringify(commentsOf(taskA.id)));
+    check("Task branch comments (4 quote lines)", commentsOf(taskA.id).includes(`Branch: ${numA}-feature-api`) && commentsOf(taskA.id).includes("Base Branch: dev") && commentsOf(taskA.id).includes(`Worktree: ${wtA}`) && commentsOf(taskA.id).includes(`Notion Story: ${createdStory.url}`), JSON.stringify(commentsOf(taskA.id)));
     const hj = JSON.parse(readFileSync(join(wtB, "tmp", "story-handoff.json"), "utf8"));
     check("handoff JSON in each worktree (2 tasks, parent urls)", hj.tasks.length === 2 && hj.story.notion_url === createdStory.url && hj.tasks.find((t) => t.name === "UI 연결").parent_issue_urls[0] === taskA.properties["Issue URL"].url && hj.tasks.find((t) => t.name === "API 추가").parent_issue_urls[0] === T1.properties["Issue URL"].url && existsSync(join(wtA, "tmp", "story-handoff.md")) && hj.tasks.every((t) => t.status === "Ready" && t.base_branch === "dev"), JSON.stringify(hj.tasks));
     const sc = commentsOf(createdStory.id);
-    check("handoff comments chunked (<=1800) with [Story handoff n] prefix and marker", sc.length >= 2 && sc.every((c, i) => c.startsWith(`[Story handoff ${i + 1}]\n`) && c.length <= 1800 + 20) && sc.map((c) => c.replace(/^\[Story handoff \d+\]\n/, "")).join("").includes("<!-- ult-story-handoff-json"), `n=${sc.length}`);
-    const joined = sc.map((c) => c.replace(/^\[Story handoff \d+\]\n/, "")).join("");
-    const m = joined.match(/<!-- ult-story-handoff-json\n([\s\S]*?)\n-->/);
-    check("handoff comment JSON round-trips", m && JSON.parse(m[1]).tasks.length === 2);
+    check("handoff published to Story page as quote blocks (marker + >=2 chunks)", sc.length >= 3 && sc.some((c) => c.includes("ult-story-handoff-json")) && sc.filter((c) => c.startsWith("[Story handoff ")).length >= 2, `n=${sc.length} first=${JSON.stringify(sc.slice(0, 3))}`);
+    // 줄 단위 quote 블록이라 한 quote 블록 안에 2000자 한도가 적용된다(긴 행이 chunk 경계에서 [Story handoff n] prefix 와 함께 분할됨).
+    // 마지막 "}" quote 블록을 찾아 그 행까지 누적하면 JSON 을 복원할 수 있다.
+    const lastBrace = sc.lastIndexOf("}");
+    const objText = sc.slice(0, lastBrace + 1).join("\n").replace(/^[ \t]*\[Story handoff \d+\]$/gm, "");
+    // "{\n" 이전의 markdown 표/헤더/메타 행을 제거하고 JSON 객체만 추출
+    const braceIdx = objText.indexOf("{\n");
+    const jsonOnly = braceIdx >= 0 ? objText.slice(braceIdx) : objText;
+    let tasksLen = 0, perr = "";
+    try { tasksLen = JSON.parse(jsonOnly)?.tasks?.length ?? 0; } catch (e) { perr = e.message; }
+    check("handoff JSON round-trips from page quote lines", tasksLen === 2, `lastBrace=${lastBrace} braceIdx=${braceIdx} jsonLen=${jsonOnly.length} tail=${JSON.stringify(jsonOnly.slice(-60))} err=${perr}`);
     check("ran in parallel-capable manner within reasonable time", Date.now() - t0 < 60000);
     // spec validation
     const bad = await cli(["story-create", "-"], { input: JSON.stringify({ github_repo: "a/b", story: { title: "x" }, tasks: [] }) });
@@ -379,10 +387,10 @@ try {
     check("description inserted after 설명", ntb[0] === "heading_2:설명" && ntb[1] === "heading_2:검증" && ntb[2] === "bulleted_list_item:케이스 1", ntb.join("|"));
     const wtn = join(WT, `d-${num}`);
     check("worktree + branch", existsSync(wtn) && g(["branch", "--show-current"], wtn) === `${num}-fix-task`, g(["branch", "--show-current"], wtn));
-    check("branch note on Task + GitHub issue", commentsOf(nt.id).some((c) => c.startsWith(`Branch: ${num}-fix-task\nBase Branch: dev\nWorktree: `)) && ghState().issues.find((i) => String(i.num) === num).comments.some((c) => c.includes("Base Branch: dev")));
+    check("branch note on Task (quote lines) + GitHub issue", commentsOf(nt.id).includes(`Branch: ${num}-fix-task`) && commentsOf(nt.id).includes("Base Branch: dev") && commentsOf(nt.id).some((c) => c.startsWith("Worktree: ")) && ghState().issues.find((i) => String(i.num) === num).comments.some((c) => c.includes("Base Branch: dev")));
     const hj = JSON.parse(readFileSync(join(wtn, "tmp", "story-handoff.json"), "utf8"));
     check("new handoff created in worktree tmp/ with the Task", hj.tasks.length === 1 && hj.tasks[0].notion_task_id === nt.id && hj.story.notion_id === S1.id && hj.tasks[0].parent_issue_urls[0] === T1.properties["Issue URL"].url);
-    check("Story handoff-update comment", commentsOf(S1.id).some((c) => c.startsWith("Story Handoff Update\n\nAdded Task: 후속 검증 작업")));
+    check("Story handoff-update quote blocks", commentsOf(S1.id).includes("Story Handoff Update") && commentsOf(S1.id).includes("Added Task: 후속 검증 작업"));
     // 2번째: worktree 안에서 handoff 컨텍스트로 Story 추론 + --here
     r = await cli(["task-create", "--name", "컨텍스트 추론 작업", "--here"], { cwd: wtn });
     const nt2 = [...mock.pages.values()].find((p) => p.ds === DB.TASK && lib.taskName(p) === "컨텍스트 추론 작업");
@@ -451,7 +459,10 @@ try {
     check("story-run (local handoff, --json)", r.code === 0 && sj && sj.story.title === "다크모드 설정" && sj.tasks.length === 2, r.all);
     const before = commentsOf(S1.id).length;
     r = await cli(["story-run", S1.url, "--publish"], { cwd });
-    check("story-run --publish comments summary on Story", r.code === 0 && commentsOf(S1.id).length === before + 1 && commentsOf(S1.id).at(-1).startsWith("# Story Run Summary"), r.all);
+    const after = commentsOf(S1.id);
+    const added = after.slice(before);
+    // r.summary = lines.join("\n") (Generated 섹션 없이 table 까지)
+    check("story-run --publish appends summary to Story page (heading + table rows)", r.code === 0 && added.length >= 12 && added[0] === "# Story Run Summary" && added.some((c) => c.startsWith("| Ready |")) && added.some((c) => c.startsWith("| --- |")), r.all + ` n=${added.length} head=${JSON.stringify(added.slice(0, 3))} tail=${JSON.stringify(added.slice(-3))}`);
     writeFileSync(join(ROOT, "c.md"), "직접 코멘트");
     r = await cli(["story-comment", S1.url, "--file", join(ROOT, "c.md")]);
     check("story-comment", r.code === 0 && commentsOf(S1.id).at(-1) === "직접 코멘트");
@@ -491,9 +502,14 @@ try {
     check("missing local checkout: warns, does not abort; assignee defaults to current member", r.code === 0 && /⚠ #\d+ repository local checkout 없음: ultivis\/ghost/.test(r.out) && /✅ 발행 완료/.test(r.out), r.all);
     const gs = [...mock.pages.values()].find((p) => p.ds === DB.STORY && lib.pageTitle(p) === "고스트 스토리");
     check("assignee fallback via GitHub->Member DB", gs.properties.Assignee.people[0].id === U1.id);
-    const hc = commentsOf(gs.id).map((c) => c.replace(/^\[Story handoff \d+\]\n/, "")).join("");
-    const hj = JSON.parse(hc.match(/<!-- ult-story-handoff-json\n([\s\S]*?)\n-->/)[1]);
-    check("handoff marks Worktree Failed", hj.tasks[0].status === "Worktree Failed" && hj.tasks[0].worktree === "", JSON.stringify(hj.tasks));
+    const hccArr = commentsOf(gs.id);
+    const lastBrace = hccArr.lastIndexOf("}");
+    const hcObj = lastBrace >= 0 ? hccArr.slice(0, lastBrace + 1).join("\n").replace(/^[ \t]*\[Story handoff \d+\]$/gm, "") : "";
+    const hcBraceIdx = hcObj.indexOf("{\n");
+    const hcJson = hcBraceIdx >= 0 ? hcObj.slice(hcBraceIdx) : hcObj;
+    let hj = null, hjErr = "";
+    try { hj = JSON.parse(hcJson); } catch (e) { hjErr = e.message; }
+    check("handoff marks Worktree Failed", hj?.tasks?.[0]?.status === "Worktree Failed" && hj?.tasks?.[0]?.worktree === "", `err=${hjErr} lastBrace=${lastBrace} tail=${JSON.stringify(hcJson.slice(-60))}`);
     // pagination (in-process)
     process.env.NOTION_API_BASE = mock.base; process.env.NOTION_TOKEN = "tok-env";
     for (let i = 0; i < 230; i++) mock.addPage("page-ds", { Name: T("row " + i) });
@@ -508,8 +524,8 @@ try {
     const miss = mock.addPage("page-ds", { Name: T("miss") }, { children: [h("paragraph", "only")] });
     await lib.insertBlocksAfterText(miss.id, blocks.slice(0, 2), "설명");
     check("anchor missing -> appended at end", children(miss.id).map(btext).join() === "only,p0,p1");
-    const cm = await lib.addCommentChunks(S1.id, "x".repeat(4000), { size: 1800, prefix: (n) => `[${n}]\n` });
-    check("addCommentChunks splits by size", cm === 3);
+    const cm = await lib.appendCommentNote(S1.id, "line1\nline2\nline3");
+    check("appendCommentNote adds one quote block per line (3 lines -> 3 blocks)", cm === 3);
   }
 
   // ------------------------------------------------------------ 10c. 대화형(TTY) 경로: script(1) 로 pty 를 준다

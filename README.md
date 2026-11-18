@@ -21,7 +21,7 @@ Plan을 작업 단위로 발행할 때는 다음 관계를 기준으로 움직�
 - 필요하면 각 Issue 기준으로 브랜치/worktree를 생성
 - 여러 Task로 나뉘는 Story는 메인 에이전트가 Notion Story와 handoff를 소유하고, 사용자가 병렬 작업을 승인한 경우 각 서브에이전트가 Task worktree를 소유
 - Task branch는 최신 원격 base에서 만들고, Task PR은 `dev` 또는 repository default branch로 보냄
-- Story 자체에는 GitHub Issue/PR을 만들지 않고, 초기 Story handoff는 Notion Story comment와 각 Task worktree에 남김
+- Story 자체에는 GitHub Issue/PR을 만들지 않고, 초기 Story handoff는 Notion Story 페이지 본문과 각 Task worktree에 남김
 
 즉 큰 Plan은 `ult-story-create`로 `Story + Task N개 + Issue N개`로 발행하고, 기존 Story에 작업 하나를 붙일 때는 `ult-task-create`로 `Task 1개 + Issue 1개`를 만듭니다.
 

@@ -66,7 +66,7 @@ node ~/.codex/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
    - `pre_existing`(이 PR 이 만들지 않은 코드)·`rejected`(통합 단계가 오탐으로 판정)·`resolved`·`declined`(이미 틀림·의도됨·상관없음으로 기록) 는 고치지 않는다.
    - `declined` 는 판단을 기록한 뒤 그 위치의 파일이 바뀌면 `reopened` 로 다시 열린다. 다시 열린 지적도 자동 수정 조건(반증됨, 출처가 이 PR, partial 아님, 신뢰할 수 있는 작성자, PR 파일 안, 민감 디렉터리 아님)을 그대로 거쳐 `to_fix` 나 `needs_user` 로 간다. 판단이 바뀌었으면 `record` 로 다시 기록한다.
    - `resolved`·`rejected`·`pre_existing` 판정은 리뷰 봇(통합 단계)의 판정을 그대로 믿는다. 그래서 `complete` 는 merge 전 사람의 확인을 대신하지 않는다.
-   - `pre_existing` 은 Story 기반 PR 이면 아래 Story Flow 처럼 `tmp/story-handoff.md` 와 Notion Story comment 에, 그 밖의 PR 이면 PR 코멘트에 carryover 로 남긴다.
+   - `pre_existing` 은 Story 기반 PR 이면 아래 Story Flow 처럼 `tmp/story-handoff.md` 와 Notion Story 페이지 본문에, 그 밖의 PR 이면 PR 코멘트에 carryover 로 남긴다.
 2. 기계 리뷰 외의 AI 리뷰(다른 bot 의 reviews, unresolved review threads)가 있으면 함께 본다
    - bot 계정이거나 AI 리뷰 헤더/패턴이 명확한 항목만 대상으로 본다
    - unresolved thread만 보고, 이미 해결된 thread는 제외한다
@@ -98,7 +98,7 @@ node ~/.codex/scripts/review-cycle-ralph-loop.mjs $ARGUMENTS
 
 - Task PR은 AI 리뷰/CI가 clear될 때까지 반복한 뒤 `dev` 또는 repository default branch로 merge한다.
 - 모든 Task PR이 merge된 뒤 Story 단위 통합 검증을 수행한다. 별도 Story PR은 만들지 않는다.
-- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`와 Notion Story comment에 carryover로 기록한다.
+- Task PR 리뷰가 Story 전체 설계나 다른 Task 범위에 해당하면 Task PR에서 확장하지 않고 `tmp/story-handoff.md`와 Notion Story 페이지 본문에 carryover로 기록한다.
 - Task PR merge 후 dependent Task를 시작하기 전에 Story handoff를 갱신한다.
 
 ## 검증 명령 선택

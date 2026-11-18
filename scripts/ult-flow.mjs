@@ -222,7 +222,7 @@ const mdHeader = (h) =>
   [
     "# Story Handoff", "", `Story: ${h.story.title}`, `Notion Story: ${h.story.notion_url}`,
     `Story Base Branch: ${h.story.base_branch || "-"}`, "",
-    "Execution source: Notion Story comment and local handoff files in Task worktrees.", "",
+    "Execution source: the Notion Story page and local handoff files in Task worktrees.", "",
     "## Task Map", "",
     "| Task | Repo | Issue | Branch | Base Branch | Worktree | Parents | Status |",
     "| --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -279,9 +279,7 @@ cmds["handoff-comment"] = ({ opt }) => {
   if (!opt.file) fail("--file 필요");
   const h = JSON.parse(readFileSync(opt.file, "utf8"));
   const body = renderMd(h) + `\n<!-- ult-story-handoff-json\n${JSON.stringify(h, null, 2)}\n-->`;
-  const parts = [];
-  for (let o = 0, n = 1; o < body.length; o += 1800, n++) parts.push(`[Story handoff ${n}]\n${body.slice(o, o + 1800)}`);
-  out({ parts });
+  out({ body });
 };
 
 function extractHandoff(text) {

@@ -74,8 +74,8 @@ argument-hint: [--dry-run]
 - Task dependency가 있으면 `Parent Task` relation을 사용한다
 - Story GitHub Issue/PR은 만들지 않는다
 - Task branch/worktree는 Task Issue 기준으로 만들고 최신 원격 base를 사용한다
-- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 각 Task worktree에 만들고 초기 handoff를 Notion Story comment에도 남긴다
-- 생성 이후 handoff 변경사항은 Task worktree handoff와 Notion Story comment에 반영한다
+- `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 각 Task worktree에 만들고 초기 handoff를 Notion Story 페이지 본문(quote 블록)에도 남긴다
+- 생성 이후 handoff 변경사항은 Task worktree handoff와 Notion Story 페이지 본문에 반영한다
 
 ## Agent Worktree 규칙
 

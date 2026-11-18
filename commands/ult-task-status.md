@@ -57,7 +57,7 @@ node ~/.claude/scripts/ult-notion.mjs task-status [<issue_num>] [<action>] [--re
 2. 검색 실패 시 title 매칭으로 Issue URL 자동 연결 시도
 3. 현재 상태 표시 + 전이 선택
 4. Status 속성 업데이트
-5. `[<이름>] 상태 변경: <old> → <new>` 코멘트 추가 (사유 포함 가능)
+5. `[<이름>] 상태 변경: <old> → <new>` 페이지 본문에 기록 (사유 포함 가능)
 
 ## 주의
 

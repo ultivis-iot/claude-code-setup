@@ -297,16 +297,43 @@ const textItems = (content, max = 2000) => {
 };
 
 // 코멘트 추가. 2000자를 넘으면 rich_text 항목으로 나눈다(항목 100개 한도 → 약 20만자).
+// 통합(Integration)에 코멘트 쓰기 권한이 없으면 403 이라 워크플로에서는 더 이상 쓰지 않는다(appendCommentNote 를 사용).
 export async function addComment(pageId, content) {
   if (!content) return null;
   return notionApi("POST", "/comments", { parent: { page_id: pageId }, rich_text: textItems(String(content)).slice(0, 100) });
 }
 
-// 긴 본문을 여러 코멘트로 분할 (handoff 코멘트처럼 1800자 단위가 필요할 때)
-export async function addCommentChunks(pageId, content, { size = 1800, prefix = (n) => `[${n}]\n` } = {}) {
-  let n = 1;
-  for (let o = 0; o < content.length; o += size, n++) await addComment(pageId, prefix(n) + content.slice(o, o + size));
-  return n - 1;
+// 페이지 본문 끝에 코멘트 없이 기록 (append). 블록 100개 한도/100자 제한은 페이지 작성과 동일해서 403 코멘트 권한 문제가 없다.
+export async function appendCommentNote(pageId, content) {
+  const text = String(content ?? "");
+  if (!text) return 0;
+  const blocks = [];
+  // 줄마다 별도 quote 블록: quote 안에는 줄바꿈이 들어갈 수 없다(한 블록에 newline 이면 Notion 에서 깨진다).
+  for (const line of text.split(/\r?\n/)) blocks.push(mdToBlocks(`> ${line}`));
+  for (const b of blocks.flat()) await appendBlocks(pageId, [b]);
+  return blocks.length;
+}
+
+// 긴 본문을 줄 경계 기준으로 여러 페이지 블록 세트로 분할 (handoff 기록처럼 1800자 단위가 필요할 때).
+// 줄 경계에서 분할해야 JSON 같은 구조화된 본문이 chunk 경계에서 깨지지 않는다.
+export async function appendNoteChunks(pageId, content, { size = 1800, prefix = (n) => `[Story handoff ${n}]` } = {}) {
+  const text = String(content ?? "");
+  if (!text) return 0;
+  const lines = text.split("\n");
+  const chunks = [];
+  let current = "";
+  for (const line of lines) {
+    if (current.length + line.length + 1 > size && current) {
+      chunks.push(current);
+      current = line;
+    } else {
+      current = current ? current + "\n" + line : line;
+    }
+  }
+  if (current) chunks.push(current);
+  for (let n = 1; n <= chunks.length; n++)
+    await appendCommentNote(pageId, `${prefix(n)}\n${chunks[n - 1]}`);
+  return chunks.length;
 }
 
 // ---------------------------------------------------------------- 속성 읽기 헬퍼

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.0 (2026-11-18)
+
+- Notion Story/Task 기록을 코멘트 API 에서 페이지 본문(quote 블록)으로 전환. `lib/notion.mjs` 에 `appendCommentNote`(페이지 본문 끝에 quote 블록 append)와 `appendNoteChunks`(줄 경계 기준 1800자 분할)를 추가하고, `ult-notion.mjs` 의 story-create·task-create·task-note·task-status·story-run --publish·story-comment 에서 `addComment`(POST /comments) 호출을 `appendCommentNote` 으로 바꾼다. Notion 통합에 코멘트 쓰기 권한(403)이 없어도 페이지 작성 권한으로만 동작한다. `ult-flow.mjs handoff-comment` 는 `parts` 배열 대신 `body` 를 반환하고, `story-create` 는 `appendNoteChunks` 로 발행한다. 줄 경계 분할이라 JSON 마커가 chunk 경계에서 깨지지 않는다.
+
 ## v1.4.1 (2026-11-03)
 
 - 머지 전 이해 확인 질문을 개념 수준으로 정한다. 질문이 SQL 문 예시·리뷰에서 고친 엣지 케이스처럼 코드를 다시 읽어야 답할 수 있는 세부로 흐르던 것을, 브리프만 읽은 사람이 답할 수 있는 의도·불변식·실패와 되돌리기·검사 한계·일하는 방식의 변화로 묻게 했다. 세부는 브리프의 "리뷰 중에 바뀐 것"·"검사가 놓칠 수 있는 것"에 적는다(`docs/references/merge-readiness.md`). 질문이 브리프 밖을 묻지 않게 브리프에 불변식을 지키는 곳, 실패하면 보이는 것, 일하는 방식의 변화를 더했다. 질문 수 기준은 그대로다.
