@@ -79,10 +79,13 @@ try {
     assert.match(f.install('--update'), /충돌/);
     assert.equal(f.read(), edited);
     assert.match(readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8'), /<{32}[\s\S]*>{32}/);
-    // 사람이 충돌을 해결하면 다음 --update가 남은 충돌본을 지운다.
+    // 새 템플릿과 똑같이 정리했어도 --resolved 없이는 충돌 기록을 지우지 않는다. --resolved로 알리면 지운다.
     writeFileSync(f.target, `${MARKER}\n${V1.replace('- 항목 1', '- 항목 1 (템플릿 수정)')}`);
-    f.install('--update');
+    assert.match(f.install('--update'), /--update --resolved/);
+    assert.ok(existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
+    f.install('--update', '--resolved');
     assert.ok(!existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
+    assert.ok(!existsSync(path.join(f.state, 'claude-md-pending.json')));
   }
   // 개인 줄을 남긴 채 충돌을 정리하고 --update --resolved로 알리면 그 결과를 그대로 받아들이고 base를 새 템플릿으로 바꾼다.
   // --resolved 없이 다시 돌리면 정리 여부를 추측하지 않고 여전히 충돌로 둔다.
@@ -121,6 +124,35 @@ try {
     assert.match(f.install('--update', '--resolved'), /충돌 표시/);
     assert.equal(f.read(), withMarkers);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+  }
+  // 충돌 기록이 있으면 구역을 비웠어도 --resolved 없이 새 템플릿으로 채우지 않는다.
+  {
+    const OLD = '# 설정\n\n- 항목 1\n';
+    const f = fixture(OLD);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 항목 1', '- 항목 1 (내 수정)')}`);
+    writeFileSync(f.templatePath, OLD.replace('- 항목 1', '- 항목 1 (템플릿 수정)'));
+    assert.match(f.install('--update'), /충돌/);
+    writeFileSync(f.target, `${MARKER}\n`);
+    assert.match(f.install('--update'), /--update --resolved/);
+    assert.equal(f.read(), `${MARKER}\n`);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+  }
+  // 유효한 JSON이어도 비었거나 해시가 맞지 않는 base는 깨진 기록으로 보고 평소 병합한다(템플릿이 중복되지 않는다).
+  {
+    const f = fixture(V1);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${V1}- 개인 항목\n`);
+    writeFileSync(f.templatePath, V2);
+    for (const bad of [{ version: 1, base: '', sha256: '' }, { version: 1, base: '# 변조\n', sha256: '0'.repeat(64) }]) {
+      writeFileSync(path.join(f.state, 'claude-md-pending.json'), JSON.stringify(bad));
+      writeFileSync(f.target, `${MARKER}\n${V1}- 개인 항목\n`);
+      assert.match(f.install('--update', '--resolved'), /충돌 기록이 없어/);
+      const merged = f.read();
+      assert.equal(merged.split('# 설정').length - 1, 1, merged);
+      assert.ok(merged.includes('- 항목 2') && merged.includes('- 개인 항목'), merged);
+      writeFileSync(path.join(f.state, 'claude-md-base.md'), V1);
+    }
   }
   // 충돌 기록이 없거나 깨졌으면 --resolved는 평소 병합으로 동작하고 죽지 않는다.
   {
