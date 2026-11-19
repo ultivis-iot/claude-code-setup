@@ -2,7 +2,7 @@
 // 저장소의 scripts/ 와 codex/skills/ux-review/scripts/ 를 임시 HOME 의 ~/.claude 로 "설치"한 뒤 그 설치본을 실행한다.
 //   node scripts/test-ult-notion.mjs        (KEEP=1 이면 임시 디렉토리를 남긴다)
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, cpSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, cpSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, delimiter } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -645,8 +645,21 @@ ok({ type: "ok" });
     const promptCall = calls.find((c) => c[0] === "agent" && c[1] === "prompt");
     check("story-herdr: worktree open → pane list → agent start(--model/--effort) → agent prompt", hr.code === 0 && hr.json?.started === 1 && hr.json.tasks.length === 1
       && calls.map((c) => c.slice(0, 2).join(" ")).join(",") === "pane list,worktree open,pane list,agent start,agent prompt"
-      && calls[1].includes(hwt) && JSON.stringify(startCall) === JSON.stringify(["agent", "start", "task-h1", "--kind", "claude", "--pane", "w9:p1", "--", "--model", "opus", "--effort", "high"])
+      && calls[1].join(" ").includes(`--cwd ${hwt} --path ${hwt}`) && JSON.stringify(startCall) === JSON.stringify(["agent", "start", "task-h1", "--kind", "claude", "--pane", "w9:p1", "--", "--model", "opus", "--effort", "high"])
       && promptCall[2] === "task-h1" && promptCall[3] === p1, hr.all + JSON.stringify(calls));
+    // linked worktree 는 원본 저장소를 --cwd 로 연다(herdr linked_worktree_source). effort 가 없으면 --effort 를 넘기지 않는다.
+    const linked = join(ROOT, "wt-herdr-linked");
+    spawnSync("git", ["-C", REPO, "worktree", "add", "-q", "-b", "herdr-linked", linked], { encoding: "utf8" });
+    const lsum = JSON.parse(readFileSync(join(hdir, "summary.json"), "utf8"));
+    lsum.ready_tasks = lsum.ready_tasks.filter((t) => t.task_id === "h2").map((t) => ({ ...t, worktree: linked }));
+    writeFileSync(join(hdir, "summary-linked.json"), JSON.stringify(lsum));
+    writeFileSync(HLOG, "");
+    const hl = flowRun(["story-herdr", "--summary", join(hdir, "summary-linked.json")], herdrEnv);
+    const lcalls = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const lopen = lcalls.find((c) => c[0] === "worktree") || [];
+    const lstart = lcalls.find((c) => c[0] === "agent" && c[1] === "start") || [];
+    check("story-herdr: linked worktree 는 원본 저장소를 --cwd 로, effort 없으면 --effort 생략", hl.code === 0 && lopen[lopen.indexOf("--cwd") + 1] === realpathSync(REPO) && lopen[lopen.indexOf("--path") + 1] === linked
+      && JSON.stringify(lstart.slice(-3)) === JSON.stringify(["--", "--model", "sonnet"]), hl.all + JSON.stringify(lcalls));
     // 일부 실패: h2 의 worktree 가 없으면 h1 만 시작하고 개수 보고 + 종료 코드 1, prompt 가 prompts 폴더 밖이면 거부
     const partial = JSON.parse(readFileSync(join(hdir, "summary.json"), "utf8"));
     partial.ready_tasks = partial.ready_tasks.map((t) => (t.task_id === "h2" ? { ...t, worktree: "" } : t));

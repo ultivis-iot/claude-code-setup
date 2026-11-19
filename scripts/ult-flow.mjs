@@ -497,6 +497,8 @@ cmds["story-eval"] = ({ opt }) => {
 // story-herdr --summary <summary.json> [--tasks <issue#|task_id,...>]
 // story-eval 이 만든 Ready Task 마다 herdr 에서 Task worktree 를 열고, claude 를 Task 모델로 시작한 뒤 Task prompt 를 보낸다.
 // herdr CLI(0.9.x) 의 JSON 응답을 쓴다: worktree open → .result.workspace.workspace_id, pane list → .result.panes[].pane_id.
+// worktree open 은 --cwd 로 원본 저장소(main checkout)를 알려줘야 --path 의 worktree 를 찾는다
+// (--cwd 가 없으면 worktree_not_found, linked worktree 면 linked_worktree_source).
 // ULT_HERDR_BIN 으로 herdr 실행 파일을 바꿀 수 있다(테스트용).
 const herdr = (args) => runBin(process.env.ULT_HERDR_BIN || "herdr", args);
 const herdrJson = (r) => { try { return JSON.parse(r.out); } catch { return null; } };
@@ -510,7 +512,10 @@ function startHerdrTask(it, promptDir) {
   if (!it.prompt || !existsSync(it.prompt)) return { ...res, error: "Task prompt 파일이 없습니다" };
   if (dirname(resolve(it.prompt)) !== promptDir) return { ...res, error: `Task prompt 가 실행 요약의 prompts 폴더 밖에 있습니다: ${it.prompt}` };
 
-  const open = herdr(["worktree", "open", "--path", it.worktree, "--label", it.name, "--no-focus"]);
+  // herdr 는 linked worktree 가 아니라 원본 저장소(main checkout)에서 열어야 한다(linked_worktree_source).
+  const common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], it.worktree);
+  const repoRoot = common.ok && common.out ? dirname(common.out) : it.worktree;
+  const open = herdr(["worktree", "open", "--cwd", repoRoot, "--path", it.worktree, "--label", it.name, "--no-focus"]);
   const ws = herdrJson(open)?.result?.workspace?.workspace_id;
   if (!open.ok || !ws) return { ...res, error: `worktree open 실패: ${herdrErr(open)}` };
   res.workspace_id = ws;
