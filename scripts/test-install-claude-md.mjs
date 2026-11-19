@@ -84,6 +84,43 @@ try {
     f.install('--update');
     assert.ok(!existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
   }
+  // 개인 줄을 남긴 채 충돌을 해결하면 다음 --update가 그 결과를 받아들이고 base를 새 템플릿으로 바꾼다.
+  // 해결하지 않고 다시 돌리면 여전히 충돌로 남는다(미해결본을 최신으로 받아들이지 않는다).
+  {
+    const OLD = '# 설정\n\n## 긴 절\n- 옛 규칙 1\n- 옛 규칙 2\n';
+    const NEW = '# 설정\n\n## 짧은 절\n- 새 규칙\n';
+    const f = fixture(OLD);
+    f.install();
+    const personal = `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n`;
+    writeFileSync(f.target, personal);
+    writeFileSync(f.templatePath, NEW);
+    assert.match(f.install('--update'), /충돌/);
+    assert.match(f.install('--update'), /충돌/, '해결하지 않으면 계속 충돌');
+    assert.equal(f.read(), personal);
+    const resolved = `${MARKER}\n${NEW}\n## 개인 절\n- 내 항목\n`;
+    writeFileSync(f.target, resolved);
+    assert.doesNotMatch(f.install('--update'), /충돌/);
+    assert.equal(f.read(), resolved);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
+    assert.ok(!existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
+    assert.ok(!existsSync(path.join(f.state, 'claude-md-pending.json')));
+    // 이후 템플릿 변경은 평소처럼 병합된다.
+    writeFileSync(f.templatePath, `${NEW}- 새 규칙 2\n`);
+    assert.match(f.install('--update'), /업데이트 완료/);
+    assert.ok(f.read().includes('- 새 규칙 2') && f.read().includes('- 내 항목'), f.read());
+  }
+  // 해결본에 충돌 표시가 남아 있으면 받아들이지 않는다.
+  {
+    const OLD = '# 설정\n\n- 항목 1\n';
+    const f = fixture(OLD);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 항목 1', '- 항목 1 (내 수정)')}`);
+    writeFileSync(f.templatePath, OLD.replace('- 항목 1', '- 항목 1 (템플릿 수정)'));
+    assert.match(f.install('--update'), /충돌/);
+    writeFileSync(f.target, readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8'));
+    assert.match(f.install('--update'), /충돌 표시/);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+  }
   // base 파일이 없는 기존 설치: git 이력에서 가장 가까운 템플릿을 base로 쓴다.
   {
     const f = fixture(V1, { git: true });

@@ -17,7 +17,8 @@ This is the lifecycle baseline when selected or required by repository instructi
 
 ## Which reference to read
 
-- For the overall flow, read [references/core-workflow.md](references/core-workflow.md).
+- For the overall flow, read [references/core-workflow.md](references/core-workflow.md). Plan 작성(UI 목업 포함), Plan 승인 뒤 분류, Task 생성 제한도 여기에 있다.
+- 서브에이전트를 띄울 때는 [references/subagent-models.md](references/subagent-models.md)로 모델을 고른다.
 - 짧은 요청을 조사·합의·Plan·Task로 구체화할 때는 같은 설치 루트의 `docs/references/request-to-plan.md`를 읽는다. 설정 저장소에서는 해당 저장소의 문서를 사용한다. 확정된 Issue는 필요한 부분만 확인하고 재발행하지 않는다.
 - For codebase navigation and Graft lifecycle behavior, read [references/graft-code-map.md](references/graft-code-map.md).
 - For natural-language overlay selection, read [references/overlay-routing.md](references/overlay-routing.md).
