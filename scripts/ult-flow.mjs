@@ -16,6 +16,7 @@
 //   handoff-comment --file <path>                                (Notion Story 코멘트용 본문을 1800자 단위로 분할)
 //   handoff-load [ref]                                           (로컬 → GitHub Issue 코멘트 순서)
 //   story-eval --input <json|@file> [--out-dir <dir>]            (Ready/Blocked 판정 + subagent prompt 생성)
+//   story-herdr --summary <summary.json> [--tasks <n,...>]       (Ready Task 를 herdr pane 에서 claude 로 시작)
 //
 // 환경: WORKTREE_ROOT (기본 ~/Git). ~/.claude/dev-tools/.env 에 있으면 읽는다. ULT_GH_BIN 으로 gh 실행 파일을 바꿀 수 있다(테스트용).
 
@@ -385,7 +386,8 @@ Task:
 - Base branch: ${t.base_branch}
 - Worktree: ${t.worktree || "(not found; create from base branch if needed)"}
 - Parent Task status: ${t.parents}
-
+- Recommended model: ${t.model}
+${story.context ? `\nStory context (shared by every Task; read this before exploring the codebase):\n${story.context}\n` : ""}${t.worktree ? `\nStory handoff: ${join(t.worktree, "tmp", "story-handoff.md")}\n` : ""}
 Rules:
 - Use only the assigned Task worktree.
 - Preserve Story context and Task scope.
@@ -395,8 +397,8 @@ Rules:
 - Verify locally using the repository's existing commands.
 - Commit and push the Task branch.
 - Create the Task PR targeting the base branch: ${t.base_branch || "(base branch required)"}.
-- Run or request review-cycle for the Task PR until AI review and CI are clear.
 - Update the Story handoff with results, PR URL, tests, and carryover.
+- Stop after the Task PR is created. Do not run review-cycle; the main agent starts a separate review-cycle run for this PR.
 
 Deliverable:
 - Implementation summary
@@ -406,8 +408,12 @@ Deliverable:
 - Any Story-wide carryover
 `;
 
-// input: { source, story:{title,notion_id,notion_url,github_repo,base_branch},
-//          tasks:[{notion_task_id,name,status,topic,issue_url,pr_url,repo,branch?,base_branch?,worktree?,
+// Task 실행 모델. handoff Task 의 model 필드를 쓰고, 없거나 모르는 값이면 sonnet.
+const TASK_MODELS = new Set(["opus", "sonnet", "haiku"]);
+const taskModel = (m) => (TASK_MODELS.has(String(m || "").toLowerCase()) ? String(m).toLowerCase() : "sonnet");
+
+// input: { source, story:{title,notion_id,notion_url,github_repo,base_branch,context?},
+//          tasks:[{notion_task_id,name,status,topic,issue_url,pr_url,repo,branch?,base_branch?,worktree?,model?,
 //                  parent_issue_urls?:[], parent_task_ids?:[], parents?:[{name,status,issue_url,pr_url}]}] }
 cmds["story-eval"] = ({ opt }) => {
   const input = readJsonArg(opt.input);
@@ -456,7 +462,7 @@ cmds["story-eval"] = ({ opt }) => {
 
     return {
       state, task_id: t.notion_task_id || t.task_id || "", name: t.name || "(제목 없음)", status: t.status || "", repo,
-      issue_url: issueUrl, pr_url: prUrl, branch, base_branch: base, worktree, parents: parentSummary,
+      issue_url: issueUrl, pr_url: prUrl, branch, base_branch: base, worktree, parents: parentSummary, model: taskModel(t.model),
     };
   });
 
@@ -464,7 +470,7 @@ cmds["story-eval"] = ({ opt }) => {
   const lines = [
     "# Story Run Summary", "", `- Source: ${input.source || "handoff"}`, `- Story: ${story.title || "(제목 없음)"}`,
     `- Notion Story: ${story.notion_url || ""}`, `- Story Base: ${story.base_branch || "(unknown)"}`, "", "## Tasks", "",
-    "| State | Task | Repo | Issue | Branch | Base | Worktree | Parents |", "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| State | Task | Model | Repo | Issue | Branch | Base | Worktree | Parents |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ];
   for (const it of items) {
     let ref = it.worktree;
@@ -474,13 +480,64 @@ cmds["story-eval"] = ({ opt }) => {
       it.prompt = pf;
       ref = ref || `prompt: ${pf}`;
     }
-    lines.push(`| ${it.state} | ${it.name} | ${it.repo} | ${it.issue_url || "-"} | ${it.branch || "-"} | ${it.base_branch || "-"} | ${ref || "-"} | ${it.parents} |`);
+    lines.push(`| ${it.state} | ${it.name} | ${it.model} | ${it.repo} | ${it.issue_url || "-"} | ${it.branch || "-"} | ${it.base_branch || "-"} | ${ref || "-"} | ${it.parents} |`);
   }
+  const allDone = items.length > 0 && items.every((i) => i.state === "Done");
+  if (allDone) lines.push("", "All Tasks are Done. Set the Story status to 완료.");
   const summaryMd = join(dir, "summary.md");
   writeFileSync(summaryMd, lines.join("\n") + "\n");
-  writeFileSync(join(dir, "summary.json"), JSON.stringify({ story, output_dir: dir, tasks: items, ready_tasks: ready }, null, 2));
+  writeFileSync(join(dir, "summary.json"), JSON.stringify({ story, output_dir: dir, tasks: items, ready_tasks: ready, all_done: allDone }, null, 2));
   writeFileSync(join(dir, "ready-tasks.json"), JSON.stringify(ready, null, 2));
   out({ output_dir: dir, summary_md: summaryMd, summary: lines.join("\n"), ready: ready.length, total: items.length });
+};
+
+// story-herdr --summary <summary.json> [--tasks <issue#|task_id,...>]
+// story-eval 이 만든 Ready Task 마다 herdr 에서 Task worktree 를 열고, claude 를 Task 모델로 시작한 뒤 Task prompt 를 보낸다.
+// herdr CLI(0.9.x) 의 JSON 응답을 쓴다: worktree open → .result.workspace.workspace_id, pane list → .result.panes[].pane_id.
+// HERDR_BIN 으로 herdr 실행 파일을 바꿀 수 있다(테스트용).
+const herdr = (args) => runBin(process.env.HERDR_BIN || "herdr", args);
+const herdrJson = (r) => { try { return JSON.parse(r.out); } catch { return null; } };
+const herdrErr = (r) => r.err || r.out || (r.status === null ? "herdr 를 실행할 수 없습니다" : `exit ${r.status}`);
+
+function startHerdrTask(it) {
+  const num = issueNumFromUrl(it.issue_url);
+  const agent = ("task-" + (num || slug(it.task_id || it.name))).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 32);
+  const res = { task: it.name, issue_url: it.issue_url, model: taskModel(it.model), worktree: it.worktree, agent, ok: false };
+  if (!it.worktree) return { ...res, error: "Task worktree 가 없습니다" };
+  if (!it.prompt || !existsSync(it.prompt)) return { ...res, error: "Task prompt 파일이 없습니다" };
+
+  const open = herdr(["worktree", "open", "--path", it.worktree, "--label", it.name, "--no-focus"]);
+  const ws = herdrJson(open)?.result?.workspace?.workspace_id;
+  if (!open.ok || !ws) return { ...res, error: `worktree open 실패: ${herdrErr(open)}` };
+  res.workspace_id = ws;
+
+  const panes = herdr(["pane", "list", "--workspace", ws]);
+  const pane = (herdrJson(panes)?.result?.panes || []).find((p) => !p.agent);
+  if (!panes.ok || !pane) return { ...res, error: panes.ok ? "agent 가 없는 pane 이 없습니다 (이미 실행 중일 수 있음)" : `pane list 실패: ${herdrErr(panes)}` };
+  res.pane_id = pane.pane_id;
+
+  const start = herdr(["agent", "start", agent, "--kind", "claude", "--pane", pane.pane_id, "--", "--model", res.model]);
+  if (!start.ok) return { ...res, error: `agent start 실패: ${herdrErr(start)}` };
+
+  const prompt = herdr(["agent", "prompt", agent, readFileSync(it.prompt, "utf8")]);
+  if (!prompt.ok) return { ...res, error: `agent prompt 실패: ${herdrErr(prompt)}` };
+  return { ...res, ok: true };
+}
+
+cmds["story-herdr"] = ({ opt }) => {
+  if (!opt.summary || opt.summary === true) fail("사용법: story-herdr --summary <summary.json> [--tasks <issue#|task_id,...>]");
+  const summary = JSON.parse(readFileSync(opt.summary, "utf8"));
+  const pick = opt.tasks && opt.tasks !== true ? new Set(String(opt.tasks).split(",").map((s) => s.trim().replace(/^#/, ""))) : null;
+  const ready = (summary.ready_tasks || []).filter((it) => !pick || pick.has(issueNumFromUrl(it.issue_url)) || pick.has(it.task_id));
+  if (!ready.length) fail("실행할 Ready Task 가 없습니다");
+
+  const ping = herdr(["pane", "list"]);
+  if (!ping.ok) fail(`herdr 서버에 연결할 수 없습니다. herdr 를 실행한 뒤 다시 시도하거나 서브에이전트로 실행하세요: ${herdrErr(ping)}`);
+
+  const tasks = ready.map(startHerdrTask);
+  const failed = tasks.filter((t) => !t.ok).length;
+  out({ started: tasks.length - failed, failed, tasks });
+  if (failed) process.exitCode = 1;
 };
 
 // ---------- main ----------

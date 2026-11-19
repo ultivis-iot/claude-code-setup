@@ -1295,6 +1295,7 @@ async function cmdStoryRun(argv) {
       say(`- Summary: ${r.summary_md}`);
       say(`- JSON: ${join(r.output_dir, "summary.json")}`);
       say(`- Ready task prompts: ${join(r.output_dir, "prompts")}`);
+      if (r.ready) say(`- herdr 실행: node "${join(HERE, "ult-flow.mjs")}" story-herdr --summary "${join(r.output_dir, "summary.json")}"`);
     }
   } finally { cleanup(dir); }
 }

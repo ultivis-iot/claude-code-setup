@@ -168,7 +168,7 @@ Task 실행 중 새 Notion Task, GitHub Issue, branch, worktree를 임의로 만
 
 ### Handoff / Review Cycle
 
-Story 기반 작업은 각 Task worktree의 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. 초기 handoff와 실행 중 변경사항은 Notion Story 페이지 본문 또는 Task worktree handoff에 남깁니다. `/ult-story-run`은 로컬 handoff를 먼저 읽고 Notion은 handoff가 없을 때 fallback으로 조회합니다.
+Story 기반 작업은 각 Task worktree의 `tmp/story-handoff.md`와 `tmp/story-handoff.json`을 유지합니다. 초기 handoff와 실행 중 변경사항은 Notion Story 페이지 본문 또는 Task worktree handoff에 남깁니다. `/ult-story-run`은 로컬 handoff를 먼저 읽고 Notion은 handoff가 없을 때 fallback으로 조회합니다. Ready Task를 시작하기 전에 서브에이전트 병렬과 herdr thread 중 실행 방식을 묻고, Task 실행자는 PR 생성까지만 합니다. review-cycle은 메인 에이전트가 PR마다 새 sonnet 서브에이전트로 실행하고, Task가 모두 완료되면 Story status를 `완료`로 바꿉니다.
 
 리뷰 사이클은 두 단계입니다.
 

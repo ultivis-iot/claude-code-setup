@@ -124,7 +124,7 @@ The handoff should include:
 
 After creation, the local handoff files and Notion Story page body are the mutable handoff sources.
 
-Use the global `ult-notion.mjs story-run` to generate a current run summary and Ready Task prompts. It reads local handoff first and falls back to Notion when no handoff is available. This script does not spawn subagents by itself; the main agent may spawn subagents only when the user has explicitly allowed subagent/parallel work.
+Use the global `ult-notion.mjs story-run` to generate a current run summary and Ready Task prompts. It reads local handoff first and falls back to Notion when no handoff is available. This script does not spawn subagents by itself. Before starting Ready Tasks, the main agent asks the user to choose subagents in parallel (recommended) or herdr threads (`ult-flow.mjs story-herdr --summary <summary.json>`). Each Task prompt carries the recommended model (handoff Task `model`, default `sonnet`) and the optional `story.context`, and ends after the Task PR is created; the main agent then runs review-cycle per PR in a fresh `sonnet` subagent. When every Task is Done (`all_done`), set the Story status to `완료`.
 
 When adding a Task to an existing Story, prefer passing the Notion Story URL or running from a Task worktree with local handoff. The global `ult-notion.mjs task-create` resolves Story context from local handoff, the current GitHub Task Issue, and then active Notion title search. It must not resolve Story context from stale branch base config or old worktrees. New Task branches should base on the latest remote base, and new Tasks should be appended to Story handoff when available.
 
