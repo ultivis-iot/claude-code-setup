@@ -612,6 +612,43 @@ try {
     const se = flowRun(["story-eval", "--out-dir", join(ROOT, "story-eval"), "--input", JSON.stringify({ source: "notion", story: { title: "S" }, tasks: [{ notion_task_id: "t1", name: "완료된 Task", status: "완료", issue_url: "", parent_task_ids: ["p1"], parents: [] }] })]);
     const seTasks = JSON.parse(readFileSync(join(ROOT, "story-eval", "summary.json"), "utf8")).tasks;
     check("story-eval: 완료 상태는 선행 Task 와 무관하게 Done", se.code === 0 && seTasks[0].state === "Done", se.all);
+    check("story-eval: Task 가 모두 Done 이면 all_done + Story 완료 안내", JSON.parse(readFileSync(join(ROOT, "story-eval", "summary.json"), "utf8")).all_done === true && /Set the Story status to 완료/.test(readFileSync(join(ROOT, "story-eval", "summary.md"), "utf8")), se.all);
+
+    // story-eval prompt: 추천 모델 · Story 공통 맥락 · PR 생성 후 종료(review-cycle 은 메인이 따로)
+    const hwt = join(ROOT, "wt-herdr"); mkdirSync(hwt, { recursive: true });
+    const hdir = join(ROOT, "story-eval-herdr");
+    const he = flowRun(["story-eval", "--out-dir", hdir, "--input", JSON.stringify({ source: "handoff", story: { title: "S2", context: "주요 파일: scripts/ult-flow.mjs" }, tasks: [
+      { notion_task_id: "h1", name: "모델 지정 Task", status: "시작 전", issue_url: "", worktree: hwt, model: "opus" },
+      { notion_task_id: "h2", name: "기본 모델 Task", status: "시작 전", issue_url: "", worktree: hwt },
+    ] })]);
+    const hs = JSON.parse(readFileSync(join(hdir, "summary.json"), "utf8"));
+    const p1 = readFileSync(join(hdir, "prompts", "task-h1.md"), "utf8");
+    check("story-eval: Task model 을 쓰고 없으면 sonnet", he.code === 0 && hs.tasks[0].model === "opus" && hs.tasks[1].model === "sonnet" && hs.all_done === false && /\| Ready \| 모델 지정 Task \| opus \|/.test(readFileSync(join(hdir, "summary.md"), "utf8")), he.all);
+    check("story-eval prompt: 추천 모델 + Story context + handoff 경로", /Recommended model: opus/.test(p1) && /주요 파일: scripts\/ult-flow\.mjs/.test(p1) && p1.includes(join(hwt, "tmp", "story-handoff.md")), p1);
+    check("story-eval prompt: PR 생성 후 종료, review-cycle 은 하지 않는다", /Stop after the Task PR is created\. Do not run review-cycle/.test(p1) && !/Run or request review-cycle/.test(p1), p1);
+
+    // story-herdr: 가짜 herdr 로 호출 순서와 인자를 확인한다
+    const FAKE_HERDR = join(ROOT, "fake-herdr.mjs"), HLOG = join(ROOT, "herdr.log");
+    writeFileSync(FAKE_HERDR, `import { appendFileSync } from "node:fs";
+const a = process.argv.slice(2);
+appendFileSync(process.env.FAKE_HERDR_LOG, JSON.stringify(a) + "\\n");
+if (process.env.FAKE_HERDR_DOWN) { process.stderr.write('{"error":{"code":"server_unavailable"}}'); process.exit(1); }
+const ok = (result) => { process.stdout.write(JSON.stringify({ id: "1", result })); process.exit(0); };
+if (a[0] === "worktree" && a[1] === "open") ok({ type: "worktree_opened", already_open: false, workspace: { workspace_id: "w9" }, worktree: {} });
+if (a[0] === "pane" && a[1] === "list") ok({ type: "pane_list", panes: a.includes("--workspace") ? [{ pane_id: "w9:p1", agent: null }] : [] });
+ok({ type: "ok" });
+`);
+    const herdrEnv = { HERDR_BIN: FAKE_HERDR, FAKE_HERDR_LOG: HLOG };
+    const hr = flowRun(["story-herdr", "--summary", join(hdir, "summary.json"), "--tasks", "h1"], herdrEnv);
+    const calls = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const startCall = calls.find((c) => c[0] === "agent" && c[1] === "start");
+    const promptCall = calls.find((c) => c[0] === "agent" && c[1] === "prompt");
+    check("story-herdr: worktree open → pane list → agent start(--model) → agent prompt", hr.code === 0 && hr.json?.started === 1 && hr.json.tasks.length === 1
+      && calls.map((c) => c.slice(0, 2).join(" ")).join(",") === "pane list,worktree open,pane list,agent start,agent prompt"
+      && calls[1].includes(hwt) && JSON.stringify(startCall) === JSON.stringify(["agent", "start", "task-h1", "--kind", "claude", "--pane", "w9:p1", "--", "--model", "opus"])
+      && promptCall[2] === "task-h1" && promptCall[3] === p1, hr.all + JSON.stringify(calls));
+    const hd = flowRun(["story-herdr", "--summary", join(hdir, "summary.json")], { ...herdrEnv, FAKE_HERDR_DOWN: "1" });
+    check("story-herdr: herdr 서버가 없으면 오류 + 서브에이전트 안내", hd.code === 1 && /herdr 서버에 연결할 수 없습니다/.test(hd.json?.error || ""), hd.all);
     // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (예전 bash workflow-env.sh 와 같은 규칙)
     const codexScripts = join(HOME, ".codex", "scripts");
     mkdirSync(join(codexScripts, "lib"), { recursive: true });

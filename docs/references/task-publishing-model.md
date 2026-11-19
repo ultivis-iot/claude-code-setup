@@ -27,6 +27,8 @@
 - review-cycle은 Task PR마다 수행한다. Story 전체 검증은 모든 Task PR이 merge된 뒤 별도 검증 단계로 수행한다.
 - Story/Task Notion page는 configured template을 사용하고, appended markdown은 raw markdown이 아니라 Notion block으로 렌더링한다.
 - 실행 전에는 `/ult-story-run`으로 Ready/Blocked Task를 확인하고 Ready Task별 subagent prompt를 생성한다. 이때 runner는 로컬/GitHub handoff를 먼저 읽고 Notion은 fallback으로만 쓴다.
+- Ready Task를 시작하기 전에 실행 방식(서브에이전트 병렬 / herdr thread)을 사용자에게 묻는다. Task 실행자는 Task PR 생성까지만 하고, review-cycle은 메인 에이전트가 PR마다 새 sonnet 서브에이전트로 실행한다.
+- Story의 Task가 모두 완료되면 Story status를 `완료`로 바꾼다.
 
 Branch flow:
 
