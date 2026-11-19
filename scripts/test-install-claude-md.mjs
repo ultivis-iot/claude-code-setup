@@ -158,6 +158,25 @@ try {
     assert.equal(f.read(), dropped);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
   }
+  // 충돌이 둘일 때 하나만 정리하면 정리로 보지 않고, 둘 다 정리해야 받아들인다.
+  {
+    const OLD = '# 설정\n\n## 가\n- 가 옛\n\n## 중간\n- 중간 1\n- 중간 2\n- 중간 3\n- 중간 4\n\n## 나\n- 나 옛\n';
+    const NEW = OLD.replace('- 가 옛', '- 가 새').replace('- 나 옛', '- 나 새');
+    const f = fixture(OLD);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 가 옛', '- 가 내것').replace('- 나 옛', '- 나 내것')}`);
+    writeFileSync(f.templatePath, NEW);
+    assert.match(f.install('--update'), /충돌\(2곳\)/);
+    const partial = `${MARKER}\n${NEW.replace('- 나 새', '- 나 새\n- 나 내것')}`;
+    writeFileSync(f.target, partial);
+    assert.match(f.install('--update'), /충돌/);
+    assert.equal(f.read(), partial);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+    const full = `${MARKER}\n${NEW}`;
+    writeFileSync(f.target, full);
+    assert.doesNotMatch(f.install('--update'), /충돌/);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
+  }
   // 해결본에 충돌 표시가 남아 있으면 받아들이지 않는다.
   {
     const OLD = '# 설정\n\n- 항목 1\n';
