@@ -495,29 +495,29 @@ cmds["story-eval"] = ({ opt }) => {
   out({ output_dir: dir, summary_md: summaryMd, summary: lines.join("\n"), ready: ready.length, total: items.length });
 };
 
+// Task 실행 ID: prompt 파일명과 herdr agent 이름에 같이 쓴다. 저장소가 있으면 읽기 쉬운 저장소 이름에
+// 정확한 "owner/repo#번호" 해시를 붙여, 이름 정규화가 같은 저장소(o/Repo.A, o/repo-a, o-repo/a)도 겹치지 않게 한다.
+// herdr agent 이름은 [a-z][a-z0-9_-]{0,31} 이라 길이를 AGENT_NAME_MAX 안으로 맞춘다.
+const AGENT_NAME_MAX = 32;
+function taskRunId(it) {
+  const num = issueNumFromUrl(it.issue_url);
+  const rawRepo = it.repo || repoFromIssueUrl(it.issue_url) || "";
+  const hash8 = (text) => createHash("sha1").update(text).digest("hex").slice(0, 8);
+  if (num && rawRepo) {
+    const tail = `-${num}-${hash8(`${rawRepo}#${num}`)}`;
+    const name = rawRepo.split("/").pop().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+    return `task-${name.slice(0, Math.max(0, AGENT_NAME_MAX - "task-".length - tail.length))}${tail}`.replace(/-+/g, "-");
+  }
+  const id = ("task-" + (num || slug(it.task_id || it.name))).toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  return id.length <= AGENT_NAME_MAX ? id : `${id.slice(0, AGENT_NAME_MAX - 9)}-${hash8(id)}`;
+}
+
 // story-herdr --summary <summary.json> [--tasks <issue#|task_id,...>]
 // story-eval 이 만든 Ready Task 마다 herdr 에서 Task worktree 를 열고, claude 를 Task 모델로 시작한 뒤 Task prompt 를 보낸다.
 // herdr CLI(0.9.x) 의 JSON 응답을 쓴다: worktree open → .result.workspace.workspace_id, pane list → .result.panes[].pane_id.
 // worktree open 은 --cwd 로 원본 저장소(main checkout)를 알려줘야 --path 의 worktree 를 찾는다
 // (--cwd 가 없으면 worktree_not_found, linked worktree 면 linked_worktree_source).
 // ULT_HERDR_BIN 으로 herdr 실행 파일을 바꿀 수 있다(테스트용).
-// Task 실행 ID: prompt 파일명과 herdr agent 이름에 같이 쓴다. 저장소가 다른 같은 Issue 번호가 충돌하지 않도록
-// 저장소 slug 를 넣고, herdr agent 이름 길이(32)를 넘으면 해시로 줄인다.
-function taskRunId(it) {
-  const num = issueNumFromUrl(it.issue_url);
-  const rawRepo = it.repo || repoFromIssueUrl(it.issue_url) || "";
-  if (num && rawRepo) {
-    // A readable repo name plus a hash of the exact owner/repo, so repos that normalize to the
-    // same name (o/Repo.A vs o/repo-a vs o-repo/a) never share a prompt file or herdr agent name.
-    const hash = createHash("sha1").update(`${rawRepo}#${num}`).digest("hex").slice(0, 8);
-    const tail = `-${num}-${hash}`;
-    const name = rawRepo.split("/").pop().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
-    return `task-${name.slice(0, Math.max(0, 32 - 5 - tail.length))}${tail}`.replace(/-+/g, "-");
-  }
-  const id = ("task-" + (num || slug(it.task_id || it.name))).toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-  if (id.length <= 32) return id;
-  return `${id.slice(0, 23)}-${createHash("sha1").update(id).digest("hex").slice(0, 8)}`;
-}
 const herdr = (args) => runBin(process.env.ULT_HERDR_BIN || "herdr", args);
 const herdrJson = (r) => { try { return JSON.parse(r.out); } catch { return null; } };
 const herdrErr = (r) => r.err || r.out || (r.status === null ? "herdr 를 실행할 수 없습니다" : `exit ${r.status}`);
@@ -547,7 +547,8 @@ function startHerdrTask(it, promptDir) {
   const start = herdr(["agent", "start", agent, "--kind", "claude", "--pane", pane.pane_id, "--", "--model", res.model, ...(res.effort ? ["--effort", res.effort] : [])]);
   if (!start.ok) return { ...res, error: `agent start 실패: ${herdrErr(start)}` };
 
-  const prompt = herdr(["agent", "prompt", agent, readFileSync(it.prompt, "utf8")]);
+  // 검사한 실제 경로(promptReal)에서 읽어, 검사와 읽기 사이에 링크를 바꿔치는 경우를 막는다.
+  const prompt = herdr(["agent", "prompt", agent, readFileSync(promptReal, "utf8")]);
   if (!prompt.ok) {
     // 시작된 agent 가 pane 을 점유한 채 남으면 같은 Task 를 다시 시작할 수 없으므로 pane 을 닫아 복구한다.
     const close = herdr(["pane", "close", pane.pane_id]);
