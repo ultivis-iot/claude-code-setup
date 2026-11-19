@@ -22,10 +22,49 @@ Key expectations:
 - Do not create Story/Task/Issue records until the plan is approved and the Story/Task breakdown has been confirmed.
 - At breakdown, if the Task list can't be written yet, several open decisions depend on each other, and no single session can reach a conclusion, recommend charting a `wayfinder` map instead of publishing fixed Tasks.
 - For an implementation Task that is a reproducible bug fix, a logic change, or a public interface change in a repository with a runnable test setup, use `tdd` and name the seams under test in the plan's verification.
-- Preserve the approved plan in `tmp/current-plan.md` when the project already uses that artifact.
+- Preserve the approved plan in `tmp/current-plan.md` (see "Plan 승인 뒤" below).
 - Validation is a gate, not a summary. If intent validation fails, stop and fix the implementation before moving on.
 - Quality validation should cover docs, security, code simplicity, tests, and CLI sync when relevant.
 - Frontend changes should trigger a suggestion for Visual QA instead of being ignored.
+
+## Plan 작성
+
+- Plan에는 반드시 `의도` 섹션을 둔다: 사용자가 원하는 것, 기대 결과물. 사용자가 자기 의도가 정확히 문서화됐는지 확인하게 한다.
+- Plan이 크거나 애매하면 Story/Task를 만들기 전에 질문한다. 최소 확인 항목: 목표와 성공 기준, 포함/제외 범위, 대상 repo·Project·Story, 데이터/API/UI 영향 범위, 선행 Task/dependency, 검증/리뷰 기준, 해당할 때만 비기능 제약(위 항목).
+- 답은 `결정사항`에, 답이 없지만 진행 가능한 내용은 `가정`에 적는다. 위험한 가정이면 진행하지 않는다.
+- **UI 변경은 목업 전·후 비교부터.** UI(화면 배치·스타일·컴포넌트·문구 위치)를 바꾸면 Plan 단계에서 바꾸는 화면마다 현재(실제 앱 캡처)와 변경 후 목업을 나란히 보여주고, 사용자 확인 뒤에 구현한다. 목업은 png나 HTML로 로컬에 만들고 절대경로를 알려준다. 데스크톱·모바일 폭, 라이트·다크 등 영향받는 경우를 함께 보이고, 작은 조정이라도 눈에 보이는 변화면 전·후 캡처를 보인다. 구현 중 목업과 달라지는 결정이 생기면 다시 보여준다.
+
+## Plan 승인 뒤
+
+1. Plan 모드 진입 시 프로젝트 루트에 `tmp/`가 없으면 만든다. 승인 뒤 Build 전에 현재 대화의 정확한 Plan을 `tmp/current-plan.md`로 저장한다. Hook에 명시 경로가 없으면 메인 에이전트가 저장하며 전역 최신 Plan 파일을 추측하지 않는다. Build 중에는 Plan을 고치지 않는다(원본 의도 보존).
+2. Plan 성격을 분류해 다음 흐름을 제안한다. 이미 승인된 범위는 이어서 수행한다.
+
+| Plan 성격 | 기본 제안 |
+|---|---|
+| Task 목록을 아직 쓸 수 없고 선후 관계가 있는 미결 결정이 여러 개인 작업 | `wayfinder` 지도 작성 — Notion Story를 지도로, 결정 티켓을 Task + Issue로 |
+| 새 Story로 관리할 작업 | `ult-story-create` — Story 1개 + Task N개 + Issue N개 + 필요 시 브랜치/worktree |
+| 기존 Story의 추가 작업 | `ult-task-create` — Task 1개 + Issue 1개 + 필요 시 브랜치/worktree |
+| 현재 Task의 보완/메모 | `ult-task-note` |
+| 발행 없이 바로 구현할 작업 | 바로 Build 시작 |
+
+3. 사용자에게 명령을 고르게 떠넘기지 않는다. 추천 흐름 1개와 이유 1줄, 대안은 최대 2개를 짧게 제시하고, **사용자 확인을 받은 뒤** 그 흐름을 직접 이어서 수행한다. 다른 흐름을 고르면 따르고, 명시적으로 거부하면 그대로 Build를 시작한다.
+
+```text
+Plan 승인 완료.
+
+추천 다음 단계: 새 Story 발행
+이유: 독립된 작업 단위가 여러 개라 Story 아래 Task로 나누는 편이 적절합니다.
+
+확인되면 제가 이어서 진행하겠습니다.
+대안:
+- 기존 Story에 Task 1개 추가
+- 발행 없이 바로 구현
+```
+
+## Task 생성 제한
+
+- 작업 중 새 Notion Task, GitHub Issue, 하위 Task를 임의로 만들지 않는다. `ult-task-create`는 사용자가 명시적으로 "Task를 추가/생성하라"고 승인한 경우에만 실행한다.
+- 현재 Task 범위를 벗어난 후속 작업, 리뷰·구현 중 발견한 추가 범위는 새 Task를 만들지 말고 Story handoff와 Notion Story 페이지 본문에 carryover로 기록한다. 사용자가 승인하기 전까지 Task/Issue/branch/worktree를 새로 만들지 않는다.
 
 ## Codebase navigation
 

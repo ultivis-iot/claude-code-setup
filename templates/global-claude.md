@@ -4,107 +4,19 @@
 - 코드 변경 전 반드시 기존 패턴 확인
 - 브랜치 생성, 체크아웃, worktree 생성 전에는 먼저 `git fetch origin --prune`로 원격 refs를 최신화하고, 새 브랜치는 최신 원격 base에서 시작
 - PR 머지는 `merge-readiness.md`(최종 HEAD 변경 브리프와 변경 범위에 따른 이해 확인 질문)를 거친 뒤 사용자의 명시적 요청으로만 한다
+- 자기 worktree 밖에서 git 쓰기 금지. 특히 메인 체크아웃에서 `git checkout -- `, `reset --hard`, `stash`, `clean` 금지 — 다른 세션의 미커밋 작업이 있을 수 있다. 다른 브랜치 내용은 `git show <ref>:<path>`나 별도 worktree로 본다. 리뷰·조사는 항상 읽기 전용이다.
+- 사용자가 승인하기 전에는 Notion Task, GitHub Issue, branch, worktree를 새로 만들지 않는다. 범위 밖 후속 작업은 carryover로 기록한다.
+
+## 응답
+- 간결하게 쓴다. 결론부터, 근거는 필요한 만큼만. 이미 말한 것을 다시 요약하지 않고, 진행 상황 표·중간 보고는 사용자가 물었을 때만 쓴다. 작업 보고는 바뀐 것과 사용자 판단이 필요한 것만 적는다.
+- 파일 위치는 **항상 절대경로**로 알려준다(읽은·수정한·만든 파일, 코드 참조 `/abs/path/file.ts:42` 모두). worktree에서 작업했으면 그 worktree 경로를, 병합 뒤 메인 체크아웃에도 반영됐으면 두 경로를 함께 쓴다. 파일이 여러 개면 목록으로 모두 적는다.
+- 아티팩트(claude.ai Artifact, 캔버스·문서 등)는 사용자가 명시적으로 요청할 때만 만든다. 기본은 로컬 파일(png, HTML, Markdown 등)이고 절대경로만 알려준다.
 
 ## 기본 라우터
+`ultivis-flow`를 모든 개발 작업의 상시 기반으로 사용한다. 이 흐름이 Plan, GitHub/Notion Story·Task, branch/worktree, commit-and-verify, PR과 review-cycle을 소유하고, 다른 스킬은 이 게이트를 대체하지 않는 일시적 오버레이다. 사용자가 `/tdd`처럼 스킬을 명시하면 그 선택을 우선한다. 오버레이 선택 규칙과 매핑은 `ultivis-flow`의 `references/overlay-routing.md`를 따른다.
 
-`ultivis-flow`를 모든 개발 작업의 상시 기반으로 사용한다. 이 흐름이 Plan, GitHub/Notion Story·Task, branch/worktree, commit-and-verify, PR과 review-cycle을 소유한다. 설치된 다른 스킬은 특정 작업 방식을 제공하는 일시적 오버레이이며 이 게이트를 대체하지 않는다.
-
-사용자의 자연어 질의와 저장소 상태를 보고 다음처럼 라우팅한다.
-
-1. 사용자가 `/tdd`, `/research`처럼 스킬을 명시하면 그 선택을 우선한다.
-2. 하나의 스킬이 명확하면 자동 선택하고 한 문장으로 알린 뒤 진행한다.
-3. 둘 이상의 접근이 결과를 실질적으로 바꾸면 질문 하나에 선택지 2~3개를 제시한다. 추천안을 먼저 두고 각 선택지의 tradeoff를 짧게 설명한다.
-4. primary overlay는 한 번에 하나만 사용하고, 완료 기준에 도달한 뒤에만 후속 스킬로 전환한다.
-5. 적합한 오버레이가 없으면 `ultivis-flow`만으로 진행한다.
-
-기본 매핑:
-
-- 중요한 모호성/의사결정: `grilling`
-- 테스트 실행 환경이 있는 저장소의 재현 가능한 버그 수정, 도메인 로직·상태·계산·파서 변경, 공개 인터페이스 변경: `tdd` (화면 배치·스타일, 설정, 문서, 탐색용 코드는 제외)
-- 원인 불명의 버그/회귀/성능 저하: `diagnosing-bugs`
-- 외부 문서/API/표준 확인: `research`
-- 도메인 용어와 불변식: `domain-modeling`
-- module/interface/seam 설계: `codebase-design`
-- 코드베이스 구조 개선 후보 탐색: `improve-codebase-architecture` (사용자 명시 호출 전용. 구조 문제가 보이면 `/improve-codebase-architecture` 호출을 제안만 한다)
-- Task 목록을 아직 쓸 수 없고, 선후 관계가 있는 미결 결정이 여러 개이며, 한 세션에 결론까지 갈 수 없는 작업: `wayfinder`
-- merge/rebase conflict: `resolving-merge-conflicts`
-- 세션 인수인계: `handoff`
-- 전용 학습 workspace: `teach`
-- skill 작성/수정: `writing-great-skills`
-
-`grill-me`는 사용자가 명시적으로 `grilling`을 시작하는 단축 진입점이다. `grill-with-docs`는 grilling을 하면서 결정을 용어집(GLOSSARY.md)과 ADR로 남기는 단축 진입점이다. 둘 다 사용자만 호출한다.
+## 서브에이전트
+`Agent`로 서브에이전트를 띄울 때 `model`을 항상 명시한다. 설계 판단·보안 표면·상태 머신·원인 불명 결함은 `opus`, 정해진 구현·리뷰 반영·테스트 보강은 `sonnet`, 기계적 작업은 `haiku`, 애매하면 `sonnet`. 상세 기준은 `ultivis-flow`의 `references/subagent-models.md`.
 
 ## Plan 모드 가이드
-Plan 모드 사용 시 반드시 의도 섹션이 포함되어 **사용자의 의도를 명확하게 명문화**해야 합니다.
-
-### Plan 작성 전 질문
-Plan이 크거나 애매하면 바로 Story/Task를 만들지 말고, 먼저 사용자가 스스로 판단할 수 있도록 질문한다.
-
-- 질문은 blocking point 위주로 1~3개씩 묻는다.
-- 단순히 답을 요구하지 말고 선택 기준과 tradeoff를 짧게 제시한다.
-- 최소 확인 항목:
-  - 목표와 성공 기준
-  - 포함/제외 범위
-  - 대상 repo, Project, Story
-  - 데이터/API/UI 영향 범위
-  - 선행 Task/dependency
-  - 검증/리뷰 기준
-  - 비기능 제약 (작업에 해당할 때만 확인. 해당 없으면 묻지 않는다)
-    - 보안: 인증·권한, 외부 입력 검증, 비밀값 보관 위치
-    - 성능: 예상 데이터 양·부하, 허용 지연
-    - 접근성·반응형: 모바일 지원, 키보드·스크린리더 지원 수준
-    - DB: 마이그레이션 방식, 기존 데이터 이전, 롤백 가능 여부
-- 비기능 제약은 기존 구현(인증 방식, 인덱스, 반응형 처리 등)을 먼저 조사하고, 코드로 정할 수 없는 정책·목표치만 질문한다. 정한 값은 `결정사항`에 남겨 구현 뒤 검증(`security-validator`, `visual-qa`)의 기준으로 쓴다.
-- 사용자의 답변은 Plan의 `결정사항`에 남긴다.
-- 답이 없지만 진행 가능한 내용은 `가정`에 적고, 위험한 가정이면 진행하지 않는다.
-- Story/Task/Issue 생성은 Plan 승인 이후에만 한다.
-
-### Task 생성 제한
-작업 수행 중 새 Notion Task, GitHub Issue, 하위 Task를 임의로 만들지 않는다.
-
-- `ult-task-create`는 사용자가 명시적으로 “Task를 추가/생성하라”고 승인한 경우에만 실행한다.
-- 현재 Task 범위를 벗어난 후속 작업은 새 Task를 만들지 말고 Story handoff와 Notion Story 페이지 본문에 carryover로 기록한다.
-- 리뷰나 구현 중 발견한 추가 범위도 동일하다. 사용자가 승인하기 전까지 Task/Issue/branch/worktree를 새로 만들지 않는다.
-
-### Plan 저장 시점
-1. Plan 모드 진입 시 프로젝트 루트에 tmp 디렉토리가 없으면 생성
-2. **사용자 승인 완료 후, Build 시작 전에** `tmp/current-plan.md`로 복사
-3. Build 중에는 Plan을 수정하지 않음 (원본 의도 보존)
-
-### Plan 승인 후 분류 + 확인
-Plan 승인 후 현재 대화의 정확한 Plan을 `tmp/current-plan.md`에 저장한다. Hook에 명시 경로가 없으면 메인 에이전트가 저장하며 전역 최신 파일을 추측하지 않는다. Build 시작 전에 Plan 성격을 분류하고 이미 승인된 범위는 이어서 수행한다.
-
-| Plan 성격 | 기본 제안 |
-|---|---|
-| Task 목록을 아직 쓸 수 없고 선후 관계가 있는 미결 결정이 여러 개인 작업 | `wayfinder` 지도 작성 제안 — Notion Story를 지도로, 결정 티켓을 Task + Issue로 |
-| 새 Story로 관리할 작업 | `ult-story-create` 흐름 제안 — Story 1개 + Task N개 + Issue N개 + 필요 시 브랜치/worktree |
-| 기존 Story의 추가 작업 | `ult-task-create` 흐름 제안 — Task 1개 + Issue 1개 + 필요 시 브랜치/worktree |
-| 현재 Task의 보완/메모 | `ult-task-note` 흐름 제안 |
-| 발행 없이 바로 구현할 작업 | 바로 Build 시작 제안 |
-
-이때 사용자가 명령어를 직접 고르게 밀어내지 말고, 아래 순서로 진행한다.
-
-1. 추천 흐름 1개를 먼저 제시
-2. 이유를 1줄로 설명
-3. 대안은 최대 2개만 짧게 제시
-4. **사용자 확인을 받은 뒤** 그 흐름을 직접 이어서 수행
-
-권장 응답 형식:
-
-```text
-Plan 승인 완료.
-
-추천 다음 단계: 새 Story 발행
-이유: 독립된 작업 단위가 여러 개라 Story 아래 Task로 나누는 편이 적절합니다.
-
-확인되면 제가 이어서 진행하겠습니다.
-대안:
-- 기존 Story에 Task 1개 추가
-- 발행 없이 바로 구현
-```
-
-사용자가 다른 흐름을 고르면 그 선택을 따른다. 명시적 거부 시 그대로 Build 시작.
-### 의도 (Intent)
-- 사용자가 원하는 것이 무엇인지 명확히 기술
-- 기대 결과물 정의
-- **사용자는 자신의 의도가 정확하게 문서화되었는지 반드시 확인해야 함**
+Plan에는 반드시 `의도` 섹션(사용자가 원하는 것, 기대 결과물)을 넣고, 사용자가 자기 의도가 정확히 문서화됐는지 확인하게 한다. Plan을 쓰기 전 질문, UI 변경의 목업 전·후 비교, `tmp/current-plan.md` 저장, 승인 뒤 다음 흐름 제안은 `ultivis-flow`의 `references/core-workflow.md`를 읽고 따른다.

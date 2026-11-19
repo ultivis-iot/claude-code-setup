@@ -26,12 +26,21 @@ const say = message => console.log(`   ${message}`);
 const lf = text => text.replace(/\r\n/g, '\n');
 
 const conflictPath = path.join(stateDir, 'CLAUDE.md.conflict');
+// On a conflict, the template the person must resolve against and the section as it was then.
+// The next --update uses that template as base once the section has changed and has no markers,
+// so a resolution that keeps personal lines is accepted instead of conflicting again forever.
+const pendingPath = path.join(stateDir, 'claude-md-pending.json');
 
 // Record the template now in effect; a leftover conflict copy from an earlier run is stale.
 function saveBase() {
   mkdirSync(stateDir, { recursive: true });
   writeFileSync(basePath, template);
   rmSync(conflictPath, { force: true });
+  rmSync(pendingPath, { force: true });
+}
+
+function readPending() {
+  try { return JSON.parse(readFileSync(pendingPath, 'utf8')); } catch { return undefined; }
 }
 
 function backup(content) {
@@ -138,7 +147,13 @@ function updateSection(content, index) {
     saveBase();
     return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
   }
-  const base = existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
+  // A section that changed since the last conflict was resolved against the pending template.
+  const pending = readPending();
+  const resolving = pending && typeof pending.base === 'string' && pending.ours !== section;
+  if (resolving && section.split('\n').some(line => [OPEN, BASE, SPLIT, CLOSE].some(marker => line.startsWith(marker)))) {
+    return say('⚠ CLAUDE.md에 충돌 표시가 남아 있어 그대로 둠. 표시를 지우고 다시 --update를 실행하세요');
+  }
+  const base = resolving ? pending.base : existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
   if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (전체 이력이 있는 git clone에서 setup을 실행하세요)');
 
   const { merged, conflicts, error } = merge(section, lf(base), theirs);
@@ -146,6 +161,7 @@ function updateSection(content, index) {
   if (conflicts) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(conflictPath, head + merged);
+    writeFileSync(pendingPath, JSON.stringify({ base: theirs, ours: section }));
     say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
     say(`  충돌 표시가 든 병합본: ${conflictPath}`);
     return say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);
