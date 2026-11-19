@@ -124,6 +124,25 @@ try {
     assert.equal(f.read(), unrelated);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
   }
+  // 템플릿이 사용자가 고친 줄을 지운 충돌(템플릿 쪽이 빔): 관계없는 편집은 정리가 아니고, 옛 줄을 지우면 정리다.
+  {
+    const OLD = '# 설정\n\n- 유지\n- 지울 규칙\n- 끝\n';
+    const NEW = '# 설정\n\n- 유지\n- 끝\n';
+    const f = fixture(OLD);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 지울 규칙', '- 지울 규칙 (내 수정)')}`);
+    writeFileSync(f.templatePath, NEW);
+    assert.match(f.install('--update'), /충돌/);
+    const unrelated = `${MARKER}\n${OLD.replace('- 지울 규칙', '- 지울 규칙 (내 수정)')}- 관계없는 줄\n`;
+    writeFileSync(f.target, unrelated);
+    assert.match(f.install('--update'), /충돌/);
+    assert.equal(f.read(), unrelated);
+    const resolved = `${MARKER}\n${NEW}- 관계없는 줄\n`;
+    writeFileSync(f.target, resolved);
+    assert.doesNotMatch(f.install('--update'), /충돌/);
+    assert.equal(f.read(), resolved);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
+  }
   // 해결본에 충돌 표시가 남아 있으면 받아들이지 않는다.
   {
     const OLD = '# 설정\n\n- 항목 1\n';
