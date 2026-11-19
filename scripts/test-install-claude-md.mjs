@@ -137,6 +137,11 @@ try {
     assert.match(f.install('--update'), /--update --resolved/);
     assert.equal(f.read(), `${MARKER}\n`);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+    // --resolved로 빈 구역을 정리 결과라고 알리면 새 템플릿으로 다시 채우지 않고 비운 채로 받아들인다.
+    assert.doesNotMatch(f.install('--update', '--resolved'), /채움/);
+    assert.equal(f.read(), `${MARKER}\n`);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD.replace('- 항목 1', '- 항목 1 (템플릿 수정)'));
+    assert.ok(!existsSync(path.join(f.state, 'claude-md-pending.json')));
   }
   // 유효한 JSON이어도 비었거나 해시가 맞지 않는 base는 깨진 기록으로 보고 평소 병합한다(템플릿이 중복되지 않는다).
   {
