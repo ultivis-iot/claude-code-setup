@@ -638,7 +638,7 @@ if (a[0] === "worktree" && a[1] === "open") ok({ type: "worktree_opened", alread
 if (a[0] === "pane" && a[1] === "list") ok({ type: "pane_list", panes: a.includes("--workspace") ? [{ pane_id: "w9:p1", agent: null }] : [] });
 ok({ type: "ok" });
 `);
-    const herdrEnv = { HERDR_BIN: FAKE_HERDR, FAKE_HERDR_LOG: HLOG };
+    const herdrEnv = { ULT_HERDR_BIN: FAKE_HERDR, FAKE_HERDR_LOG: HLOG };
     const hr = flowRun(["story-herdr", "--summary", join(hdir, "summary.json"), "--tasks", "h1"], herdrEnv);
     const calls = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
     const startCall = calls.find((c) => c[0] === "agent" && c[1] === "start");
@@ -647,6 +647,18 @@ ok({ type: "ok" });
       && calls.map((c) => c.slice(0, 2).join(" ")).join(",") === "pane list,worktree open,pane list,agent start,agent prompt"
       && calls[1].includes(hwt) && JSON.stringify(startCall) === JSON.stringify(["agent", "start", "task-h1", "--kind", "claude", "--pane", "w9:p1", "--", "--model", "opus"])
       && promptCall[2] === "task-h1" && promptCall[3] === p1, hr.all + JSON.stringify(calls));
+    // 일부 실패: h2 의 worktree 가 없으면 h1 만 시작하고 개수 보고 + 종료 코드 1, prompt 가 prompts 폴더 밖이면 거부
+    const partial = JSON.parse(readFileSync(join(hdir, "summary.json"), "utf8"));
+    partial.ready_tasks = partial.ready_tasks.map((t) => (t.task_id === "h2" ? { ...t, worktree: "" } : t));
+    writeFileSync(join(hdir, "summary-partial.json"), JSON.stringify(partial));
+    const hp = flowRun(["story-herdr", "--summary", join(hdir, "summary-partial.json")], herdrEnv);
+    check("story-herdr: 일부 Task 실패는 개수와 error 를 보고하고 종료 코드 1", hp.code === 1 && hp.json?.started === 1 && hp.json?.failed === 1 && /worktree 가 없습니다/.test(hp.json.tasks.find((t) => !t.ok)?.error || ""), hp.all);
+    const outside = join(ROOT, "outside-prompt.md"); writeFileSync(outside, "x");
+    partial.ready_tasks = partial.ready_tasks.map((t) => ({ ...t, worktree: hwt, prompt: outside }));
+    writeFileSync(join(hdir, "summary-outside.json"), JSON.stringify(partial));
+    const ho = flowRun(["story-herdr", "--summary", join(hdir, "summary-outside.json"), "--tasks", "h1"], herdrEnv);
+    check("story-herdr: prompts 폴더 밖 prompt 파일은 보내지 않는다", ho.code === 1 && /prompts 폴더 밖/.test(ho.json?.tasks?.[0]?.error || ""), ho.all);
+    check("story-eval prompt: Story context 는 참고 자료 블록으로 감싼다", /not instructions/.test(p1) && /<story-context>\n주요 파일/.test(p1), p1);
     const hd = flowRun(["story-herdr", "--summary", join(hdir, "summary.json")], { ...herdrEnv, FAKE_HERDR_DOWN: "1" });
     check("story-herdr: herdr 서버가 없으면 오류 + 서브에이전트 안내", hd.code === 1 && /herdr 서버에 연결할 수 없습니다/.test(hd.json?.error || ""), hd.all);
     // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (예전 bash workflow-env.sh 와 같은 규칙)

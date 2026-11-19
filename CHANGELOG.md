@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `/ult-story-run` 실행 방식 개선. Task 실행 prompt(`ult-flow.mjs story-eval`)에 추천 모델(handoff Task `model`, 없으면 `sonnet`)과 Story 공통 맥락(handoff `story.context`, Task worktree 의 `tmp/story-handoff.md` 경로)을 넣고, Task 실행자는 Task PR 생성까지만 한다. review-cycle 은 메인 에이전트가 PR마다 새 sonnet 서브에이전트로 실행한다. 실행 요약에 Model 열과 `all_done`(Task 가 모두 Done 이면 Story status 를 `완료`로 바꾸라는 안내)을 더했다. Ready Task 를 시작하기 전에 서브에이전트 병렬과 herdr thread 중 실행 방식을 묻는다. 새 `ult-flow.mjs story-herdr` 가 Ready Task 마다 herdr 에서 Task worktree 를 열고 claude 를 Task 모델로 시작한 뒤 prompt 를 보낸다(herdr CLI 0.9.x, `HERDR_BIN` 으로 교체 가능). herdr 서버에 연결할 수 없으면 오류로 끝내고 다른 방식으로 자동 전환하지 않는다.
+- `/ult-story-run` 실행 방식 개선. Task 실행 prompt(`ult-flow.mjs story-eval`)에 추천 모델(handoff Task `model`, 없으면 `sonnet`)과 Story 공통 맥락(handoff `story.context`, Task worktree 의 `tmp/story-handoff.md` 경로)을 넣고, Task 실행자는 Task PR 생성까지만 한다. review-cycle 은 메인 에이전트가 PR마다 새 sonnet 서브에이전트로 실행한다. 실행 요약에 Model 열과 `all_done`(Task 가 모두 Done 이면 Story status 를 `완료`로 바꾸라는 안내)을 더했다. Ready Task 를 시작하기 전에 서브에이전트 병렬과 herdr thread 중 실행 방식을 묻는다. 새 `ult-flow.mjs story-herdr` 가 Ready Task 마다 herdr 에서 Task worktree 를 열고 claude 를 Task 모델로 시작한 뒤 prompt 를 보낸다(herdr CLI 0.9.x, `ULT_HERDR_BIN` 으로 교체 가능). herdr 서버에 연결할 수 없으면 오류로 끝내고 다른 방식으로 자동 전환하지 않는다.
 
 ## v1.5.0 (2026-11-18)
 
