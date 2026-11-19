@@ -505,9 +505,16 @@ cmds["story-eval"] = ({ opt }) => {
 // 저장소 slug 를 넣고, herdr agent 이름 길이(32)를 넘으면 해시로 줄인다.
 function taskRunId(it) {
   const num = issueNumFromUrl(it.issue_url);
-  const repo = (it.repo || repoFromIssueUrl(it.issue_url) || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
-  const stem = num ? (repo ? `${repo}-${num}` : String(num)) : slug(it.task_id || it.name);
-  const id = ("task-" + stem).toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  const rawRepo = it.repo || repoFromIssueUrl(it.issue_url) || "";
+  if (num && rawRepo) {
+    // A readable repo name plus a hash of the exact owner/repo, so repos that normalize to the
+    // same name (o/Repo.A vs o/repo-a vs o-repo/a) never share a prompt file or herdr agent name.
+    const hash = createHash("sha1").update(`${rawRepo}#${num}`).digest("hex").slice(0, 8);
+    const tail = `-${num}-${hash}`;
+    const name = rawRepo.split("/").pop().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+    return `task-${name.slice(0, Math.max(0, 32 - 5 - tail.length))}${tail}`.replace(/-+/g, "-");
+  }
+  const id = ("task-" + (num || slug(it.task_id || it.name))).toLowerCase().replace(/[^a-z0-9_-]/g, "-");
   if (id.length <= 32) return id;
   return `${id.slice(0, 23)}-${createHash("sha1").update(id).digest("hex").slice(0, 8)}`;
 }

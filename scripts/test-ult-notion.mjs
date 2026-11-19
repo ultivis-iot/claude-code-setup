@@ -684,13 +684,15 @@ ok({ type: "ok" });
     flowRun(["story-eval", "--out-dir", cdir, "--input", JSON.stringify({ source: "handoff", story: { title: "S3" }, tasks: [
       { notion_task_id: "c1", name: "A", status: "시작 전", issue_url: "https://github.com/o/repo-a/issues/12", worktree: hwt },
       { notion_task_id: "c2", name: "B", status: "시작 전", issue_url: "https://github.com/o/repo-b/issues/12", worktree: hwt },
+      { notion_task_id: "c3", name: "C", status: "시작 전", issue_url: "https://github.com/o/Repo.A/issues/12", worktree: hwt },
+      { notion_task_id: "c4", name: "D", status: "시작 전", issue_url: "https://github.com/o-repo/a/issues/12", worktree: hwt },
     ] })]);
     const cs = JSON.parse(readFileSync(join(cdir, "summary.json"), "utf8"));
     const cp = cs.tasks.map((t) => t.prompt);
     writeFileSync(HLOG, "");
     const hc = flowRun(["story-herdr", "--summary", join(cdir, "summary.json")], herdrEnv);
     const cAgents = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((c) => c[0] === "agent" && c[1] === "start").map((c) => c[2]);
-    check("story-herdr: 저장소가 다른 같은 Issue 번호도 prompt 파일과 agent 이름이 겹치지 않는다", cp.length === 2 && cp[0] !== cp[1] && cAgents.length === 2 && cAgents[0] !== cAgents[1] && hc.code === 0, hc.all + JSON.stringify([cp, cAgents]));
+    check("story-herdr: 저장소가 다른 같은 Issue 번호도 prompt 파일과 agent 이름이 겹치지 않는다(이름 정규화가 같아도)", cp.length === 4 && new Set(cp).size === 4 && cAgents.length === 4 && new Set(cAgents).size === 4 && cAgents.every((a) => /^[a-z][a-z0-9_-]{0,31}$/.test(a)) && hc.code === 0, hc.all + JSON.stringify([cp, cAgents]));
     // prompt 가 prompts 폴더 안 심볼릭 링크로 밖 파일을 가리키면 보내지 않는다
     const linkDir = join(ROOT, "story-eval-link"); mkdirSync(join(linkDir, "prompts"), { recursive: true });
     const secret = join(ROOT, "secret.md"); writeFileSync(secret, "secret");
