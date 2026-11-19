@@ -106,6 +106,8 @@ const [OPEN, BASE, SPLIT, CLOSE] = ['<', '|', '=', '>'].map(c => c.repeat(MARKER
 
 function resolveAdditions(text, [ours, base, theirs]) {
   const out = [];
+  // The template's side of each real conflict: a resolution must contain these lines.
+  const required = [];
   let conflicts = 0;
   let hunk;
   for (const line of text.split(/(?<=\n)/)) {
@@ -117,6 +119,7 @@ function resolveAdditions(text, [ours, base, theirs]) {
       if (hunk.base.every(l => !l.trim())) out.push(...hunk.base, ...hunk.theirs, ...hunk.ours);
       else {
         conflicts++;
+        required.push(...hunk.theirs.map(l => l.replace(/\r?\n$/, '')).filter(l => l.trim()));
         out.push(`${OPEN} ${ours}\n`, ...hunk.ours, `${BASE} ${base}\n`, ...hunk.base, `${SPLIT}\n`, ...hunk.theirs, `${CLOSE} ${theirs}\n`);
       }
       hunk = undefined;
@@ -125,7 +128,7 @@ function resolveAdditions(text, [ours, base, theirs]) {
   }
   // An unterminated hunk means a section line looked like a conflict marker; refuse rather than drop lines.
   if (hunk) return { error: '충돌 표시처럼 보이는 줄 때문에 병합 결과를 해석하지 못함' };
-  return { merged: out.join(''), conflicts };
+  return { merged: out.join(''), conflicts, required };
 }
 
 function updateSection(content, index) {
@@ -147,21 +150,24 @@ function updateSection(content, index) {
     saveBase();
     return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
   }
-  // A section that changed since the last conflict was resolved against the pending template.
+  // A section that changed since the last conflict and holds every template-side line of that
+  // conflict was resolved against the pending template. Any other edit is not a resolution.
   const pending = readPending();
-  const resolving = pending && typeof pending.base === 'string' && pending.ours !== section;
+  const lines = new Set(section.split('\n'));
+  const resolving = pending && typeof pending.base === 'string' && pending.ours !== section
+    && Array.isArray(pending.required) && pending.required.every(line => lines.has(line));
   if (resolving && section.split('\n').some(line => [OPEN, BASE, SPLIT, CLOSE].some(marker => line.startsWith(marker)))) {
     return say('⚠ CLAUDE.md에 충돌 표시가 남아 있어 그대로 둠. 표시를 지우고 다시 --update를 실행하세요');
   }
   const base = resolving ? pending.base : existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
   if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (전체 이력이 있는 git clone에서 setup을 실행하세요)');
 
-  const { merged, conflicts, error } = merge(section, lf(base), theirs);
+  const { merged, conflicts, required, error } = merge(section, lf(base), theirs);
   if (error) return say(`⚠ CLAUDE.md 병합 실패, 파일은 그대로 둠: ${error}`);
   if (conflicts) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(conflictPath, head + merged);
-    writeFileSync(pendingPath, JSON.stringify({ base: theirs, ours: section }));
+    writeFileSync(pendingPath, JSON.stringify({ base: theirs, ours: section, required }));
     say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
     say(`  충돌 표시가 든 병합본: ${conflictPath}`);
     return say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);

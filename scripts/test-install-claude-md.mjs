@@ -109,6 +109,21 @@ try {
     assert.match(f.install('--update'), /업데이트 완료/);
     assert.ok(f.read().includes('- 새 규칙 2') && f.read().includes('- 내 항목'), f.read());
   }
+  // 충돌 뒤 정리본을 반영하지 않고 관계없는 줄만 고치면 정리로 보지 않는다(템플릿 변경을 조용히 버리지 않는다).
+  {
+    const OLD = '# 설정\n\n## 긴 절\n- 옛 규칙 1\n- 옛 규칙 2\n';
+    const NEW = '# 설정\n\n## 짧은 절\n- 새 규칙\n';
+    const f = fixture(OLD);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n`);
+    writeFileSync(f.templatePath, NEW);
+    assert.match(f.install('--update'), /충돌/);
+    const unrelated = `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n- 관계없는 새 줄\n`;
+    writeFileSync(f.target, unrelated);
+    assert.match(f.install('--update'), /충돌/);
+    assert.equal(f.read(), unrelated);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+  }
   // 해결본에 충돌 표시가 남아 있으면 받아들이지 않는다.
   {
     const OLD = '# 설정\n\n- 항목 1\n';
