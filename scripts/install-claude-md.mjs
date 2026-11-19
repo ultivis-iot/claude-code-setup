@@ -106,8 +106,10 @@ const [OPEN, BASE, SPLIT, CLOSE] = ['<', '|', '=', '>'].map(c => c.repeat(MARKER
 
 function resolveAdditions(text, [ours, base, theirs]) {
   const out = [];
-  // The template's side of each real conflict: a resolution must contain these lines.
+  // Each real conflict's template-side lines (a resolution must contain them) and its local-side
+  // lines (a resolution changes at least one of those the new template does not have).
   const required = [];
+  const local = [];
   let conflicts = 0;
   let hunk;
   for (const line of text.split(/(?<=\n)/)) {
@@ -119,7 +121,9 @@ function resolveAdditions(text, [ours, base, theirs]) {
       if (hunk.base.every(l => !l.trim())) out.push(...hunk.base, ...hunk.theirs, ...hunk.ours);
       else {
         conflicts++;
-        required.push(...hunk.theirs.map(l => l.replace(/\r?\n$/, '')).filter(l => l.trim()));
+        const bareLines = part => part.map(l => l.replace(/\r?\n$/, '')).filter(l => l.trim());
+        required.push(...bareLines(hunk.theirs));
+        local.push(...bareLines(hunk.ours));
         out.push(`${OPEN} ${ours}\n`, ...hunk.ours, `${BASE} ${base}\n`, ...hunk.base, `${SPLIT}\n`, ...hunk.theirs, `${CLOSE} ${theirs}\n`);
       }
       hunk = undefined;
@@ -128,7 +132,7 @@ function resolveAdditions(text, [ours, base, theirs]) {
   }
   // An unterminated hunk means a section line looked like a conflict marker; refuse rather than drop lines.
   if (hunk) return { error: '충돌 표시처럼 보이는 줄 때문에 병합 결과를 해석하지 못함' };
-  return { merged: out.join(''), conflicts, required };
+  return { merged: out.join(''), conflicts, required, local };
 }
 
 function updateSection(content, index) {
@@ -150,24 +154,29 @@ function updateSection(content, index) {
     saveBase();
     return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
   }
-  // A section that changed since the last conflict and holds every template-side line of that
-  // conflict was resolved against the pending template. Any other edit is not a resolution.
+  // A section resolved against the pending template has changed since the conflict, holds every
+  // template-side line of it and no longer has at least one local-side line the new template lacks
+  // (only one: personal lines may stay). A presence check by line, so an edit elsewhere is not a
+  // resolution and the update conflicts again instead of dropping template changes.
   const pending = readPending();
   const lines = new Set(section.split('\n'));
-  const resolving = pending && typeof pending.base === 'string' && pending.ours !== section
-    && Array.isArray(pending.required) && pending.required.every(line => lines.has(line));
+  const valid = pending && typeof pending.base === 'string' && Array.isArray(pending.required) && Array.isArray(pending.local);
+  const inTemplate = new Set(valid ? pending.base.split('\n') : []);
+  const localOnly = valid ? pending.local.filter(line => !inTemplate.has(line)) : [];
+  const resolving = valid && pending.ours !== section && pending.required.every(line => lines.has(line))
+    && (localOnly.length ? localOnly.some(line => !lines.has(line)) : pending.required.length > 0);
   if (resolving && section.split('\n').some(line => [OPEN, BASE, SPLIT, CLOSE].some(marker => line.startsWith(marker)))) {
     return say('⚠ CLAUDE.md에 충돌 표시가 남아 있어 그대로 둠. 표시를 지우고 다시 --update를 실행하세요');
   }
   const base = resolving ? pending.base : existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
   if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (전체 이력이 있는 git clone에서 setup을 실행하세요)');
 
-  const { merged, conflicts, required, error } = merge(section, lf(base), theirs);
+  const { merged, conflicts, required, local, error } = merge(section, lf(base), theirs);
   if (error) return say(`⚠ CLAUDE.md 병합 실패, 파일은 그대로 둠: ${error}`);
   if (conflicts) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(conflictPath, head + merged);
-    writeFileSync(pendingPath, JSON.stringify({ base: theirs, ours: section, required }));
+    writeFileSync(pendingPath, JSON.stringify({ base: theirs, ours: section, required, local }));
     say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
     say(`  충돌 표시가 든 병합본: ${conflictPath}`);
     return say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);
