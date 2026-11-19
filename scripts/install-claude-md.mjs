@@ -4,6 +4,7 @@
 // template it was installed from (base) and the new template are 3-way merged with
 // `git merge-file`, so lines a person added or changed inside the section survive.
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -40,10 +41,17 @@ function saveBase() {
   rmSync(pendingPath, { force: true });
 }
 
+const sha256 = text => createHash('sha256').update(text).digest('hex');
+const PENDING_VERSION = 1;
+
+// A record is valid only in the shape this version writes and with a base matching its hash;
+// anything else (empty, edited, older shape) is treated as no record at all.
 function readPending() {
   try {
     const pending = JSON.parse(readFileSync(pendingPath, 'utf8'));
-    return pending && typeof pending.base === 'string' ? pending : undefined;
+    const ok = pending && pending.version === PENDING_VERSION && typeof pending.base === 'string'
+      && pending.base.trim() && pending.sha256 === sha256(pending.base);
+    return ok ? pending : undefined;
   } catch { return undefined; }
 }
 
@@ -141,6 +149,13 @@ function updateSection(content, index) {
   const write = text => writeFileSync(target, head + (crlf ? text.replace(/\n/g, '\r\n') : text));
   const theirs = lf(template);
 
+  // A conflict reported earlier stays open until the person says it is settled with --resolved,
+  // even when the section now equals the template or is empty: no path accepts it silently.
+  if (!resolved && existsSync(pendingPath)) {
+    say('⚠ 이전 --update가 알린 CLAUDE.md 충돌이 아직 열려 있어 그대로 둠');
+    say(`  충돌본: ${conflictPath}`);
+    return say(`  정리해서 ${target}에 반영했으면 --update --resolved로 다시 실행하세요`);
+  }
   if (section === theirs) {
     saveBase();
     return say('✓ CLAUDE.md 이미 최신');
@@ -166,7 +181,7 @@ function updateSection(content, index) {
   if (conflicts) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(conflictPath, head + merged);
-    writeFileSync(pendingPath, JSON.stringify({ base: theirs }));
+    writeFileSync(pendingPath, JSON.stringify({ version: PENDING_VERSION, base: theirs, sha256: sha256(theirs) }));
     say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
     say(`  충돌 표시가 든 병합본: ${conflictPath}`);
     return say(`  해결해서 ${target}에 반영한 뒤 --update --resolved로 다시 실행하세요`);
