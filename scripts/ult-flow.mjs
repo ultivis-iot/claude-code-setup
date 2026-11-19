@@ -529,7 +529,11 @@ function startHerdrTask(it, promptDir) {
   if (!start.ok) return { ...res, error: `agent start 실패: ${herdrErr(start)}` };
 
   const prompt = herdr(["agent", "prompt", agent, readFileSync(it.prompt, "utf8")]);
-  if (!prompt.ok) return { ...res, error: `agent prompt 실패: ${herdrErr(prompt)}` };
+  if (!prompt.ok) {
+    // 시작된 agent 가 pane 을 점유한 채 남으면 같은 Task 를 다시 시작할 수 없으므로 pane 을 닫아 복구한다.
+    const close = herdr(["pane", "close", pane.pane_id]);
+    return { ...res, error: `agent prompt 실패: ${herdrErr(prompt)}${close.ok ? " (시작한 pane 을 닫았습니다)" : ` (pane 정리도 실패: ${herdrErr(close)})`}` };
+  }
   return { ...res, ok: true };
 }
 

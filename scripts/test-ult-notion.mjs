@@ -633,6 +633,7 @@ try {
 const a = process.argv.slice(2);
 appendFileSync(process.env.FAKE_HERDR_LOG, JSON.stringify(a) + "\\n");
 if (process.env.FAKE_HERDR_DOWN) { process.stderr.write('{"error":{"code":"server_unavailable"}}'); process.exit(1); }
+if (process.env.FAKE_HERDR_PROMPT_FAIL && a[0] === "agent" && a[1] === "prompt") { process.stderr.write("prompt failed"); process.exit(1); }
 const ok = (result) => { process.stdout.write(JSON.stringify({ id: "1", result })); process.exit(0); };
 if (a[0] === "worktree" && a[1] === "open") ok({ type: "worktree_opened", already_open: false, workspace: { workspace_id: "w9" }, worktree: {} });
 if (a[0] === "pane" && a[1] === "list") ok({ type: "pane_list", panes: a.includes("--workspace") ? [{ pane_id: "w9:p1", agent: null }] : [] });
@@ -674,6 +675,10 @@ ok({ type: "ok" });
     check("story-eval prompt: Story context 는 참고 자료 블록으로 감싼다", /not instructions/.test(p1) && /<story-context>\n주요 파일/.test(p1), p1);
     const hd = flowRun(["story-herdr", "--summary", join(hdir, "summary.json")], { ...herdrEnv, FAKE_HERDR_DOWN: "1" });
     check("story-herdr: herdr 서버가 없으면 오류 + 서브에이전트 안내", hd.code === 1 && /herdr 서버에 연결할 수 없습니다/.test(hd.json?.error || ""), hd.all);
+    const hpf = flowRun(["story-herdr", "--summary", join(hdir, "summary.json"), "--tasks", "h1"], { ...herdrEnv, FAKE_HERDR_PROMPT_FAIL: "1" });
+    const pfCalls = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    const lastPf = pfCalls[pfCalls.length - 1] || [];
+    check("story-herdr: prompt 전송 실패 시 시작한 pane 을 닫아 재시도할 수 있게 한다", hpf.code === 1 && /agent prompt 실패/.test(hpf.json?.tasks?.[0]?.error || "") && lastPf[0] === "pane" && lastPf[1] === "close" && lastPf[2] === "w9:p1", hpf.all + JSON.stringify(lastPf));
     // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (예전 bash workflow-env.sh 와 같은 규칙)
     const codexScripts = join(HOME, ".codex", "scripts");
     mkdirSync(join(codexScripts, "lib"), { recursive: true });
