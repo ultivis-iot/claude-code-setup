@@ -618,13 +618,13 @@ try {
     const hwt = join(ROOT, "wt-herdr"); mkdirSync(hwt, { recursive: true });
     const hdir = join(ROOT, "story-eval-herdr");
     const he = flowRun(["story-eval", "--out-dir", hdir, "--input", JSON.stringify({ source: "handoff", story: { title: "S2", context: "주요 파일: scripts/ult-flow.mjs" }, tasks: [
-      { notion_task_id: "h1", name: "모델 지정 Task", status: "시작 전", issue_url: "", worktree: hwt, model: "opus" },
+      { notion_task_id: "h1", name: "모델 지정 Task", status: "시작 전", issue_url: "", worktree: hwt, model: "opus", effort: "High" },
       { notion_task_id: "h2", name: "기본 모델 Task", status: "시작 전", issue_url: "", worktree: hwt },
     ] })]);
     const hs = JSON.parse(readFileSync(join(hdir, "summary.json"), "utf8"));
     const p1 = readFileSync(join(hdir, "prompts", "task-h1.md"), "utf8");
-    check("story-eval: Task model 을 쓰고 없으면 sonnet", he.code === 0 && hs.tasks[0].model === "opus" && hs.tasks[1].model === "sonnet" && hs.all_done === false && /\| Ready \| 모델 지정 Task \| opus \|/.test(readFileSync(join(hdir, "summary.md"), "utf8")), he.all);
-    check("story-eval prompt: 추천 모델 + Story context + handoff 경로", /Recommended model: opus/.test(p1) && /주요 파일: scripts\/ult-flow\.mjs/.test(p1) && p1.includes(join(hwt, "tmp", "story-handoff.md")), p1);
+    check("story-eval: Task model 을 쓰고 없으면 sonnet", he.code === 0 && hs.tasks[0].model === "opus" && hs.tasks[1].model === "sonnet" && hs.tasks[0].effort === "high" && hs.tasks[1].effort === "" && hs.all_done === false && /\| Ready \| 모델 지정 Task \| opus \| high \|/.test(readFileSync(join(hdir, "summary.md"), "utf8")) && /\| Ready \| 기본 모델 Task \| sonnet \| - \|/.test(readFileSync(join(hdir, "summary.md"), "utf8")), he.all);
+    check("story-eval prompt: 추천 모델·effort + Story context + handoff 경로", /Recommended model: opus/.test(p1) && /Recommended effort: high/.test(p1) && !/Recommended effort/.test(readFileSync(join(hdir, "prompts", "task-h2.md"), "utf8")) && /주요 파일: scripts\/ult-flow\.mjs/.test(p1) && p1.includes(join(hwt, "tmp", "story-handoff.md")), p1);
     check("story-eval prompt: PR 생성 후 종료, review-cycle 은 하지 않는다", /Stop after the Task PR is created\. Do not run review-cycle/.test(p1) && !/Run or request review-cycle/.test(p1), p1);
 
     // story-herdr: 가짜 herdr 로 호출 순서와 인자를 확인한다
@@ -643,9 +643,9 @@ ok({ type: "ok" });
     const calls = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
     const startCall = calls.find((c) => c[0] === "agent" && c[1] === "start");
     const promptCall = calls.find((c) => c[0] === "agent" && c[1] === "prompt");
-    check("story-herdr: worktree open → pane list → agent start(--model) → agent prompt", hr.code === 0 && hr.json?.started === 1 && hr.json.tasks.length === 1
+    check("story-herdr: worktree open → pane list → agent start(--model/--effort) → agent prompt", hr.code === 0 && hr.json?.started === 1 && hr.json.tasks.length === 1
       && calls.map((c) => c.slice(0, 2).join(" ")).join(",") === "pane list,worktree open,pane list,agent start,agent prompt"
-      && calls[1].includes(hwt) && JSON.stringify(startCall) === JSON.stringify(["agent", "start", "task-h1", "--kind", "claude", "--pane", "w9:p1", "--", "--model", "opus"])
+      && calls[1].includes(hwt) && JSON.stringify(startCall) === JSON.stringify(["agent", "start", "task-h1", "--kind", "claude", "--pane", "w9:p1", "--", "--model", "opus", "--effort", "high"])
       && promptCall[2] === "task-h1" && promptCall[3] === p1, hr.all + JSON.stringify(calls));
     // 일부 실패: h2 의 worktree 가 없으면 h1 만 시작하고 개수 보고 + 종료 코드 1, prompt 가 prompts 폴더 밖이면 거부
     const partial = JSON.parse(readFileSync(join(hdir, "summary.json"), "utf8"));
