@@ -2,7 +2,7 @@
 // 저장소의 scripts/ 와 codex/skills/ux-review/scripts/ 를 임시 HOME 의 ~/.claude 로 "설치"한 뒤 그 설치본을 실행한다.
 //   node scripts/test-ult-notion.mjs        (KEEP=1 이면 임시 디렉토리를 남긴다)
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, cpSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, cpSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname, delimiter } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -679,6 +679,27 @@ ok({ type: "ok" });
     const pfCalls = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l));
     const lastPf = pfCalls[pfCalls.length - 1] || [];
     check("story-herdr: prompt 전송 실패 시 시작한 pane 을 닫아 재시도할 수 있게 한다", hpf.code === 1 && /agent prompt 실패/.test(hpf.json?.tasks?.[0]?.error || "") && lastPf[0] === "pane" && lastPf[1] === "close" && lastPf[2] === "w9:p1", hpf.all + JSON.stringify(lastPf));
+    // 서로 다른 저장소의 같은 Issue 번호는 prompt 파일명·agent 이름이 달라야 한다
+    const cdir = join(ROOT, "story-eval-collide");
+    flowRun(["story-eval", "--out-dir", cdir, "--input", JSON.stringify({ source: "handoff", story: { title: "S3" }, tasks: [
+      { notion_task_id: "c1", name: "A", status: "시작 전", issue_url: "https://github.com/o/repo-a/issues/12", worktree: hwt },
+      { notion_task_id: "c2", name: "B", status: "시작 전", issue_url: "https://github.com/o/repo-b/issues/12", worktree: hwt },
+    ] })]);
+    const cs = JSON.parse(readFileSync(join(cdir, "summary.json"), "utf8"));
+    const cp = cs.tasks.map((t) => t.prompt);
+    writeFileSync(HLOG, "");
+    const hc = flowRun(["story-herdr", "--summary", join(cdir, "summary.json")], herdrEnv);
+    const cAgents = readFileSync(HLOG, "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((c) => c[0] === "agent" && c[1] === "start").map((c) => c[2]);
+    check("story-herdr: 저장소가 다른 같은 Issue 번호도 prompt 파일과 agent 이름이 겹치지 않는다", cp.length === 2 && cp[0] !== cp[1] && cAgents.length === 2 && cAgents[0] !== cAgents[1] && hc.code === 0, hc.all + JSON.stringify([cp, cAgents]));
+    // prompt 가 prompts 폴더 안 심볼릭 링크로 밖 파일을 가리키면 보내지 않는다
+    const linkDir = join(ROOT, "story-eval-link"); mkdirSync(join(linkDir, "prompts"), { recursive: true });
+    const secret = join(ROOT, "secret.md"); writeFileSync(secret, "secret");
+    symlinkSync(secret, join(linkDir, "prompts", "task-link.md"));
+    writeFileSync(join(linkDir, "summary.json"), JSON.stringify({ output_dir: linkDir, ready_tasks: [{ task_id: "l1", name: "L", issue_url: "", worktree: hwt, prompt: join(linkDir, "prompts", "task-link.md"), model: "sonnet" }] }));
+    writeFileSync(HLOG, "");
+    const hk = flowRun(["story-herdr", "--summary", join(linkDir, "summary.json")], herdrEnv);
+    const kCalls = readFileSync(HLOG, "utf8");
+    check("story-herdr: 심볼릭 링크로 prompts 폴더 밖을 가리키는 prompt 는 보내지 않는다", hk.code === 1 && /prompts 폴더 밖/.test(hk.json?.tasks?.[0]?.error || "") && !/"agent","prompt"/.test(kCalls), hk.all + kCalls);
     // Codex 설치본(~/.codex/scripts)은 ~/.codex/notion-cache 를 쓴다 (예전 bash workflow-env.sh 와 같은 규칙)
     const codexScripts = join(HOME, ".codex", "scripts");
     mkdirSync(join(codexScripts, "lib"), { recursive: true });

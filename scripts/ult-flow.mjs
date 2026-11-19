@@ -20,6 +20,7 @@
 //
 // 환경: WORKTREE_ROOT (기본 ~/Git). ~/.claude/dev-tools/.env 에 있으면 읽는다. ULT_GH_BIN 으로 gh, ULT_HERDR_BIN 으로 herdr 실행 파일을 바꿀 수 있다(테스트용).
 
+import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, copyFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -478,7 +479,7 @@ cmds["story-eval"] = ({ opt }) => {
   for (const it of items) {
     let ref = it.worktree;
     if (it.state === "Ready") {
-      const pf = join(dir, "prompts", `task-${issueNumFromUrl(it.issue_url) || it.task_id}.md`);
+      const pf = join(dir, "prompts", `${taskRunId(it)}.md`);
       writeFileSync(pf, promptFor(story, it));
       it.prompt = pf;
       ref = ref || `prompt: ${pf}`;
@@ -500,17 +501,28 @@ cmds["story-eval"] = ({ opt }) => {
 // worktree open 은 --cwd 로 원본 저장소(main checkout)를 알려줘야 --path 의 worktree 를 찾는다
 // (--cwd 가 없으면 worktree_not_found, linked worktree 면 linked_worktree_source).
 // ULT_HERDR_BIN 으로 herdr 실행 파일을 바꿀 수 있다(테스트용).
+// Task 실행 ID: prompt 파일명과 herdr agent 이름에 같이 쓴다. 저장소가 다른 같은 Issue 번호가 충돌하지 않도록
+// 저장소 slug 를 넣고, herdr agent 이름 길이(32)를 넘으면 해시로 줄인다.
+function taskRunId(it) {
+  const num = issueNumFromUrl(it.issue_url);
+  const repo = (it.repo || repoFromIssueUrl(it.issue_url) || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  const stem = num ? (repo ? `${repo}-${num}` : String(num)) : slug(it.task_id || it.name);
+  const id = ("task-" + stem).toLowerCase().replace(/[^a-z0-9_-]/g, "-");
+  if (id.length <= 32) return id;
+  return `${id.slice(0, 23)}-${createHash("sha1").update(id).digest("hex").slice(0, 8)}`;
+}
 const herdr = (args) => runBin(process.env.ULT_HERDR_BIN || "herdr", args);
 const herdrJson = (r) => { try { return JSON.parse(r.out); } catch { return null; } };
 const herdrErr = (r) => r.err || r.out || (r.status === null ? "herdr 를 실행할 수 없습니다" : `exit ${r.status}`);
 
 function startHerdrTask(it, promptDir) {
-  const num = issueNumFromUrl(it.issue_url);
-  const agent = ("task-" + (num || slug(it.task_id || it.name))).toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 32);
+  const agent = taskRunId(it);
   const res = { task: it.name, issue_url: it.issue_url, model: taskModel(it.model), effort: taskEffort(it.effort), worktree: it.worktree, agent, ok: false };
   if (!it.worktree) return { ...res, error: "Task worktree 가 없습니다" };
   if (!it.prompt || !existsSync(it.prompt)) return { ...res, error: "Task prompt 파일이 없습니다" };
-  if (dirname(resolve(it.prompt)) !== promptDir) return { ...res, error: `Task prompt 가 실행 요약의 prompts 폴더 밖에 있습니다: ${it.prompt}` };
+  let promptReal = "", promptDirReal = promptDir;
+  try { promptReal = realpathSync(it.prompt); promptDirReal = realpathSync(promptDir); } catch { /* 아래 검사에서 거부 */ }
+  if (!promptReal || dirname(promptReal) !== promptDirReal) return { ...res, error: `Task prompt 가 실행 요약의 prompts 폴더 밖에 있습니다: ${it.prompt}` };
 
   // herdr 는 linked worktree 가 아니라 원본 저장소(main checkout)에서 열어야 한다(linked_worktree_source).
   const common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], it.worktree);
