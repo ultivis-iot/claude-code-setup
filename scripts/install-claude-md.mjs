@@ -10,7 +10,7 @@ import path from 'node:path';
 
 // setup.sh and setup.ps1 repeat this marker in their no-Node fallback; keep them in sync.
 const MARKER = '# === Claude Code 개발 플로우 설정 ===';
-const usage = 'Usage: install-claude-md.mjs <CLAUDE.md> <template> --state <dir> [--repo <dir>] [--update]';
+const usage = 'Usage: install-claude-md.mjs <CLAUDE.md> <template> --state <dir> [--repo <dir>] [--update [--resolved]]';
 
 const argv = process.argv.slice(2);
 const option = name => { const i = argv.indexOf(name); return i === -1 ? undefined : argv[i + 1]; };
@@ -18,6 +18,7 @@ const [target, templatePath] = argv;
 const stateDir = option('--state');
 const repo = option('--repo');
 const update = argv.includes('--update');
+const resolved = argv.includes('--resolved');
 if (!target || !templatePath || target.startsWith('--') || !stateDir) throw new Error(usage);
 
 const basePath = path.join(stateDir, 'claude-md-base.md');
@@ -26,9 +27,9 @@ const say = message => console.log(`   ${message}`);
 const lf = text => text.replace(/\r\n/g, '\n');
 
 const conflictPath = path.join(stateDir, 'CLAUDE.md.conflict');
-// On a conflict, the template the person must resolve against and the section as it was then.
-// The next --update uses that template as base once the section has changed and has no markers,
-// so a resolution that keeps personal lines is accepted instead of conflicting again forever.
+// On a conflict, the template the person must resolve against. The installer never guesses
+// whether the section was resolved: the person says so with --update --resolved, and that run
+// uses this template as base, so the resolution (personal lines included) is kept as it is.
 const pendingPath = path.join(stateDir, 'claude-md-pending.json');
 
 // Record the template now in effect; a leftover conflict copy from an earlier run is stale.
@@ -40,7 +41,10 @@ function saveBase() {
 }
 
 function readPending() {
-  try { return JSON.parse(readFileSync(pendingPath, 'utf8')); } catch { return undefined; }
+  try {
+    const pending = JSON.parse(readFileSync(pendingPath, 'utf8'));
+    return pending && typeof pending.base === 'string' ? pending : undefined;
+  } catch { return undefined; }
 }
 
 function backup(content) {
@@ -106,14 +110,6 @@ const [OPEN, BASE, SPLIT, CLOSE] = ['<', '|', '=', '>'].map(c => c.repeat(MARKER
 
 function resolveAdditions(text, [ours, base, theirs]) {
   const out = [];
-  // Each real conflict's template-side lines (a resolution must contain them) and its local-side
-  // lines (a resolution changes at least one of those the new template does not have).
-  const required = [];
-  const local = [];
-  const hunks = [];
-  // Template-side lines a resolution must add on top of the current section, counted per line
-  // (a line the local side of the same conflict already has needs no addition).
-  const need = {};
   let conflicts = 0;
   let hunk;
   for (const line of text.split(/(?<=\n)/)) {
@@ -125,16 +121,6 @@ function resolveAdditions(text, [ours, base, theirs]) {
       if (hunk.base.every(l => !l.trim())) out.push(...hunk.base, ...hunk.theirs, ...hunk.ours);
       else {
         conflicts++;
-        const bareLines = part => part.map(l => l.replace(/\r?\n$/, '')).filter(l => l.trim());
-        required.push(...bareLines(hunk.theirs));
-        local.push(...bareLines(hunk.ours));
-        hunks.push({ required: bareLines(hunk.theirs), local: bareLines(hunk.ours) });
-        const have = new Map();
-        for (const l of bareLines(hunk.ours)) have.set(l, (have.get(l) ?? 0) + 1);
-        for (const l of bareLines(hunk.theirs)) {
-          if (have.get(l)) have.set(l, have.get(l) - 1);
-          else need[l] = (need[l] ?? 0) + 1;
-        }
         out.push(`${OPEN} ${ours}\n`, ...hunk.ours, `${BASE} ${base}\n`, ...hunk.base, `${SPLIT}\n`, ...hunk.theirs, `${CLOSE} ${theirs}\n`);
       }
       hunk = undefined;
@@ -143,7 +129,7 @@ function resolveAdditions(text, [ours, base, theirs]) {
   }
   // An unterminated hunk means a section line looked like a conflict marker; refuse rather than drop lines.
   if (hunk) return { error: '충돌 표시처럼 보이는 줄 때문에 병합 결과를 해석하지 못함' };
-  return { merged: out.join(''), conflicts, required, local, need, hunks };
+  return { merged: out.join(''), conflicts };
 }
 
 function updateSection(content, index) {
@@ -165,39 +151,25 @@ function updateSection(content, index) {
     saveBase();
     return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
   }
-  // A section resolved against the pending template has changed since the conflict, holds every
-  // template-side line of it and no longer has at least one local-side line the new template lacks
-  // (only one: personal lines may stay). A presence check by line, so an edit elsewhere is not a
-  // resolution and the update conflicts again instead of dropping template changes.
-  const pending = readPending();
-  const lines = new Set(section.split('\n'));
-  const countIn = (text, line) => text.split('\n').filter(l => l === line).length;
-  const valid = pending && typeof pending.base === 'string' && typeof pending.ours === 'string' && Array.isArray(pending.required) && Array.isArray(pending.local)
-    && Array.isArray(pending.hunks) && pending.hunks.length > 0 && pending.need && typeof pending.need === 'object';
-  const inTemplate = new Set(valid ? pending.base.split('\n') : []);
-  // Every conflict must be settled on its own: its template lines present and, when its local side
-  // has lines the new template lacks, at least one of them changed.
-  const settled = hunk => hunk.required.every(line => lines.has(line))
-    && (hunk.local.filter(line => !inTemplate.has(line)).length
-      ? hunk.local.filter(line => !inTemplate.has(line)).some(line => !lines.has(line))
-      : hunk.required.length > 0);
-  const resolving = valid && pending.ours !== section && pending.hunks.every(settled)
-    && Object.entries(pending.need).every(([line, n]) => countIn(section, line) >= countIn(pending.ours, line) + n);
-  if (resolving && section.split('\n').some(line => [OPEN, BASE, SPLIT, CLOSE].some(marker => line.startsWith(marker)))) {
-    return say('⚠ CLAUDE.md에 충돌 표시가 남아 있어 그대로 둠. 표시를 지우고 다시 --update를 실행하세요');
+  // --resolved: the person says the conflict reported last time is settled in the section.
+  // Refuse while markers remain; otherwise merge from the template they resolved against.
+  const pending = resolved ? readPending() : undefined;
+  if (resolved && !pending) say('⚠ --resolved: 정리할 충돌 기록이 없어 평소처럼 병합함');
+  if (pending && section.split('\n').some(line => [OPEN, BASE, SPLIT, CLOSE].some(marker => line.startsWith(marker)))) {
+    return say('⚠ CLAUDE.md에 충돌 표시가 남아 있어 그대로 둠. 표시를 지우고 다시 --update --resolved를 실행하세요');
   }
-  const base = resolving ? pending.base : existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
+  const base = pending ? pending.base : existsSync(basePath) ? readFileSync(basePath, 'utf8') : inferBase(section);
   if (base === undefined) return say('⚠ 이전 템플릿을 찾지 못해 CLAUDE.md 업데이트를 건너뜀 (전체 이력이 있는 git clone에서 setup을 실행하세요)');
 
-  const { merged, conflicts, required, local, need, hunks, error } = merge(section, lf(base), theirs);
+  const { merged, conflicts, error } = merge(section, lf(base), theirs);
   if (error) return say(`⚠ CLAUDE.md 병합 실패, 파일은 그대로 둠: ${error}`);
   if (conflicts) {
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(conflictPath, head + merged);
-    writeFileSync(pendingPath, JSON.stringify({ base: theirs, ours: section, required, local, need, hunks }));
+    writeFileSync(pendingPath, JSON.stringify({ base: theirs }));
     say(`⚠ 직접 고친 줄과 템플릿 변경이 충돌(${conflicts}곳)해 CLAUDE.md는 그대로 둠`);
     say(`  충돌 표시가 든 병합본: ${conflictPath}`);
-    return say(`  해결해서 ${target}에 반영한 뒤 다시 --update를 실행하세요`);
+    return say(`  해결해서 ${target}에 반영한 뒤 --update --resolved로 다시 실행하세요`);
   }
   if (merged === section) {
     saveBase();
