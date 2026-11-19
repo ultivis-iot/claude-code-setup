@@ -143,6 +143,21 @@ try {
     assert.equal(f.read(), resolved);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
   }
+  // 필수 줄이 충돌 구간 밖 다른 절에도 있을 때, 충돌 구간에 새 줄을 반영하지 않고 옛 줄만 지우면 정리로 보지 않는다.
+  {
+    const OLD = '# 설정\n\n## 가\n- 새 규칙\n\n## 나\n- 옛 규칙\n';
+    const NEW = '# 설정\n\n## 가\n- 새 규칙\n\n## 나\n- 옛 규칙 (템플릿 수정)\n- 새 규칙\n';
+    const f = fixture(OLD);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 옛 규칙', '- 옛 규칙 (내 수정)')}`);
+    writeFileSync(f.templatePath, NEW);
+    assert.match(f.install('--update'), /충돌/);
+    const dropped = `${MARKER}\n# 설정\n\n## 가\n- 새 규칙\n\n## 나\n- 내 줄\n`;
+    writeFileSync(f.target, dropped);
+    assert.match(f.install('--update'), /충돌/);
+    assert.equal(f.read(), dropped);
+    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+  }
   // 해결본에 충돌 표시가 남아 있으면 받아들이지 않는다.
   {
     const OLD = '# 설정\n\n- 항목 1\n';
