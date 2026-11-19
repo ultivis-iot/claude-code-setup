@@ -84,23 +84,22 @@ try {
     f.install('--update');
     assert.ok(!existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
   }
-  // 개인 줄을 남긴 채 충돌을 해결하면 다음 --update가 그 결과를 받아들이고 base를 새 템플릿으로 바꾼다.
-  // 해결하지 않고 다시 돌리면 여전히 충돌로 남는다(미해결본을 최신으로 받아들이지 않는다).
+  // 개인 줄을 남긴 채 충돌을 정리하고 --update --resolved로 알리면 그 결과를 그대로 받아들이고 base를 새 템플릿으로 바꾼다.
+  // --resolved 없이 다시 돌리면 정리 여부를 추측하지 않고 여전히 충돌로 둔다.
   {
     const OLD = '# 설정\n\n## 긴 절\n- 옛 규칙 1\n- 옛 규칙 2\n';
     const NEW = '# 설정\n\n## 짧은 절\n- 새 규칙\n';
     const f = fixture(OLD);
     f.install();
-    const personal = `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n`;
-    writeFileSync(f.target, personal);
+    writeFileSync(f.target, `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n`);
     writeFileSync(f.templatePath, NEW);
-    assert.match(f.install('--update'), /충돌/);
-    assert.match(f.install('--update'), /충돌/, '해결하지 않으면 계속 충돌');
-    assert.equal(f.read(), personal);
-    const resolved = `${MARKER}\n${NEW}\n## 개인 절\n- 내 항목\n`;
-    writeFileSync(f.target, resolved);
-    assert.doesNotMatch(f.install('--update'), /충돌/);
-    assert.equal(f.read(), resolved);
+    assert.match(f.install('--update'), /--update --resolved/);
+    const resolvedText = `${MARKER}\n${NEW}\n## 개인 절\n- 내 항목\n`;
+    writeFileSync(f.target, resolvedText);
+    assert.match(f.install('--update'), /충돌/, '--resolved 없이는 추측하지 않는다');
+    assert.equal(f.read(), resolvedText);
+    assert.doesNotMatch(f.install('--update', '--resolved'), /충돌/);
+    assert.equal(f.read(), resolvedText);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
     assert.ok(!existsSync(path.join(f.state, 'CLAUDE.md.conflict')));
     assert.ok(!existsSync(path.join(f.state, 'claude-md-pending.json')));
@@ -109,75 +108,7 @@ try {
     assert.match(f.install('--update'), /업데이트 완료/);
     assert.ok(f.read().includes('- 새 규칙 2') && f.read().includes('- 내 항목'), f.read());
   }
-  // 충돌 뒤 정리본을 반영하지 않고 관계없는 줄만 고치면 정리로 보지 않는다(템플릿 변경을 조용히 버리지 않는다).
-  {
-    const OLD = '# 설정\n\n## 긴 절\n- 옛 규칙 1\n- 옛 규칙 2\n';
-    const NEW = '# 설정\n\n## 짧은 절\n- 새 규칙\n';
-    const f = fixture(OLD);
-    f.install();
-    writeFileSync(f.target, `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n`);
-    writeFileSync(f.templatePath, NEW);
-    assert.match(f.install('--update'), /충돌/);
-    const unrelated = `${MARKER}\n${OLD}## 개인 절\n- 내 항목\n- 관계없는 새 줄\n`;
-    writeFileSync(f.target, unrelated);
-    assert.match(f.install('--update'), /충돌/);
-    assert.equal(f.read(), unrelated);
-    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
-  }
-  // 템플릿이 사용자가 고친 줄을 지운 충돌(템플릿 쪽이 빔): 관계없는 편집은 정리가 아니고, 옛 줄을 지우면 정리다.
-  {
-    const OLD = '# 설정\n\n- 유지\n- 지울 규칙\n- 끝\n';
-    const NEW = '# 설정\n\n- 유지\n- 끝\n';
-    const f = fixture(OLD);
-    f.install();
-    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 지울 규칙', '- 지울 규칙 (내 수정)')}`);
-    writeFileSync(f.templatePath, NEW);
-    assert.match(f.install('--update'), /충돌/);
-    const unrelated = `${MARKER}\n${OLD.replace('- 지울 규칙', '- 지울 규칙 (내 수정)')}- 관계없는 줄\n`;
-    writeFileSync(f.target, unrelated);
-    assert.match(f.install('--update'), /충돌/);
-    assert.equal(f.read(), unrelated);
-    const resolved = `${MARKER}\n${NEW}- 관계없는 줄\n`;
-    writeFileSync(f.target, resolved);
-    assert.doesNotMatch(f.install('--update'), /충돌/);
-    assert.equal(f.read(), resolved);
-    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
-  }
-  // 필수 줄이 충돌 구간 밖 다른 절에도 있을 때, 충돌 구간에 새 줄을 반영하지 않고 옛 줄만 지우면 정리로 보지 않는다.
-  {
-    const OLD = '# 설정\n\n## 가\n- 새 규칙\n\n## 나\n- 옛 규칙\n';
-    const NEW = '# 설정\n\n## 가\n- 새 규칙\n\n## 나\n- 옛 규칙 (템플릿 수정)\n- 새 규칙\n';
-    const f = fixture(OLD);
-    f.install();
-    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 옛 규칙', '- 옛 규칙 (내 수정)')}`);
-    writeFileSync(f.templatePath, NEW);
-    assert.match(f.install('--update'), /충돌/);
-    const dropped = `${MARKER}\n# 설정\n\n## 가\n- 새 규칙\n\n## 나\n- 내 줄\n`;
-    writeFileSync(f.target, dropped);
-    assert.match(f.install('--update'), /충돌/);
-    assert.equal(f.read(), dropped);
-    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
-  }
-  // 충돌이 둘일 때 하나만 정리하면 정리로 보지 않고, 둘 다 정리해야 받아들인다.
-  {
-    const OLD = '# 설정\n\n## 가\n- 가 옛\n\n## 중간\n- 중간 1\n- 중간 2\n- 중간 3\n- 중간 4\n\n## 나\n- 나 옛\n';
-    const NEW = OLD.replace('- 가 옛', '- 가 새').replace('- 나 옛', '- 나 새');
-    const f = fixture(OLD);
-    f.install();
-    writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 가 옛', '- 가 내것').replace('- 나 옛', '- 나 내것')}`);
-    writeFileSync(f.templatePath, NEW);
-    assert.match(f.install('--update'), /충돌\(2곳\)/);
-    const partial = `${MARKER}\n${NEW.replace('- 나 새', '- 나 새\n- 나 내것')}`;
-    writeFileSync(f.target, partial);
-    assert.match(f.install('--update'), /충돌/);
-    assert.equal(f.read(), partial);
-    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
-    const full = `${MARKER}\n${NEW}`;
-    writeFileSync(f.target, full);
-    assert.doesNotMatch(f.install('--update'), /충돌/);
-    assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), NEW);
-  }
-  // 해결본에 충돌 표시가 남아 있으면 받아들이지 않는다.
+  // --resolved여도 충돌 표시가 남아 있으면 받아들이지 않는다.
   {
     const OLD = '# 설정\n\n- 항목 1\n';
     const f = fixture(OLD);
@@ -185,9 +116,23 @@ try {
     writeFileSync(f.target, `${MARKER}\n${OLD.replace('- 항목 1', '- 항목 1 (내 수정)')}`);
     writeFileSync(f.templatePath, OLD.replace('- 항목 1', '- 항목 1 (템플릿 수정)'));
     assert.match(f.install('--update'), /충돌/);
-    writeFileSync(f.target, readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8'));
-    assert.match(f.install('--update'), /충돌 표시/);
+    const withMarkers = readFileSync(path.join(f.state, 'CLAUDE.md.conflict'), 'utf8');
+    writeFileSync(f.target, withMarkers);
+    assert.match(f.install('--update', '--resolved'), /충돌 표시/);
+    assert.equal(f.read(), withMarkers);
     assert.equal(readFileSync(path.join(f.state, 'claude-md-base.md'), 'utf8'), OLD);
+  }
+  // 충돌 기록이 없거나 깨졌으면 --resolved는 평소 병합으로 동작하고 죽지 않는다.
+  {
+    const f = fixture(V1);
+    f.install();
+    writeFileSync(f.target, `${MARKER}\n${V1}- 개인 항목\n`);
+    mkdirSync(f.state, { recursive: true });
+    writeFileSync(path.join(f.state, 'claude-md-pending.json'), '{"base": 3, "hunks": "x"');
+    writeFileSync(f.templatePath, V2);
+    const out = f.install('--update', '--resolved');
+    assert.match(out, /충돌 기록이 없어/);
+    assert.ok(f.read().includes('- 항목 2') && f.read().includes('- 개인 항목'), f.read());
   }
   // base 파일이 없는 기존 설치: git 이력에서 가장 가까운 템플릿을 base로 쓴다.
   {

@@ -1,8 +1,10 @@
 ﻿# Claude Code 개발 플로우 설치 스크립트 (Windows PowerShell)
-# 사용법: .\setup.ps1 [-Update]
+# 사용법: .\setup.ps1 [-Update] [-Resolved]
+#   -Resolved: -Update 가 알린 CLAUDE.md 충돌을 정리했으면 함께 붙여 다시 실행한다
 
 param(
-    [switch]$Update
+    [switch]$Update,
+    [switch]$Resolved
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,6 +94,7 @@ $SourceClaudeMd = Join-Path $ScriptDir "templates\global-claude.md"
 if (Get-Command node -ErrorAction SilentlyContinue) {
     $ClaudeMdArgs = @($ClaudeMdPath, $SourceClaudeMd, "--state", (Join-Path $ClaudeDir ".claude-code-setup"), "--repo", $ScriptDir)
     if ($Update) { $ClaudeMdArgs += "--update" }
+    if ($Update -and $Resolved) { $ClaudeMdArgs += "--resolved" }
     & node (Join-Path $ScriptDir "scripts\install-claude-md.mjs") @ClaudeMdArgs
     if ($LASTEXITCODE -ne 0) { throw "CLAUDE.md 설치 실패" }
 } else {

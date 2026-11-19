@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Claude Code 개발 플로우 설치 스크립트
-# 사용법: ./setup.sh [--update|-u]
+# 사용법: ./setup.sh [--update|-u] [--resolved]
+#   --resolved: --update 가 알린 CLAUDE.md 충돌을 정리했으면 함께 붙여 다시 실행한다
 
 set -e
 
@@ -15,9 +16,13 @@ NC='\033[0m' # No Color
 
 # 옵션 파싱
 UPDATE_MODE=false
-if [ "$1" = "--update" ] || [ "$1" = "-u" ]; then
-    UPDATE_MODE=true
-fi
+RESOLVED=false
+for arg in "$@"; do
+    case "$arg" in
+        --update|-u) UPDATE_MODE=true ;;
+        --resolved) RESOLVED=true ;;
+    esac
+done
 
 # 버전 파일 경로
 VERSION_FILE="$SCRIPT_DIR/VERSION"
@@ -96,6 +101,7 @@ echo "2. CLAUDE.md 설치..."
 if command -v node > /dev/null 2>&1; then
     CLAUDE_MD_ARGS=("$CLAUDE_DIR/CLAUDE.md" "$SCRIPT_DIR/templates/global-claude.md" --state "$CLAUDE_DIR/.claude-code-setup" --repo "$SCRIPT_DIR")
     [ "$UPDATE_MODE" = true ] && CLAUDE_MD_ARGS+=(--update)
+    [ "$UPDATE_MODE" = true ] && [ "$RESOLVED" = true ] && CLAUDE_MD_ARGS+=(--resolved)
     node "$SCRIPT_DIR/scripts/install-claude-md.mjs" "${CLAUDE_MD_ARGS[@]}"
 else
     # Node.js 없이도 첫 설치·추가는 한다. 병합이 필요한 업데이트만 건너뛴다.
