@@ -160,15 +160,16 @@ function updateSection(content, index) {
     saveBase();
     return say('✓ CLAUDE.md 이미 최신');
   }
-  if (!section.trim()) {
+  // --resolved: the person says the conflict reported last time is settled in the section,
+  // even an emptied one, so the empty-section refill below is skipped while a record is in use.
+  const pending = resolved ? readPending() : undefined;
+  if (!section.trim() && !pending) {
     const saved = backup(content);
     write(theirs);
     saveBase();
     return say(`✓ 비어 있던 설정 구역을 새 템플릿으로 채움 (백업: ${saved})`);
   }
-  // --resolved: the person says the conflict reported last time is settled in the section.
   // Refuse while markers remain; otherwise merge from the template they resolved against.
-  const pending = resolved ? readPending() : undefined;
   if (resolved && !pending) say('⚠ --resolved: 정리할 충돌 기록이 없어 평소처럼 병합함');
   if (pending && section.split('\n').some(line => [OPEN, BASE, SPLIT, CLOSE].some(marker => line.startsWith(marker)))) {
     return say('⚠ CLAUDE.md에 충돌 표시가 남아 있어 그대로 둠. 표시를 지우고 다시 --update --resolved를 실행하세요');
